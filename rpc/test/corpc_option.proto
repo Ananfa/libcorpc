@@ -1,0 +1,11 @@
+import "google/protobuf/descriptor.proto";
+
+package corpc;
+
+extend google.protobuf.ServiceOptions {
+    optional uint32 global_service_id = 10000;
+}
+
+extend google.protobuf.MethodOptions {
+    optional bool need_coroutine = 10002;
+}
