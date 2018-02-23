@@ -18,7 +18,6 @@
 #include <mutex>
 #include <thread>
 #include <unistd.h>
-#include <stdio.h>
 
 #include <google/protobuf/service.h>
 #include <google/protobuf/descriptor.h>

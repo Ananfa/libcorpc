@@ -12,7 +12,6 @@
 #include "co_routine.h"
 #include "corpc_inner.h"
 
-#include <stdio.h>
 #include <list>
 
 namespace CoRpc {

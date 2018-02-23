@@ -18,7 +18,6 @@
 #include <string>
 #include <thread>
 #include <google/protobuf/service.h>
-#include <stdio.h>
 
 #define CORPC_MAX_BUFFER_SIZE 0x100000
 

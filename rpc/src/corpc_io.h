@@ -11,4 +11,8 @@
 
 #include <stdio.h>
 
+namespace CoRpc {
+    
+}
+
 #endif /* corpc_io_h */
