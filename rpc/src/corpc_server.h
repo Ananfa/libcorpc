@@ -20,6 +20,7 @@
 #include <google/protobuf/service.h>
 
 #define CORPC_MAX_BUFFER_SIZE 0x100000
+#define CORPC_MAX_REQUEST_SIZE 0x10000
 
 namespace CoRpc {
 

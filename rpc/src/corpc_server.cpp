@@ -259,6 +259,134 @@ namespace CoRpc {
         int fd = connection->getfd();
         printf("INFO: start connectHandleRoutine for fd:%d in thread:%d\n", fd, GetPid());
         
+        std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
+        uint8_t *buf = (uint8_t *)buffs.data();
+        
+        RpcRequestHead reqhead;
+        char *head_buf = (char *)(&reqhead);
+        int headNum = 0;
+        
+        std::string reqdata(CORPC_MAX_REQUEST_SIZE,0);
+        uint8_t *data_buf = (uint8_t *)reqdata.data();
+        int dataNum = 0;
+        
+        while (true) {
+            // 先将数据读到缓存中（尽可能多的读）
+            int ret = read(fd, buf, CORPC_MAX_BUFFER_SIZE);
+            
+            if (ret <= 0) {
+                // ret 0 mean disconnected
+                if (ret < 0 && errno == EAGAIN) {
+                    continue;
+                }
+                
+                // 出错处理
+                printf("ERROR: Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+                       fd, ret, errno, strerror(errno));
+                
+                goto CLOSE_CONNECTION;
+            }
+            
+            // 解析数据
+            int offset = 0;
+            while (ret > offset) {
+                // 先解析头部
+                if (headNum < sizeof(RpcRequestHead)) {
+                    int needNum = sizeof(RpcRequestHead) - headNum;
+                    if (ret - offset > needNum) {
+                        memcpy(head_buf + headNum, buf + offset, needNum);
+                        headNum = sizeof(RpcRequestHead);
+                        
+                        offset += needNum;
+                    } else {
+                        memcpy(head_buf + headNum, buf + offset, ret - offset);
+                        headNum += ret - offset;
+                        
+                        break;
+                    }
+                }
+                
+                if (reqhead.size > CORPC_MAX_REQUEST_SIZE) { // 数据超长
+                    printf("ERROR: Receiver::connectionRoutine -- request too large for fd:%d in thread:%d\n", fd, GetPid());
+                    
+                    goto CLOSE_CONNECTION;
+                }
+                
+                // 从缓存中解析数据
+                if (dataNum < reqhead.size) {
+                    int needNum = reqhead.size - dataNum;
+                    if (ret - offset >= needNum) {
+                        memcpy(data_buf + dataNum, buf + offset, needNum);
+                        dataNum = reqhead.size;
+                        
+                        offset += needNum;
+                    } else {
+                        memcpy(data_buf + dataNum, buf + offset, ret - offset);
+                        dataNum += ret - offset;
+                        
+                        break;
+                    }
+                }
+                
+                // 生成ServerRpcTask
+                // 根据serverId和methodId查表
+                const MethodData *methodData = server->getMethod(reqhead.serviceId, reqhead.methodId);
+                if (methodData != NULL) {
+                    google::protobuf::Message *request = methodData->_request_proto->New();
+                    google::protobuf::Message *response = methodData->_response_proto->New();
+                    Controller *controller = new Controller();
+                    if (!request->ParseFromArray(data_buf, reqhead.size)) {
+                        // 出错处理
+                        printf("ERROR: Receiver::connectionRoutine -- parse request body fail\n");
+                        
+                        goto CLOSE_CONNECTION;
+                    }
+                    
+                    // 将收到的请求传给worker
+                    WorkerTask *task = new WorkerTask;
+                    task->connection = connection;
+                    task->rpcTask = new RpcTask;
+                    task->rpcTask->service = server->getService(reqhead.serviceId);
+                    task->rpcTask->method_descriptor = methodData->_method_descriptor;
+                    task->rpcTask->request = request;
+                    task->rpcTask->response = response;
+                    task->rpcTask->controller = controller;
+                    task->rpcTask->callId = reqhead.callId;
+                    
+                    // 传给worker
+                    worker->postRpcTask(task);
+                } else {
+                    // 出错处理
+                    printf("ERROR: Receiver::connectHandleRoutine -- can't find method object of serviceId: %u methodId: %u\n", reqhead.serviceId, reqhead.methodId);
+                    
+                    goto CLOSE_CONNECTION;
+                }
+                
+                // 处理完一个请求消息，复位状态
+                headNum = 0;
+                dataNum = 0;
+            }
+            
+        }
+        
+    CLOSE_CONNECTION:
+        connection->_sender->removeConnection(connection); // 通知sender关闭connection
+        shutdown(fd, SHUT_WR);  // 让sender中的fd相关协程退出
+        
+        // 等待写关闭
+        while (!connection->_canClose) {
+            // sleep 100 milisecond
+            struct pollfd pf = { 0 };
+            pf.fd = -1;
+            poll( &pf,1,100);
+        }
+        
+        close(fd);
+        printf("INFO: end connectHandleRoutine for fd:%d in thread:%d\n", fd, GetPid());
+        
+        return NULL;
+        
+/*
         // 接收rpc请求数据
         int ret = 0;
         
@@ -364,6 +492,7 @@ CLOSE_CONNECTION:
         printf("INFO: end connectHandleRoutine for fd:%d in thread:%d\n", fd, GetPid());
         
         return NULL;
+ */
     }
     
     void Server::MultiThreadReceiver::threadEntry(ThreadData *tdata) {
