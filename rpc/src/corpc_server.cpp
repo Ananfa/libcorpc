@@ -28,8 +28,7 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    Server::Connection::Connection(int fd, Receiver* receiver, Sender* sender): _fd(fd), _receiver(receiver), _sender(sender), _routineHang(false), _routine(NULL), _buffs(CORPC_MAX_BUFFER_SIZE,0), _startIndex(0), _endIndex(0), _isClosing(false), _canClose(false) {
-        _buf = (uint8_t *)_buffs.data();
+    Server::Connection::Connection(int fd, Receiver* receiver, Sender* sender): _fd(fd), _receiver(receiver), _sender(sender), _routineHang(false), _routine(NULL), _isClosing(false), _canClose(false) {
     }
     
     Server::Connection::~Connection() {
@@ -50,9 +49,6 @@ namespace CoRpc {
         
         Receiver *receiver = self->_server->getReceiver();
         Sender *sender = self->_server->getSender();
-        
-        // 初始化receiver的pipe writefd
-        receiver->initForAcceptor();
         
         int listen_fd = self->_listen_fd;
         // 侦听连接，并把接受的连接传给连接处理对象
@@ -377,12 +373,6 @@ CLOSE_CONNECTION:
         RoutineEnvironment::runEventLoop();
     }
     
-    void Server::MultiThreadReceiver::initForAcceptor() {
-        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
-            co_register_fd(it->_queueContext._queue.getWriteFd());
-        }
-    }
-    
     bool Server::MultiThreadReceiver::start() {
         // 启动线程
         for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
@@ -402,10 +392,6 @@ CLOSE_CONNECTION:
         recvTask->connection = connection;
         
         _threadDatas[_lastThreadIndex]._queueContext._queue.push(recvTask);
-    }
-    
-    void Server::CoroutineReceiver::initForAcceptor() {
-        co_register_fd(_queueContext._queue.getWriteFd());
     }
     
     bool Server::CoroutineReceiver::start() {
@@ -534,6 +520,11 @@ CLOSE_CONNECTION:
         connection->_routine = co_self();
         connection->_routineHang = false;
         
+        std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
+        uint8_t *buf = (uint8_t *)buffs.data();
+        uint32_t startIndex = 0;
+        uint32_t endIndex = 0;
+        
         // 若无数据可以发送则挂起，否则整理发送数据并发送
         while (true) {
             if (connection->_isClosing) {
@@ -547,7 +538,7 @@ CLOSE_CONNECTION:
                     msgSize = rpcTask->response->ByteSize();
                 }
                 
-                if (msgSize + sizeof(RpcResponseHead) >= CORPC_MAX_BUFFER_SIZE - connection->_endIndex) {
+                if (msgSize + sizeof(RpcResponseHead) >= CORPC_MAX_BUFFER_SIZE - endIndex) {
                     break;
                 }
                 
@@ -556,11 +547,11 @@ CLOSE_CONNECTION:
                 resphead.callId = rpcTask->callId;
                 resphead.size = msgSize;
                 
-                memcpy(connection->_buf + connection->_endIndex, &resphead, sizeof(RpcResponseHead));
-                connection->_endIndex += sizeof(RpcResponseHead);
+                memcpy(buf + endIndex, &resphead, sizeof(RpcResponseHead));
+                endIndex += sizeof(RpcResponseHead);
                 
-                rpcTask->response->SerializeWithCachedSizesToArray(connection->_buf + connection->_endIndex);
-                connection->_endIndex += msgSize;
+                rpcTask->response->SerializeWithCachedSizesToArray(buf + endIndex);
+                endIndex += msgSize;
                 
                 connection->_respList.pop_front();
                 
@@ -570,9 +561,9 @@ CLOSE_CONNECTION:
                 delete rpcTask;
             }
             
-            int dataSize = connection->_endIndex - connection->_startIndex;
+            int dataSize = endIndex - startIndex;
             if (dataSize == 0) {
-                assert(connection->_startIndex == 0);
+                assert(startIndex == 0);
                 
                 // 挂起
                 connection->_routineHang = true;
@@ -583,7 +574,7 @@ CLOSE_CONNECTION:
             }
             
             // 发数据
-            int ret = write(connection->_fd, connection->_buf + connection->_startIndex, dataSize);
+            int ret = write(connection->_fd, buf + startIndex, dataSize);
             if (ret < 0) {
                 printf("ERROR: Server::Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));
@@ -591,9 +582,9 @@ CLOSE_CONNECTION:
                 break;
             }
             
-            connection->_startIndex += ret;
-            if (connection->_startIndex == connection->_endIndex) {
-                connection->_startIndex = connection->_endIndex = 0;
+            startIndex += ret;
+            if (startIndex == endIndex) {
+                startIndex = endIndex = 0;
             }
             
         }

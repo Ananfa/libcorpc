@@ -112,12 +112,6 @@ namespace CoRpc {
             
             std::list<RpcTask*> _respList; // 等待发送的response数据
             
-            // buff相关
-            std::string _buffs;
-            uint8_t *_buf;
-            uint32_t _startIndex;
-            uint32_t _endIndex;
-            
             std::atomic<bool> _isClosing; // 是否正在关闭
             std::atomic<bool> _canClose; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
             
@@ -182,8 +176,6 @@ namespace CoRpc {
             Receiver(Server *server):_server(server) {}
             virtual ~Receiver() = 0;
             
-            virtual void initForAcceptor() = 0;
-            
             virtual bool start() = 0;
             
             virtual void addConnection(std::shared_ptr<Connection> connection) = 0;
@@ -210,8 +202,6 @@ namespace CoRpc {
             MultiThreadReceiver(Server *server, uint16_t threadNum): Receiver(server), _threadNum(threadNum), _threadDatas(threadNum) {}
             virtual ~MultiThreadReceiver() {}
             
-            void initForAcceptor();
-            
             bool start();
             
             void addConnection(std::shared_ptr<Connection> connection);
@@ -229,8 +219,6 @@ namespace CoRpc {
         public:
             CoroutineReceiver(Server *server): Receiver(server) { _queueContext._receiver = this; }
             virtual ~CoroutineReceiver() {}
-            
-            void initForAcceptor();
             
             bool start();
             
