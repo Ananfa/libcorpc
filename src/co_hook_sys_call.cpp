@@ -243,8 +243,16 @@ int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 		return cli;
 	}
 	alloc_by_fd( cli );
+    
+    int flag = g_sys_fcntl_func(fd, F_GETFL, 0 );
+    if (!(flag & O_NONBLOCK))
+    {
+        fcntl( fd, F_SETFL, flag );
+    }
+    
 	return cli;
 }
+
 int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 {
 	HOOK_SYS_FUNC( connect );
@@ -291,6 +299,7 @@ int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 			break;
 		}
 	}
+    
 	if( pf.revents & POLLOUT ) //connect succ
 	{
         // warning: when connect fail also can run to here in mac os
@@ -459,7 +468,6 @@ ssize_t sendto(int socket, const void *message, size_t length,
 	{
 		int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 					+ ( lp->write_timeout.tv_usec / 1000 );
-
 
 		struct pollfd pf = { 0 };
 		pf.fd = socket;

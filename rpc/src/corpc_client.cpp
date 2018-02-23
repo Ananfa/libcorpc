@@ -1,14 +1,13 @@
 //
-//  co_rpc_channel.cpp
+//  co_rpc_client.cpp
 //  rpccli
 //
-//  Created by Xianke Liu on 2017/10/27.
+//  Created by Xianke Liu on 2017/11/1.
 //  Copyright © 2017年 Dena. All rights reserved.
 //
+#include "corpc_routine_env.h"
 
-#include "co_rpc_routine_env.h"
-#include "co_rpc_channel.h"
-#include "co_rpc_client.h"
+#include "corpc_client.h"
 
 #include <errno.h>
 #include <sys/socket.h>
@@ -23,25 +22,26 @@
 
 namespace CoRpc {
     
-    void Connection::start(const stCoRoutineAttr_t *attr) {
+    void Client::Connection::start(const stCoRoutineAttr_t *attr) {
         // 启动连接侦听协程建立与服务器的连接
-        assert(_deamonCo == NULL);
-        _deamonCo = RoutineEnvironment::startCoroutine(workingRoutine, this);
+        assert(_routine == NULL);
+        RoutineEnvironment::startCoroutine(workingRoutine, this);
     }
     
-    void * Connection::workingRoutine( void * arg ) {
+    void * Client::Connection::workingRoutine( void * arg ) {
         co_enable_hook_sys();
         Connection *self = (Connection *)arg;
-        self->_deamonHang = false;
+        self->_routine = co_self();
+        self->_routineHang = false;
         int ret = 0;
         
         while (true) {
             assert(self->_st != CONNECTING);
             if (self->_st == CONNECTED) {
                 if (self->_waitSendTaskCoList.empty() && self->_waitResultCoMap.empty()) {
-                    self->_deamonHang = true;
+                    self->_routineHang = true;
                     co_yield_ct();
-                    self->_deamonHang = false;
+                    self->_routineHang = false;
                 }
                 
                 // FIXME: 若有需要，可以优化发送方式，将待发送的数据集中到一个buff后再发送
@@ -52,7 +52,7 @@ namespace CoRpc {
                 
                 // 先发送所有等待发送的RPC请求
                 while (!self->_waitSendTaskCoList.empty()) {
-                    ClientRpcTask *task = self->_waitSendTaskCoList.front();
+                    RpcTask *task = self->_waitSendTaskCoList.front();
                     
                     // 准备发送的数据包头和包体
                     RpcRequestHead head;
@@ -161,7 +161,7 @@ namespace CoRpc {
                     continue;
                 }
                 
-                ClientRpcTask *task = itor->second;
+                RpcTask *task = itor->second;
                 
                 // 解析包体（RpcResponseData）
                 if (!task->response->ParseFromArray(&buf[0], head.size)) {
@@ -275,7 +275,7 @@ namespace CoRpc {
         return NULL;
     }
     
-    void Connection::handleTaskError() {
+    void Client::Connection::handleTaskError() {
         close(_fd);
         _fd = -1;
         _st = CLOSED;
@@ -292,9 +292,9 @@ namespace CoRpc {
         wakeUpAll(_waitSendTaskCoList, err);
     }
     
-    void Connection::wakeUpAll(WaitTaskList& taskList, int err) {
+    void Client::Connection::wakeUpAll(WaitTaskList& taskList, int err) {
         while (!taskList.empty()) {
-            ClientRpcTask *task = taskList.front();
+            RpcTask *task = taskList.front();
             taskList.pop_front();
             
             if (err) {
@@ -305,10 +305,10 @@ namespace CoRpc {
         }
     }
     
-    void Connection::wakeUpAll(WaitTaskMap& taskMap, int err) {
+    void Client::Connection::wakeUpAll(WaitTaskMap& taskMap, int err) {
         while (!taskMap.empty()) {
             WaitTaskMap::iterator itor = taskMap.begin();
-            ClientRpcTask *task = itor->second;
+            RpcTask *task = itor->second;
             taskMap.erase(itor);
             
             if (err) {
@@ -320,7 +320,7 @@ namespace CoRpc {
     }
     
     
-    Channel::Channel(Client *client, const char* ip, uint32_t port, uint32_t connectNum)
+    Client::Channel::Channel(Client *client, const char* ip, uint32_t port, uint32_t connectNum)
     : _client(client), _ip(ip), _port(port), _conIndex(0) {
         if (connectNum == 0) {
             connectNum = 1;
@@ -334,24 +334,24 @@ namespace CoRpc {
         _client->registerChannel(this);
     }
     
-    Channel::~Channel() {
+    Client::Channel::~Channel() {
         // TODO: 如何优雅的关闭channel？涉及其中connection关闭，而connection中有协程正在执行
         // 一般情况channel是不会被关闭的
     }
     
-    void Channel::start(const stCoRoutineAttr_t *attr) {
+    void Client::Channel::start(const stCoRoutineAttr_t *attr) {
         for (int i = 0; i < _connections.size(); i++) {
             _connections[i]->start(attr);
         }
     }
     
-    Connection *Channel::getNextConnection() {
+    Client::Connection *Client::Channel::getNextConnection() {
         _conIndex = (_conIndex + 1) % _connections.size();
         return _connections[_conIndex];
     }
     
-    void Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
-        ClientRpcTask *task = (ClientRpcTask*)calloc( 1,sizeof(ClientRpcTask) );
+    void Client::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
+        RpcTask *task = (RpcTask*)calloc( 1,sizeof(RpcTask) );
         task->channel = this;
         task->co = co_self();
         task->request = request;
@@ -373,4 +373,167 @@ namespace CoRpc {
         }
     }
     
+    bool Client::registerChannel(Channel *channel) {
+        if (_channelSet.find(channel) != _channelSet.end()) {
+            return false;
+        }
+        
+        _channelSet.insert(std::make_pair(channel, channel));
+        return true;
+    }
+    
+    void Client::start() {
+        RoutineEnvironment::startCoroutine(downQueueRoutine, this);
+        
+        co_register_fd(_upQueue.getWriteFd());
+        
+        _t = std::thread(threadEntry, this);
+    }
+    
+    void Client::threadEntry(Client *self) {
+        RoutineEnvironment *curenv = RoutineEnvironment::getEnv();
+        assert(curenv);
+        
+        // 启动channel deamon协程
+        for (ChannelSet::iterator it = self->_channelSet.begin(); it != self->_channelSet.end(); it++) {
+            it->first->start(curenv->getAttr());
+        }
+        
+        co_register_fd(self->_downQueue.getWriteFd());
+        
+        // 启动上行任务队列处理协程
+        stCoRoutine_t *co = RoutineEnvironment::startCoroutine(upQueueRoutine, self);
+        if (!co) {
+            printf("Error: Client::threadEntry can't start upQueueRoutine at once!\n");
+        }
+        
+        RoutineEnvironment::runEventLoop();
+    }
+    
+    void *Client::upQueueRoutine( void * arg ) {
+        Client *self = (Client *)arg;
+        co_enable_hook_sys();
+        int readFd = self->_upQueue.getReadFd();
+        co_register_fd(readFd);
+        
+        int ret;
+        int hopeNum = 1;
+        while (true) {
+            std::vector<char> buf(hopeNum);
+            int total_read_num = 0;
+            while (total_read_num < hopeNum) {
+                ret = read(readFd, &buf[0] + total_read_num, hopeNum - total_read_num);
+                assert(ret != 0);
+                if (ret < 0) {
+                    if (errno == EAGAIN) {
+                        continue;
+                    }
+                    
+                    // 管道出错
+                    printf("Error: Client::upQueueRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    struct pollfd pf = { 0 };
+                    pf.fd = -1;
+                    poll( &pf,1,10);
+                    
+                    break;
+                }
+                
+                total_read_num += ret;
+            }
+            
+            hopeNum = 0;
+            // 处理任务队列
+            RpcTask *task = self->_upQueue.pop();
+            while (task) {
+                hopeNum++;
+                
+                // 先从channel中获得一connection
+                Connection *conn = ((Channel*)(task->channel))->getNextConnection();
+                
+                if (conn->_st == Connection::CLOSED) {
+                    // 返回服务器断接错误（通过controller）
+                    task->controller->SetFailed("Server not connected");
+                    
+                    // 将任务插入到下行队列中
+                    self->_downQueue.push(task);
+                } else {
+                    conn->_waitSendTaskCoList.push_back(task);
+                    
+                    if (conn->_routineHang) {
+                        co_resume(conn->_routine);
+                    }
+                }
+                
+                task = self->_upQueue.pop();
+            }
+            
+            if (hopeNum == 0) {
+                printf("Warning: Client::upQueueRoutine no task in queue\n");
+                
+                hopeNum = 1;
+            }
+        }
+        
+        return NULL;
+    }
+    
+    void *Client::downQueueRoutine( void * arg ) {
+        Client *self = (Client *)arg;
+        co_enable_hook_sys();
+        int readFd = self->_downQueue.getReadFd();
+        co_register_fd(readFd);
+        
+        int ret;
+        int hopeNum = 1;
+        while (true) {
+            std::vector<char> buf(hopeNum);
+            int total_read_num = 0;
+            while (total_read_num < hopeNum) {
+                ret = read(readFd, &buf[0] + total_read_num, hopeNum - total_read_num);
+                assert(ret != 0);
+                if (ret < 0) {
+                    if (errno == EAGAIN) {
+                        continue;
+                    }
+                    
+                    // 管道出错
+                    printf("Error: Client::downQueueRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    struct pollfd pf = { 0 };
+                    pf.fd = -1;
+                    poll( &pf,1,10);
+                    
+                    break;
+                }
+                
+                total_read_num += ret;
+            }
+            
+            hopeNum = 0;
+            // 处理任务队列
+            RpcTask *task = self->_downQueue.pop();
+            while (task) {
+                hopeNum++;
+                
+                co_resume(task->co);
+                
+                task = self->_downQueue.pop();
+            }
+            
+            if (hopeNum == 0) {
+                printf("Warning: Client::downQueueRoutine no task in queue\n");
+                
+                hopeNum = 1;
+            }
+        }
+        
+        return NULL;
+    }
 }

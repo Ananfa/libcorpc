@@ -118,6 +118,10 @@ static void *rpc_routine( void *arg )
         request->set_text("test1");
         request->set_times(1);
         
+        //printf("before call ByteSize() cache_size is %d\n", request->GetCachedSize());
+        //printf("call ByteSize() result %d\n", request->ByteSize());
+        //printf("after call ByteSize() cache_size is %d\n", request->GetCachedSize());
+        
         testStubs->foo_clt->Foo(controller, request, response, NULL);
         
         if (controller->Failed()) {
@@ -203,7 +207,7 @@ int main(int argc, char *argv[]) {
     start_hook();
     
     Client client;
-    Channel channel(&client, ip, port, 10);
+    Client::Channel channel(&client, ip, port, 10);
     
     
     g_stubs.foo_clt = new FooService::Stub(&channel);

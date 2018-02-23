@@ -6,10 +6,9 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 
-#include "co_rpc_routine_env.h"
-#include "co_rpc_channel.h"
-#include "co_rpc_controller.h"
-#include "co_rpc_server.h"
+#include "corpc_routine_env.h"
+#include "corpc_controller.h"
+#include "corpc_server.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -79,7 +78,7 @@ int main(int argc, char *argv[]) {
     start_hook();
     
     // 注册服务
-    Server *server = new Server(true, 2, 2, ip, port);
+    Server *server = new Server(true, 2, 2, 2, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     

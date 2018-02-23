@@ -35,8 +35,6 @@ namespace CoRpc {
         uint64_t callId;
     };
     
-    class Channel;
-    
     struct PipeType {
         int pipefd[2];
     };
@@ -184,64 +182,6 @@ namespace CoRpc {
         
     private:
         PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
-    };
-    
-    struct ClientRpcTask {
-        Channel *channel;
-        stCoRoutine_t *co;
-        const google::protobuf::Message* request;
-        google::protobuf::Message* response;
-        google::protobuf::RpcController *controller;
-        uint32_t serviceId;
-        uint32_t methodId;
-    };
-    
-    struct ServerRpcTask {
-        google::protobuf::Service *service;
-        const google::protobuf::MethodDescriptor *method_descriptor;
-        const google::protobuf::Message* request;
-        google::protobuf::Message* response;
-        google::protobuf::RpcController *controller;
-        uint64_t callId;
-    };
-    
-#ifdef USE_NO_LOCK_QUEUE
-    typedef Co_MPSC_NoLockQueue<ClientRpcTask*, static_cast<struct ClientRpcTask *>(NULL)> ClientRpcTaskQueue;
-
-    typedef Co_MPSC_NoLockQueue<int, 0> ServerConnectFdQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    
-    typedef MPSC_NoLockQueue<ServerRpcTask*, static_cast<struct ServerRpcTask *>(NULL)> ServerRpcResultQueue; // 用于从worker向rpc收发协程发送rpc处理结果
-#else
-    typedef CoSyncQueue<ClientRpcTask*, static_cast<struct ClientRpcTask *>(NULL)> ClientRpcTaskQueue;
-    
-    typedef CoSyncQueue<int, 0> ServerConnectFdQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    
-    typedef SyncQueue<ServerRpcTask*, static_cast<struct ServerRpcTask *>(NULL)> ServerRpcResultQueue; // 用于从worker向rpc收发协程发送rpc处理结果
-#endif
-    
-    struct ServerWorkerTask {
-        std::shared_ptr<ServerRpcResultQueue> queue; // 处理结果将存入此队列
-        
-        ServerRpcTask *rpcTask;
-    };
-    
-#ifdef USE_NO_LOCK_QUEUE
-    typedef Co_MPSC_NoLockQueue<ServerWorkerTask*, static_cast<struct ServerWorkerTask *>(NULL)> ServerWorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-    //typedef MPSC_NoLockQueue<ServerWorkerTask*, static_cast<struct ServerWorkerTask *>(NULL)> ServerWorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#else
-    typedef CoSyncQueue<ServerWorkerTask*, static_cast<struct ServerWorkerTask *>(NULL)> ServerWorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-    //typedef SyncQueue<ServerWorkerTask*, static_cast<struct ServerWorkerTask *>(NULL)> ServerWorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#endif
-    
-    struct MethodData {
-        const google::protobuf::MethodDescriptor *_method_descriptor;
-        const google::protobuf::Message *_request_proto;
-        const google::protobuf::Message *_response_proto;
-    };
-    
-    struct ServiceData {
-        google::protobuf::Service *rpcService;
-        std::vector<MethodData> methods;
     };
     
     struct DebugContext {

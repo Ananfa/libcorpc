@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D0E8CD21FBAB955009A0BA6 /* co_rpc_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CD01FBAB955009A0BA6 /* co_rpc_client.cpp */; };
-		2D0E8CE71FC40A88009A0BA6 /* co_rpc_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CE51FC40A88009A0BA6 /* co_rpc_server.cpp */; };
-		2D0E8CF01FC6AEB1009A0BA6 /* co_rpc_routine_env.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CEE1FC6AEB1009A0BA6 /* co_rpc_routine_env.cpp */; };
+		2D0E8CD21FBAB955009A0BA6 /* corpc_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CD01FBAB955009A0BA6 /* corpc_client.cpp */; };
+		2D0E8CE71FC40A88009A0BA6 /* corpc_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CE51FC40A88009A0BA6 /* corpc_server.cpp */; };
+		2D0E8CF01FC6AEB1009A0BA6 /* corpc_routine_env.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D0E8CEE1FC6AEB1009A0BA6 /* corpc_routine_env.cpp */; };
 		2D6BC6842016D3730068AF30 /* corpc_option.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D6BC6822016D3730068AF30 /* corpc_option.pb.cc */; };
 		2D6BC689201728F50068AF30 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D6BC686201728F50068AF30 /* foo.pb.cc */; };
 		2D6BC68A201728F50068AF30 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D6BC688201728F50068AF30 /* bar.pb.cc */; };
-		2DC09BF21FAABB9E00B94E05 /* co_rpc_channel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DC09BED1FAABB9E00B94E05 /* co_rpc_channel.cpp */; };
+		2DB2B27F203FAE1F00114392 /* corpc_io.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B27D203FAE1F00114392 /* corpc_io.cpp */; };
 		2DC09BF81FAABBB500B94E05 /* testrpc_svr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DC09BF61FAABBB500B94E05 /* testrpc_svr.cpp */; };
 		2DC09BFB1FAABBC100B94E05 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DC09BFA1FAABBC100B94E05 /* libco.dylib */; };
 /* End PBXBuildFile section */
@@ -31,25 +31,25 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2D0E8CD01FBAB955009A0BA6 /* co_rpc_client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = co_rpc_client.cpp; path = ../src/co_rpc_client.cpp; sourceTree = "<group>"; };
-		2D0E8CD11FBAB955009A0BA6 /* co_rpc_client.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_client.h; path = ../src/co_rpc_client.h; sourceTree = "<group>"; };
-		2D0E8CE51FC40A88009A0BA6 /* co_rpc_server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = co_rpc_server.cpp; path = ../src/co_rpc_server.cpp; sourceTree = "<group>"; };
-		2D0E8CE61FC40A88009A0BA6 /* co_rpc_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_server.h; path = ../src/co_rpc_server.h; sourceTree = "<group>"; };
-		2D0E8CEE1FC6AEB1009A0BA6 /* co_rpc_routine_env.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = co_rpc_routine_env.cpp; path = ../src/co_rpc_routine_env.cpp; sourceTree = "<group>"; };
-		2D0E8CEF1FC6AEB1009A0BA6 /* co_rpc_routine_env.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_routine_env.h; path = ../src/co_rpc_routine_env.h; sourceTree = "<group>"; };
+		2D0E8CD01FBAB955009A0BA6 /* corpc_client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_client.cpp; path = ../src/corpc_client.cpp; sourceTree = "<group>"; };
+		2D0E8CD11FBAB955009A0BA6 /* corpc_client.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_client.h; path = ../src/corpc_client.h; sourceTree = "<group>"; };
+		2D0E8CE51FC40A88009A0BA6 /* corpc_server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_server.cpp; path = ../src/corpc_server.cpp; sourceTree = "<group>"; };
+		2D0E8CE61FC40A88009A0BA6 /* corpc_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_server.h; path = ../src/corpc_server.h; sourceTree = "<group>"; };
+		2D0E8CEE1FC6AEB1009A0BA6 /* corpc_routine_env.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_routine_env.cpp; path = ../src/corpc_routine_env.cpp; sourceTree = "<group>"; };
+		2D0E8CEF1FC6AEB1009A0BA6 /* corpc_routine_env.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_routine_env.h; path = ../src/corpc_routine_env.h; sourceTree = "<group>"; };
 		2D6BC6822016D3730068AF30 /* corpc_option.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_option.pb.cc; path = ../src/corpc_option.pb.cc; sourceTree = "<group>"; };
 		2D6BC6832016D3730068AF30 /* corpc_option.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_option.pb.h; path = ../src/corpc_option.pb.h; sourceTree = "<group>"; };
 		2D6BC685201728F50068AF30 /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = bar.pb.h; path = ../test/bar.pb.h; sourceTree = "<group>"; };
 		2D6BC686201728F50068AF30 /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../test/foo.pb.cc; sourceTree = "<group>"; };
 		2D6BC687201728F50068AF30 /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../test/foo.pb.h; sourceTree = "<group>"; };
 		2D6BC688201728F50068AF30 /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bar.pb.cc; path = ../test/bar.pb.cc; sourceTree = "<group>"; };
+		2DB2B27D203FAE1F00114392 /* corpc_io.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_io.cpp; path = ../src/corpc_io.cpp; sourceTree = "<group>"; };
+		2DB2B27E203FAE1F00114392 /* corpc_io.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = corpc_io.h; path = ../src/corpc_io.h; sourceTree = "<group>"; };
 		2DC09BDC1FAABA8700B94E05 /* rpcsvr */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = rpcsvr; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DC09BED1FAABB9E00B94E05 /* co_rpc_channel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = co_rpc_channel.cpp; path = ../src/co_rpc_channel.cpp; sourceTree = "<group>"; };
-		2DC09BEE1FAABB9E00B94E05 /* co_rpc_channel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_channel.h; path = ../src/co_rpc_channel.h; sourceTree = "<group>"; };
-		2DC09BEF1FAABB9E00B94E05 /* co_rpc_controller.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_controller.h; path = ../src/co_rpc_controller.h; sourceTree = "<group>"; };
+		2DC09BEF1FAABB9E00B94E05 /* corpc_controller.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_controller.h; path = ../src/corpc_controller.h; sourceTree = "<group>"; };
 		2DC09BF61FAABBB500B94E05 /* testrpc_svr.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = testrpc_svr.cpp; path = ../test/testrpc_svr.cpp; sourceTree = "<group>"; };
 		2DC09BFA1FAABBC100B94E05 /* libco.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libco.dylib; path = ../../DerivedData/libco_mac/Build/Products/Debug/libco.dylib; sourceTree = "<group>"; };
-		2DC09C131FB2FBCB00B94E05 /* co_rpc_inner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = co_rpc_inner.h; path = ../src/co_rpc_inner.h; sourceTree = "<group>"; };
+		2DC09C131FB2FBCB00B94E05 /* corpc_inner.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_inner.h; path = ../src/corpc_inner.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,16 +87,16 @@
 			children = (
 				2D6BC6822016D3730068AF30 /* corpc_option.pb.cc */,
 				2D6BC6832016D3730068AF30 /* corpc_option.pb.h */,
-				2D0E8CEE1FC6AEB1009A0BA6 /* co_rpc_routine_env.cpp */,
-				2D0E8CEF1FC6AEB1009A0BA6 /* co_rpc_routine_env.h */,
-				2D0E8CD01FBAB955009A0BA6 /* co_rpc_client.cpp */,
-				2D0E8CD11FBAB955009A0BA6 /* co_rpc_client.h */,
-				2DC09BED1FAABB9E00B94E05 /* co_rpc_channel.cpp */,
-				2DC09BEE1FAABB9E00B94E05 /* co_rpc_channel.h */,
-				2DC09BEF1FAABB9E00B94E05 /* co_rpc_controller.h */,
-				2DC09C131FB2FBCB00B94E05 /* co_rpc_inner.h */,
-				2D0E8CE51FC40A88009A0BA6 /* co_rpc_server.cpp */,
-				2D0E8CE61FC40A88009A0BA6 /* co_rpc_server.h */,
+				2D0E8CEE1FC6AEB1009A0BA6 /* corpc_routine_env.cpp */,
+				2D0E8CEF1FC6AEB1009A0BA6 /* corpc_routine_env.h */,
+				2DC09BEF1FAABB9E00B94E05 /* corpc_controller.h */,
+				2DC09C131FB2FBCB00B94E05 /* corpc_inner.h */,
+				2DB2B27D203FAE1F00114392 /* corpc_io.cpp */,
+				2DB2B27E203FAE1F00114392 /* corpc_io.h */,
+				2D0E8CD01FBAB955009A0BA6 /* corpc_client.cpp */,
+				2D0E8CD11FBAB955009A0BA6 /* corpc_client.h */,
+				2D0E8CE51FC40A88009A0BA6 /* corpc_server.cpp */,
+				2D0E8CE61FC40A88009A0BA6 /* corpc_server.h */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -178,13 +178,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DC09BF21FAABB9E00B94E05 /* co_rpc_channel.cpp in Sources */,
-				2D0E8CE71FC40A88009A0BA6 /* co_rpc_server.cpp in Sources */,
+				2D0E8CE71FC40A88009A0BA6 /* corpc_server.cpp in Sources */,
 				2D6BC68A201728F50068AF30 /* bar.pb.cc in Sources */,
 				2D6BC689201728F50068AF30 /* foo.pb.cc in Sources */,
-				2D0E8CD21FBAB955009A0BA6 /* co_rpc_client.cpp in Sources */,
+				2DB2B27F203FAE1F00114392 /* corpc_io.cpp in Sources */,
+				2D0E8CD21FBAB955009A0BA6 /* corpc_client.cpp in Sources */,
 				2D6BC6842016D3730068AF30 /* corpc_option.pb.cc in Sources */,
-				2D0E8CF01FC6AEB1009A0BA6 /* co_rpc_routine_env.cpp in Sources */,
+				2D0E8CF01FC6AEB1009A0BA6 /* corpc_routine_env.cpp in Sources */,
 				2DC09BF81FAABBB500B94E05 /* testrpc_svr.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
