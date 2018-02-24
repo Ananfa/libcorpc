@@ -78,11 +78,12 @@ int main(int argc, char *argv[]) {
     start_hook();
     
     // 注册服务
-    Server *server = new Server(true, 2, 2, 2, ip, port);
+    IO *io = new IO(2,2);
+    Server *server = new Server(io, true, 2, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     
-    if (server->start()) {
+    if (io->start() && server->start()) {
         RoutineEnvironment::runEventLoop();
     }
 }

@@ -462,4 +462,8 @@ namespace CoRpc {
         return true;
     }
 
+    void IO::addConnection(std::shared_ptr<Connection> connection) {
+        _receiver->addConnection(connection);
+        _sender->addConnection(connection);
+    }
 }

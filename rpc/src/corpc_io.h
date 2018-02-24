@@ -24,7 +24,7 @@ namespace CoRpc {
         class Sender;
         
     public:
-        class Connection {
+        class Connection: public std::enable_shared_from_this<Connection> {
         public:
             Connection(int fd, IO* io);
             virtual ~Connection() = 0;
@@ -122,9 +122,9 @@ namespace CoRpc {
             MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _threadDatas(threadNum) {}
             virtual ~MultiThreadReceiver() {}
             
-            bool start();
+            virtual bool start();
             
-            void addConnection(std::shared_ptr<Connection> connection);
+            virtual void addConnection(std::shared_ptr<Connection> connection);
             
         protected:
             static void threadEntry( ThreadData *tdata );
@@ -140,9 +140,9 @@ namespace CoRpc {
             CoroutineReceiver(IO *io): Receiver(io) { _queueContext._receiver = this; }
             virtual ~CoroutineReceiver() {}
             
-            bool start();
+            virtual bool start();
             
-            void addConnection(std::shared_ptr<Connection> connection);
+            virtual void addConnection(std::shared_ptr<Connection> connection);
             
         private:
             QueueContext _queueContext;
@@ -188,11 +188,11 @@ namespace CoRpc {
             MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _threadDatas(threadNum) {}
             virtual ~MultiThreadSender() {}
             
-            bool start();
+            virtual bool start();
             
-            void addConnection(std::shared_ptr<Connection> connection);
-            void removeConnection(std::shared_ptr<Connection> connection);
-            void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
+            virtual void addConnection(std::shared_ptr<Connection> connection);
+            virtual void removeConnection(std::shared_ptr<Connection> connection);
+            virtual void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
         private:
             static void threadEntry( ThreadData *tdata );
             
@@ -207,11 +207,11 @@ namespace CoRpc {
             CoroutineSender(IO *io): Sender(io) { _queueContext._sender = this; }
             virtual ~CoroutineSender() {}
             
-            bool start();
+            virtual bool start();
             
-            void addConnection(std::shared_ptr<Connection> connection);
-            void removeConnection(std::shared_ptr<Connection> connection);
-            void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
+            virtual void addConnection(std::shared_ptr<Connection> connection);
+            virtual void removeConnection(std::shared_ptr<Connection> connection);
+            virtual void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
         private:
             QueueContext _queueContext;
         };
@@ -227,6 +227,7 @@ namespace CoRpc {
         Receiver *getReceiver() { return _receiver; }
         Sender *getSender() { return _sender; }
         
+        void addConnection(std::shared_ptr<Connection> connection);
     private:
         ~IO();  // 不允许在栈上创建IO
         
