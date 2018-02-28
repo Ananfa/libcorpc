@@ -222,10 +222,4 @@ int main(int argc, char *argv[]) {
     printf("running...\n");
     
     RoutineEnvironment::runEventLoop(100);
-    
-    delete g_stubs.foo_clt;
-    delete g_stubs.bar_clt;
-    delete channel;
-    client->destroy();
-    io->destroy();
 }
