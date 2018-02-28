@@ -206,19 +206,26 @@ int main(int argc, char *argv[]) {
     
     start_hook();
     
-    Client client;
-    Client::Channel channel(&client, ip, port, 10);
+    IO *io = new IO(1,1);
+    Client *client = new Client(io);
+    Client::Channel *channel = new Client::Channel(client, ip, port, 10);
     
     
-    g_stubs.foo_clt = new FooService::Stub(&channel);
-    g_stubs.bar_clt = new BarService::Stub(&channel);
+    g_stubs.foo_clt = new FooService::Stub(channel);
+    g_stubs.bar_clt = new BarService::Stub(channel);
     
-    client.start();
+    io->start();
+    client->start();
     
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
+    
+    printf("running...\n");
     
     RoutineEnvironment::runEventLoop(100);
     
     delete g_stubs.foo_clt;
     delete g_stubs.bar_clt;
+    delete channel;
+    client->destroy();
+    io->destroy();
 }

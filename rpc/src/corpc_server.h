@@ -18,7 +18,6 @@
 #include <thread>
 #include <google/protobuf/service.h>
 
-#define CORPC_MAX_BUFFER_SIZE 0x100000
 #define CORPC_MAX_REQUEST_SIZE 0x10000
 
 namespace CoRpc {
@@ -33,6 +32,7 @@ namespace CoRpc {
             virtual bool parseData(uint8_t *buf, int size);
             virtual int buildData(uint8_t *buf, int space);
             
+            virtual void onClose() {}
         private:
             Server *_server;
             
@@ -61,6 +61,19 @@ namespace CoRpc {
             uint64_t callId;
         };
         
+        struct WorkerTask {
+            std::shared_ptr<IO::Connection> connection;
+            std::shared_ptr<RpcTask> rpcTask;
+        };
+        
+#ifdef USE_NO_LOCK_QUEUE
+        typedef Co_MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
+        //typedef MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
+#else
+        typedef CoSyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
+        //typedef SyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
+#endif
+        
         struct MethodData {
             const google::protobuf::MethodDescriptor *_method_descriptor;
             const google::protobuf::Message *_request_proto;
@@ -72,24 +85,6 @@ namespace CoRpc {
             std::vector<MethodData> methods;
         };
         
-#ifdef USE_NO_LOCK_QUEUE
-        struct WorkerTask {
-            std::shared_ptr<IO::Connection> connection;
-            std::shared_ptr<RpcTask> rpcTask;
-        };
-        
-        typedef Co_MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#else
-        struct WorkerTask {
-            std::shared_ptr<IO::Connection> connection;
-            std::shared_ptr<RpcTask> rpcTask;
-        };
-        
-        typedef CoSyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef SyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#endif
-         
         class Acceptor {
         public:
             Acceptor(Server *server): _server(server), _listen_fd(-1) {}
@@ -210,11 +205,7 @@ namespace CoRpc {
         
         bool start();
         
-        void destroy(); // 销毁Server
-        
-        IO *getIO() { return _io; }
-        Acceptor *getAcceptor() { return _acceptor; }
-        Worker *getWorker() { return _worker; }
+        void destroy() { delete this; } // 销毁Server
         
         const std::string &getIP() { return _ip; }
         uint16_t getPort() { return _port; }

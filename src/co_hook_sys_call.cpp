@@ -755,6 +755,14 @@ int co_set_timeout(int fd, int read_timeout_ms, int write_timeout_ms)
     return 0;
 }
 
+int co_set_nonblock(int fd)
+{
+    int iFlags = g_sys_fcntl_func(fd, F_GETFL, 0);
+    iFlags |= O_NONBLOCK;
+    iFlags |= O_NDELAY;
+    return fcntl(fd, F_SETFL, iFlags);
+}
+
 /*
 int co_pipe( int pfd[2] )
 {

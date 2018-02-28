@@ -28,7 +28,7 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    Server::Connection::Connection(int fd, Server* server): IO::Connection(fd, server->getIO()), _server(server), _reqdata(CORPC_MAX_REQUEST_SIZE,0), _headNum(0), _dataNum(0) {
+    Server::Connection::Connection(int fd, Server* server): IO::Connection(fd, server->_io), _server(server), _reqdata(CORPC_MAX_REQUEST_SIZE,0), _headNum(0), _dataNum(0) {
         _head_buf = (char *)(&_reqhead);
         _data_buf = (uint8_t *)_reqdata.data();
     }
@@ -105,7 +105,7 @@ namespace CoRpc {
                 task->rpcTask->callId = _reqhead.callId;
                 
                 // 传给worker
-                _server->getWorker()->postRpcTask(task);
+                _server->_worker->postRpcTask(task);
             } else {
                 // 出错处理
                 printf("ERROR: Server::Connection::parseData -- can't find method object of serviceId: %u methodId: %u\n", _reqhead.serviceId, _reqhead.methodId);
@@ -165,7 +165,7 @@ namespace CoRpc {
         Acceptor *self = (Acceptor *)arg;
         co_enable_hook_sys();
         
-        IO *io = self->_server->getIO();
+        IO *io = self->_server->_io;
         
         int listen_fd = self->_listen_fd;
         // 侦听连接，并把接受的连接传给连接处理对象
@@ -297,7 +297,7 @@ namespace CoRpc {
         
         WorkerTaskQueue& tqueue = context->_queue;
         Worker *self = context->_worker;
-        IO *io = self->_server->getIO();
+        IO *io = self->_server->_io;
         
         // 初始化pipe readfd
         co_enable_hook_sys();
@@ -306,41 +306,30 @@ namespace CoRpc {
         co_set_timeout(readFd, -1, 1000);
         
         int ret;
-        int hopeNum = 1;
+        std::vector<char> buf(1024);
         while (true) {
-            std::vector<char> buf(hopeNum);
-            int total_read_num = 0;
-            while (total_read_num < hopeNum) {
-                ret = read(readFd, &buf[0] + total_read_num, hopeNum - total_read_num);
-                
-                assert(ret != 0);
-                if (ret < 0) {
-                    if (errno == EAGAIN) {
-                        continue;
-                    }
-                    
+            // 等待处理信号
+            ret = read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
                     // 管道出错
                     printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
-                    // FIXME: 如何处理？退出协程？
-                    // sleep 100 milisecond
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
                     struct pollfd pf = { 0 };
                     pf.fd = -1;
-                    poll( &pf,1,100);
-                    
-                    break;
+                    poll( &pf,1,10);
                 }
-                
-                total_read_num += ret;
             }
             
-            hopeNum = 0;
             // 处理任务队列
             WorkerTask *task = tqueue.pop();
             while (task) {
-                hopeNum++;
-                
                 bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
                 
                 if (needCoroutine) {
@@ -357,12 +346,6 @@ namespace CoRpc {
                 }
                 
                 task = tqueue.pop();
-            }
-            
-            if (hopeNum == 0) {
-                printf("WARN: Worker::taskHandleRoutine no task in queue\n");
-            
-                hopeNum = 1;
             }
         }
         
@@ -418,7 +401,7 @@ namespace CoRpc {
         task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
         
         // 处理结果发回给receiver处理
-        task->connection->getIO()->getSender()->send(task->connection, task->rpcTask);
+        task->connection->send(task->rpcTask);
         
         delete task;
         

@@ -25,6 +25,8 @@ namespace CoRpc {
         _attr->share_stack = co_alloc_sharestack(SHARE_STACK_COUNT, SHARE_STACK_SIZE);
         
         pipe(_endPipe.pipefd);
+        co_register_fd(_endPipe.pipefd[1]);
+        co_set_nonblock(_endPipe.pipefd[1]);
     }
 
     RoutineEnvironment::~RoutineEnvironment() {
@@ -34,8 +36,6 @@ namespace CoRpc {
     }
     
     RoutineEnvironment *RoutineEnvironment::getEnv() {
-        pid_t pid = GetPid();
-        
         RoutineEnvironment *env = g_routineEnvPerThread[GetPid()];
         if (!env) {
             env = initialize();
@@ -57,8 +57,6 @@ namespace CoRpc {
         stCoRoutine_t *co = NULL;
         co_create( &co, env->_attr, deamonRoutine, env);
         co_resume( co );
-        
-        co_register_fd(env->_endPipe.pipefd[1]);
         
         return env;
     }
@@ -125,21 +123,18 @@ namespace CoRpc {
         
         int pReadFd = curenv->_endPipe.pipefd[0];
         co_register_fd(pReadFd);
+        co_set_timeout(pReadFd, -1, 1000);
         
         int ret;
-        int hopeNum = 1;
+        std::vector<char> buf(1024);
         while (true) {
-            // 等待结束协程出现
-            std::vector<char> buf(hopeNum);
-            int total_read_num = 0;
-            while (total_read_num < hopeNum) {
-                ret = read(pReadFd, &buf[0] + total_read_num, hopeNum - total_read_num);
-                assert(ret != 0);
-                if (ret < 0) {
-                    if (errno == EAGAIN) {
-                        continue;
-                    }
-                    
+            // 等待处理信号
+            ret = read(pReadFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
                     // 管道出错
                     printf("Error: RoutineEnvironment::deamonRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            pReadFd, ret, errno, strerror(errno));
@@ -149,14 +144,8 @@ namespace CoRpc {
                     struct pollfd pf = { 0 };
                     pf.fd = -1;
                     poll( &pf,1,10);
-                    
-                    break;
                 }
-                
-                total_read_num += ret;
             }
-            
-            hopeNum = 0;
             
             // 处理结束协程
             while (!curenv->_endedCoroutines.empty()) {
@@ -165,8 +154,6 @@ namespace CoRpc {
                 
                 curenv->_coCount--;
                 assert(curenv->_coCount >= 0);
-                
-                hopeNum++;
                 
                 co_release(co);
             }
@@ -190,7 +177,7 @@ namespace CoRpc {
     void RoutineEnvironment::addEndedCoroutine( stCoRoutine_t *co ) {
         _endedCoroutines.push_back(co);
         
-        char buf = 'A';
+        char buf = 'L';
         write(_endPipe.pipefd[1], &buf, 1);
     }
 }

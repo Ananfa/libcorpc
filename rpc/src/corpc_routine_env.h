@@ -36,7 +36,7 @@ namespace CoRpc {
         stCoRoutineAttr_t *getAttr() { return _attr; }
         
     private:
-        RoutineEnvironment(/*int maxCoNum, int stackCount, int stackSize*/);
+        RoutineEnvironment();
         ~RoutineEnvironment();
         
         static RoutineEnvironment *initialize(); // 为当前线程创建协程环境
@@ -49,7 +49,6 @@ namespace CoRpc {
         
     private:
         stCoRoutineAttr_t *_attr;
-        //int _maxCoNum;  // 最大协程数量
         int _coCount;   // 协程数量（已启动的任务数量）
         
         std::list<WaitingRoutine*> _waitingRoutines; // 未启动的任务

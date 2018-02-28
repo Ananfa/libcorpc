@@ -99,7 +99,12 @@ namespace CoRpc {
     template <typename T, T defaultValue>
     class Co_MPSC_NoLockQueue: public MPSC_NoLockQueue<T, defaultValue> {
     public:
-        Co_MPSC_NoLockQueue() { pipe(_queuePipe.pipefd); }
+        Co_MPSC_NoLockQueue() {
+            pipe(_queuePipe.pipefd);
+            
+            co_register_fd(_queuePipe.pipefd[1]);
+            co_set_nonblock(_queuePipe.pipefd[1]);
+        }
         ~Co_MPSC_NoLockQueue() {
             close(_queuePipe.pipefd[0]);
             close(_queuePipe.pipefd[1]);
@@ -111,7 +116,7 @@ namespace CoRpc {
         void push(T & v) {
             MPSC_NoLockQueue<T, defaultValue>::push(v);
             
-            char buf = 'A';
+            char buf = 'X';
             write(getWriteFd(), &buf, 1);
         }
         
@@ -163,7 +168,12 @@ namespace CoRpc {
     template <typename T, T defaultValue>
     class CoSyncQueue: public SyncQueue<T, defaultValue> {
     public:
-        CoSyncQueue() { pipe(_queuePipe.pipefd); }
+        CoSyncQueue() {
+            pipe(_queuePipe.pipefd);
+            
+            co_register_fd(_queuePipe.pipefd[1]);
+            co_set_nonblock(_queuePipe.pipefd[1]);
+        }
         ~CoSyncQueue() {
             close(_queuePipe.pipefd[0]);
             close(_queuePipe.pipefd[1]);
@@ -175,7 +185,7 @@ namespace CoRpc {
         void push(T & v) {
             SyncQueue<T, defaultValue>::push(v);
             
-            char buf = 'A';
+            char buf = 'K';
             ssize_t ret = write(getWriteFd(), &buf, 1);
             assert(ret == 1);
         }

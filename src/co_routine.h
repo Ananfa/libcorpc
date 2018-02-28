@@ -97,6 +97,7 @@ void co_log_err( const char *fmt,... );
 int co_accept(int fd, struct sockaddr *addr, socklen_t *len );
 int co_register_fd(int fd);
 int co_set_timeout(int fd, int read_timeout_ms, int write_timeout_ms);
+int co_set_nonblock(int fd);
 
 pid_t GetPid();
 

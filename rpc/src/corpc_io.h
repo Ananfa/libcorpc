@@ -34,6 +34,9 @@ namespace CoRpc {
             
             // 发送数据处理，将要发送的数据写入buf中，返回实际写入的数据量，不能大于space
             virtual int buildData(uint8_t *buf, int space) = 0;
+            
+            // TODO: 加入关闭数据处理
+            virtual void onClose() = 0;
         public:
             int getfd() { return _fd; }
             
@@ -42,7 +45,8 @@ namespace CoRpc {
             int getRecvThreadIndex() { return _recvThreadIndex; }
             void setRecvThreadIndex(int threadIndex) { _recvThreadIndex = threadIndex; }
             
-            IO *getIO() { return _io; }
+            void send(std::shared_ptr<void> data);
+            //IO *getIO() { return _io; }
         protected:
             IO *_io;
             int _fd; // connect fd
@@ -98,7 +102,7 @@ namespace CoRpc {
             
             virtual bool start() = 0;
             
-            virtual void addConnection(std::shared_ptr<Connection> connection) = 0;
+            virtual void addConnection(std::shared_ptr<Connection>& connection) = 0;
             
         protected:
             static void *connectionDispatchRoutine( void * arg );
@@ -124,7 +128,7 @@ namespace CoRpc {
             
             virtual bool start();
             
-            virtual void addConnection(std::shared_ptr<Connection> connection);
+            virtual void addConnection(std::shared_ptr<Connection>& connection);
             
         protected:
             static void threadEntry( ThreadData *tdata );
@@ -142,7 +146,7 @@ namespace CoRpc {
             
             virtual bool start();
             
-            virtual void addConnection(std::shared_ptr<Connection> connection);
+            virtual void addConnection(std::shared_ptr<Connection>& connection);
             
         private:
             QueueContext _queueContext;
@@ -164,9 +168,9 @@ namespace CoRpc {
             
             virtual bool start() = 0;
             
-            virtual void addConnection(std::shared_ptr<Connection> connection) = 0;
-            virtual void removeConnection(std::shared_ptr<Connection> connection) = 0;
-            virtual void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data) = 0;
+            virtual void addConnection(std::shared_ptr<Connection>& connection) = 0;
+            virtual void removeConnection(std::shared_ptr<Connection>& connection) = 0;
+            virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) = 0;
         protected:
             static void *taskQueueRoutine( void * arg );
             static void *connectionRoutine( void * arg );
@@ -190,9 +194,9 @@ namespace CoRpc {
             
             virtual bool start();
             
-            virtual void addConnection(std::shared_ptr<Connection> connection);
-            virtual void removeConnection(std::shared_ptr<Connection> connection);
-            virtual void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
+            virtual void addConnection(std::shared_ptr<Connection>& connection);
+            virtual void removeConnection(std::shared_ptr<Connection>& connection);
+            virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
         private:
             static void threadEntry( ThreadData *tdata );
             
@@ -209,9 +213,9 @@ namespace CoRpc {
             
             virtual bool start();
             
-            virtual void addConnection(std::shared_ptr<Connection> connection);
-            virtual void removeConnection(std::shared_ptr<Connection> connection);
-            virtual void send(std::shared_ptr<Connection> connection, std::shared_ptr<void> data);
+            virtual void addConnection(std::shared_ptr<Connection>& connection);
+            virtual void removeConnection(std::shared_ptr<Connection>& connection);
+            virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
         private:
             QueueContext _queueContext;
         };
@@ -222,14 +226,14 @@ namespace CoRpc {
         
         bool start();
         
-        void destroy(); // 销毁IO
+        void destroy() { delete this; } // 销毁IO
         
         Receiver *getReceiver() { return _receiver; }
         Sender *getSender() { return _sender; }
         
-        void addConnection(std::shared_ptr<Connection> connection);
+        void addConnection(std::shared_ptr<Connection>& connection);
     private:
-        ~IO();  // 不允许在栈上创建IO
+        ~IO() {}  // 不允许在栈上创建IO
         
     private:
         uint16_t _receiveThreadNum;
