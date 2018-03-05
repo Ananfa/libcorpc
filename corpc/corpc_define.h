@@ -6,8 +6,8 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 
-#ifndef co_rpc_inner_h
-#define co_rpc_inner_h
+#ifndef corpc_define_h
+#define corpc_define_h
 
 #include "co_routine.h"
 #include "co_routine_inner.h"
@@ -20,6 +20,10 @@
 #include <unistd.h>
 
 #define USE_NO_LOCK_QUEUE
+
+#define CORPC_MAX_BUFFER_SIZE 0x100000
+#define CORPC_MAX_REQUEST_SIZE 0x10000
+#define CORPC_MAX_RESPONSE_SIZE 0x100000
 
 namespace CoRpc {
     
@@ -37,6 +41,17 @@ namespace CoRpc {
     
     struct PipeType {
         int pipefd[2];
+    };
+    
+    struct MethodData {
+        const google::protobuf::MethodDescriptor *method_descriptor;
+        const google::protobuf::Message *request_proto;
+        const google::protobuf::Message *response_proto;
+    };
+    
+    struct ServiceData {
+        google::protobuf::Service *rpcService;
+        std::vector<MethodData> methods;
     };
     
     // 多生产者单消费者无锁队列实现
@@ -233,4 +248,4 @@ namespace CoRpc {
     };
 }
 
-#endif /* co_rpc_inner_h */
+#endif /* corpc_define_h */

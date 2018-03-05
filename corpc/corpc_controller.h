@@ -6,8 +6,8 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 
-#ifndef co_rpc_controller_h
-#define co_rpc_controller_h
+#ifndef corpc_controller_h
+#define corpc_controller_h
 
 #include <google/protobuf/service.h>
 #include <string>
@@ -46,4 +46,4 @@ namespace CoRpc {
     
 }
 
-#endif /* co_rpc_controller_h */
+#endif /* corpc_controller_h */

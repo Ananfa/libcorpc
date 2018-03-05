@@ -97,7 +97,7 @@ namespace CoRpc {
                 }
                 
                 // 出错处理
-                printf("ERROR: Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+                printf("ERROR: IO::Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
                        fd, ret, errno, strerror(errno));
                 
                 break;
@@ -120,7 +120,7 @@ namespace CoRpc {
         }
         
         close(fd);
-        printf("INFO: end connectHandleRoutine for fd:%d in thread:%d\n", fd, GetPid());
+        printf("INFO: IO::Receiver::connectionRoutine -- end for fd:%d in thread:%d\n", fd, GetPid());
         
         connection->onClose();
         
@@ -197,7 +197,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Server::Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: IO::Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -288,7 +288,7 @@ namespace CoRpc {
             // 发数据
             int ret = write(connection->_fd, buf + startIndex, dataSize);
             if (ret < 0) {
-                printf("ERROR: Server::Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
+                printf("ERROR: IO::Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));
                 
                 break;
@@ -390,6 +390,15 @@ namespace CoRpc {
     }
     
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
+    }
+    
+    IO *IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
+        if (receiveThreadNum == 0 && sendThreadNum == 0) {
+            printf("ERROR: IO::start() -- sender and receiver can't run at same thread.\n");
+            return NULL;
+        }
+        
+        return new IO(receiveThreadNum, sendThreadNum);
     }
     
     bool IO::start() {

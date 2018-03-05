@@ -10,11 +10,9 @@
 #define corpc_io_h
 
 #include "co_routine.h"
-#include "corpc_inner.h"
+#include "corpc_define.h"
 
 #include <thread>
-
-#define CORPC_MAX_BUFFER_SIZE 0x100000
 
 namespace CoRpc {
     
@@ -221,8 +219,7 @@ namespace CoRpc {
         };
         
     public:
-        // 注意：sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误
-        IO(uint16_t receiveThreadNum, uint16_t sendThreadNum);
+        static IO *create(uint16_t receiveThreadNum, uint16_t sendThreadNum);
         
         bool start();
         
@@ -232,7 +229,10 @@ namespace CoRpc {
         Sender *getSender() { return _sender; }
         
         void addConnection(std::shared_ptr<Connection>& connection);
+        
     private:
+        // 注意：sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误
+        IO(uint16_t receiveThreadNum, uint16_t sendThreadNum);
         ~IO() {}  // 不允许在栈上创建IO
         
     private:

@@ -2,24 +2,30 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:rpc/rpcsvr/rpcsvr.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:rpc/rpccli/rpccli.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:echocli/echocli.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:echosvr/echosvr.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "group:co/co.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:testpipe/testpipe.xcodeproj">
+      location = "group:corpc/corpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:testMySQL/testMySQL.xcodeproj">
+      location = "group:test/rpcsvr/rpcsvr.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/rpccli/rpccli.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/testInnerRpc/testInnerRpc.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/echosvr/echosvr.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/echocli/echocli.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/testMySQL/testMySQL.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/testpipe/testpipe.xcodeproj">
    </FileRef>
 </Workspace>

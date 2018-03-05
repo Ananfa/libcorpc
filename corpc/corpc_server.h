@@ -6,8 +6,8 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 
-#ifndef co_rpc_server_h
-#define co_rpc_server_h
+#ifndef corpc_server_h
+#define corpc_server_h
 
 #include "corpc_io.h"
 
@@ -17,8 +17,6 @@
 #include <string>
 #include <thread>
 #include <google/protobuf/service.h>
-
-#define CORPC_MAX_REQUEST_SIZE 0x10000
 
 namespace CoRpc {
 
@@ -73,17 +71,6 @@ namespace CoRpc {
         typedef CoSyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
         //typedef SyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
 #endif
-        
-        struct MethodData {
-            const google::protobuf::MethodDescriptor *_method_descriptor;
-            const google::protobuf::Message *_request_proto;
-            const google::protobuf::Message *_response_proto;
-        };
-        
-        struct ServiceData {
-            google::protobuf::Service *rpcService;
-            std::vector<MethodData> methods;
-        };
         
         class Acceptor {
         public:
@@ -145,7 +132,7 @@ namespace CoRpc {
             virtual void postRpcTask(WorkerTask *task) = 0;
             
         protected:
-            static void *taskHandleRoutine( void * arg );
+            static void *taskHandleRoutine( void * arg );   // 处理WorkerTask，及其中的rpc任务，若rpc定义了need_coroutine，启动单独的taskCallRoutine协程来处理rpc任务
             
             static void *taskCallRoutine( void * arg );
             
@@ -194,7 +181,6 @@ namespace CoRpc {
         };
         
     public:
-        // 注意：sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误
         Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
@@ -228,4 +214,4 @@ namespace CoRpc {
     
 }
 
-#endif /* co_rpc_server_h */
+#endif /* corpc_server_h */

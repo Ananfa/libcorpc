@@ -6,11 +6,11 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 
-#ifndef co_rpc_routine_env_h
-#define co_rpc_routine_env_h
+#ifndef corpc_routine_env_h
+#define corpc_routine_env_h
 
 #include "co_routine.h"
-#include "corpc_inner.h"
+#include "corpc_define.h"
 
 #include <list>
 
@@ -58,7 +58,6 @@ namespace CoRpc {
         
     };
     
-    // 
 }
 
-#endif /* co_rpc_routine_env_h */
+#endif /* corpc_routine_env_h */

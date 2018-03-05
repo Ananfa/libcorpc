@@ -94,7 +94,7 @@ namespace CoRpc {
                 return false;
             }
             
-            _channel->_client->_downQueue.push(task);
+            _channel->_client->_downQueue.push(task->rpcTask->co);
             
             // 处理完一个请求消息，复位状态
             _headNum = 0;
@@ -137,26 +137,22 @@ namespace CoRpc {
     }
     
     void Client::Connection::onClose() {
-        std::unique_lock<std::mutex> lock( _waitResultCoMapMutex );
-        while (!_waitResultCoMap.empty()) {
-            WaitTaskMap::iterator itor = _waitResultCoMap.begin();
-            ClientTask *task = itor->second;
-            _waitResultCoMap.erase(itor);
-            
-            task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
-            
-            _channel->_client->_downQueue.push(task);
-        }
+        ConnectionTask *connectionTask = new ConnectionTask;
+        connectionTask->type = ConnectionTask::CLOSE;
+        connectionTask->connection = std::static_pointer_cast<Connection>(IO::Connection::shared_from_this());
+        
+        _channel->_client->_connectionTaskQueue.push(connectionTask);
     }
     
     Client::Channel::Channel(Client *client, const char* ip, uint32_t port, uint32_t connectNum)
-    : _client(client), _ip(ip), _port(port), _conIndex(0) {
+    : _client(client), _ip(ip), _port(port), _conIndex(0), _connectDelay(false) {
         if (connectNum == 0) {
             connectNum = 1;
         }
         
+        //_connections.resize(connectNum, nullptr);
         for (int i = 0; i < connectNum; i++) {
-            _connections.push_back(std::make_shared<Connection>(this));
+            _connections.push_back(nullptr);
         }
         
         _client->registerChannel(this);
@@ -170,14 +166,20 @@ namespace CoRpc {
     std::shared_ptr<Client::Connection>& Client::Channel::getNextConnection() {
         _conIndex = (_conIndex + 1) % _connections.size();
         
+        if (_connections[_conIndex] == nullptr) {
+            _connections[_conIndex] = std::make_shared<Connection>(this);
+        } else if (_connections[_conIndex]->_st == Connection::CLOSED) {
+            _connections[_conIndex] = std::make_shared<Connection>(this);
+        }
+        
         if (_connections[_conIndex]->_st == Connection::CLOSED) {
             _connections[_conIndex]->_st = Connection::CONNECTING;
             
-            _client->_waitConnections.push_back(_connections[_conIndex]);
+            ConnectionTask *connectionTask = new ConnectionTask;
+            connectionTask->type = ConnectionTask::CONNECT;
+            connectionTask->connection = _connections[_conIndex];
             
-            if (_client->_connectRoutineHang) {
-                co_resume(_client->_connectRoutine);
-            }
+            _client->_connectionTaskQueue.push(connectionTask);
         }
         
         return _connections[_conIndex];
@@ -219,140 +221,188 @@ namespace CoRpc {
     }
     
     void Client::start() {
-        RoutineEnvironment::startCoroutine(connectRoutine, this);
+        RoutineEnvironment::startCoroutine(connectionRoutine, this);
         RoutineEnvironment::startCoroutine(downRoutine, this);
         RoutineEnvironment::startCoroutine(upRoutine, this);
     }
     
-    void *Client::connectRoutine( void * arg ) {
+    void *Client::connectionRoutine( void * arg ) {
         Client *self = (Client *)arg;
         co_enable_hook_sys();
         
-        self->_connectRoutine = co_self();
-        self->_connectRoutineHang = false;
+        int readFd = self->_connectionTaskQueue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
         
+        int ret;
+        std::vector<char> buf(1024);
         while (true) {
-            if (self->_waitConnections.empty()) {
-                self->_connectRoutineHang = true;
-                co_yield_ct();
-                self->_connectRoutineHang = false;
-                
-                continue;
-            }
-            
-            std::shared_ptr<Connection> connection = self->_waitConnections.front();
-            self->_waitConnections.pop_front();
-            assert(connection->_st == Connection::CONNECTING);
-            if (self->_connectDelay) {
-                // sleep 1 second
-                struct pollfd pf = { 0 };
-                pf.fd = -1;
-                poll( &pf,1,1000);
-            }
-            
-            // 建立连接
-            connection->_fd = socket(PF_INET, SOCK_STREAM, 0);
-            co_set_timeout(connection->_fd, -1, 1000);
-            printf("co %d socket fd %d\n", co_self(), connection->_fd);
-            struct sockaddr_in addr;
-            
-            Channel *channel = connection->_channel;
-            bzero(&addr,sizeof(addr));
-            addr.sin_family = AF_INET;
-            addr.sin_port = htons(channel->_port);
-            int nIP = 0;
-            if (channel->_ip.empty() ||
-                channel->_ip.compare("0") == 0 ||
-                channel->_ip.compare("0.0.0.0") == 0 ||
-                channel->_ip.compare("*") == 0) {
-                nIP = htonl(INADDR_ANY);
-            } else {
-                nIP = inet_addr(channel->_ip.c_str());
-            }
-            
-            addr.sin_addr.s_addr = nIP;
-            
-            int ret = connect(connection->_fd, (struct sockaddr*)&addr, sizeof(addr));
-            
-            if ( ret < 0 ) {
-                if ( errno == EALREADY || errno == EINPROGRESS ) {
-                    struct pollfd pf = { 0 };
-                    pf.fd = connection->_fd;
-                    pf.events = (POLLOUT|POLLERR|POLLHUP);
-                    co_poll( co_get_epoll_ct(),&pf,1,200);
-                    //check connect
-                    int error = 0;
-                    uint32_t socklen = sizeof(error);
-                    errno = 0;
-                    ret = getsockopt(connection->_fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
-                    if ( ret == -1 ) {
-                        // 出错处理
-                        printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
-                               co_self(), connection->_fd, ret, errno, strerror(errno));
-                        
-                        close(connection->_fd);
-                        connection->_fd = -1;
-                        connection->_st = Connection::CLOSED;
-                    } else if ( error ) {
-                        // 出错处理
-                        printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
-                               co_self(), connection->_fd, ret, error, strerror(error));
-                        
-                        close(connection->_fd);
-                        connection->_fd = -1;
-                        connection->_st = Connection::CLOSED;
-                    }
-                    
-                    assert(connection->_waitResultCoMap.empty());
+            // 等待处理信号
+            ret = read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
                 } else {
-                    // 出错处理
-                    printf("Client::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
-                           co_self(), connection->_fd, ret, errno, strerror(errno));
+                    // 管道出错
+                    printf("Error: Client::connectionRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
                     
-                    close(connection->_fd);
-                    connection->_fd = -1;
-                    connection->_st = Connection::CLOSED;
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    struct pollfd pf = { 0 };
+                    pf.fd = -1;
+                    poll( &pf,1,10);
                 }
             }
             
-            if (connection->_st == Connection::CLOSED) {
-                self->_connectDelay = true;
+            ConnectionTask *task = self->_connectionTaskQueue.pop();
+            while (task) {
+                std::shared_ptr<Connection> connection = task->connection;
                 
-                // 唤醒所有等待连接的协程进行错误处理
-                while (!connection->_waitSendTaskCoList.empty()) {
-                    ClientTask *task = connection->_waitSendTaskCoList.front();
-                    connection->_waitSendTaskCoList.pop_front();
-                    
-                    task->rpcTask->controller->SetFailed("Connect fail");
-                    
-                    self->_downQueue.push(task);
+                switch (task->type) {
+                    case ConnectionTask::CLOSE: {
+                        // 清理
+                        connection->_st = Connection::CLOSED;
+                        connection->_channel->_connectDelay = true;
+                        
+                        assert(connection->_waitSendTaskCoList.empty());
+                        
+                        {
+                            std::unique_lock<std::mutex> lock( connection->_waitResultCoMapMutex );
+                            while (!connection->_waitResultCoMap.empty()) {
+                                Connection::WaitTaskMap::iterator itor = connection->_waitResultCoMap.begin();
+                                ClientTask *task = itor->second;
+                                connection->_waitResultCoMap.erase(itor);
+                                
+                                task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                                
+                                self->_downQueue.push(task->rpcTask->co);
+                            }
+                        }
+                        
+                        break;
+                    }
+                    case ConnectionTask::CONNECT: {
+                        assert(connection->_st == Connection::CONNECTING);
+                        if (connection->_channel->_connectDelay) {
+                            // sleep 1 second
+                            struct pollfd pf = { 0 };
+                            pf.fd = -1;
+                            poll( &pf,1,1000);
+                        }
+                        
+                        // 建立连接
+                        connection->_fd = socket(PF_INET, SOCK_STREAM, 0);
+                        co_set_timeout(connection->_fd, -1, 1000);
+                        printf("co %d socket fd %d\n", co_self(), connection->_fd);
+                        struct sockaddr_in addr;
+                        
+                        Channel *channel = connection->_channel;
+                        bzero(&addr,sizeof(addr));
+                        addr.sin_family = AF_INET;
+                        addr.sin_port = htons(channel->_port);
+                        int nIP = 0;
+                        if (channel->_ip.empty() ||
+                            channel->_ip.compare("0") == 0 ||
+                            channel->_ip.compare("0.0.0.0") == 0 ||
+                            channel->_ip.compare("*") == 0) {
+                            nIP = htonl(INADDR_ANY);
+                        } else {
+                            nIP = inet_addr(channel->_ip.c_str());
+                        }
+                        
+                        addr.sin_addr.s_addr = nIP;
+                        
+                        int ret = connect(connection->_fd, (struct sockaddr*)&addr, sizeof(addr));
+                        
+                        if ( ret < 0 ) {
+                            if ( errno == EALREADY || errno == EINPROGRESS ) {
+                                struct pollfd pf = { 0 };
+                                pf.fd = connection->_fd;
+                                pf.events = (POLLOUT|POLLERR|POLLHUP);
+                                co_poll( co_get_epoll_ct(),&pf,1,200);
+                                //check connect
+                                int error = 0;
+                                uint32_t socklen = sizeof(error);
+                                errno = 0;
+                                ret = getsockopt(connection->_fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
+                                if ( ret == -1 ) {
+                                    // 出错处理
+                                    printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                           co_self(), connection->_fd, ret, errno, strerror(errno));
+                                    
+                                    close(connection->_fd);
+                                    connection->_fd = -1;
+                                    connection->_st = Connection::CLOSED;
+                                } else if ( error ) {
+                                    // 出错处理
+                                    printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                           co_self(), connection->_fd, ret, error, strerror(error));
+                                    
+                                    close(connection->_fd);
+                                    connection->_fd = -1;
+                                    connection->_st = Connection::CLOSED;
+                                }
+                                
+                                assert(connection->_waitResultCoMap.empty());
+                            } else {
+                                // 出错处理
+                                printf("Client::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
+                                       co_self(), connection->_fd, ret, errno, strerror(errno));
+                                
+                                close(connection->_fd);
+                                connection->_fd = -1;
+                                connection->_st = Connection::CLOSED;
+                            }
+                        }
+                        
+                        if (connection->_st == Connection::CLOSED) {
+                            // 唤醒所有等待连接的协程进行错误处理
+                            while (!connection->_waitSendTaskCoList.empty()) {
+                                ClientTask *task = connection->_waitSendTaskCoList.front();
+                                connection->_waitSendTaskCoList.pop_front();
+                                
+                                task->rpcTask->controller->SetFailed("Connect fail");
+                                
+                                self->_downQueue.push(task->rpcTask->co);
+                            }
+                            
+                            assert(connection->_waitResultCoMap.empty());
+                            break;
+                        }
+                        
+                        connection->_st = Connection::CONNECTED;
+                        connection->_channel->_connectDelay = false;
+                        
+                        // 加入到IO中
+                        std::shared_ptr<IO::Connection> ioConnection = std::static_pointer_cast<IO::Connection>(connection);
+                        self->_io->addConnection(ioConnection);
+                        
+                        // 发送等待发送队列中的任务
+                        while (!connection->_waitSendTaskCoList.empty()) {
+                            ClientTask *task = connection->_waitSendTaskCoList.front();
+                            connection->_waitSendTaskCoList.pop_front();
+                            
+                            std::shared_ptr<IO::Connection> ioConn = std::static_pointer_cast<IO::Connection>(connection);
+                            
+                            {
+                                std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
+                                connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                            }
+                            
+                            self->_io->getSender()->send(ioConn, task->rpcTask);
+                        }
+                        
+                        break;
+                    }
                 }
                 
-                continue;
+                delete task;
+                
+                task = self->_connectionTaskQueue.pop();
             }
             
-            connection->_st = Connection::CONNECTED;
-            
-            self->_connectDelay = false;
-            
-            // 加入到IO中
-            std::shared_ptr<IO::Connection> ioConnection = std::static_pointer_cast<IO::Connection>(connection);
-            self->_io->addConnection(ioConnection);
-            
-            // 发送等待发送队列中的任务
-            while (!connection->_waitSendTaskCoList.empty()) {
-                ClientTask *task = connection->_waitSendTaskCoList.front();
-                connection->_waitSendTaskCoList.pop_front();
-                
-                std::shared_ptr<IO::Connection> ioConn = std::static_pointer_cast<IO::Connection>(connection);
-                
-                {
-                    std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
-                    connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
-                }
-                
-                self->_io->getSender()->send(ioConn, task->rpcTask);
-            }
         }
     }
     
@@ -431,11 +481,11 @@ namespace CoRpc {
             }
             
             // 处理任务队列
-            ClientTask *task = self->_downQueue.pop();
-            while (task) {
-                co_resume(task->rpcTask->co);
+            stCoRoutine_t *co = self->_downQueue.pop();
+            while (co) {
+                co_resume(co);
                 
-                task = self->_downQueue.pop();
+                co = self->_downQueue.pop();
             }
         }
         

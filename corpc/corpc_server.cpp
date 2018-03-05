@@ -83,8 +83,8 @@ namespace CoRpc {
             // 根据serverId和methodId查表
             const MethodData *methodData = _server->getMethod(_reqhead.serviceId, _reqhead.methodId);
             if (methodData != NULL) {
-                google::protobuf::Message *request = methodData->_request_proto->New();
-                google::protobuf::Message *response = methodData->_response_proto->New();
+                google::protobuf::Message *request = methodData->request_proto->New();
+                google::protobuf::Message *response = methodData->response_proto->New();
                 Controller *controller = new Controller();
                 if (!request->ParseFromArray(_data_buf, _reqhead.size)) {
                     // 出错处理
@@ -98,7 +98,7 @@ namespace CoRpc {
                 task->connection = shared_from_this();
                 task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
                 task->rpcTask->service = _server->getService(_reqhead.serviceId);
-                task->rpcTask->method_descriptor = methodData->_method_descriptor;
+                task->rpcTask->method_descriptor = methodData->method_descriptor;
                 task->rpcTask->request = request;
                 task->rpcTask->response = response;
                 task->rpcTask->controller = controller;
@@ -451,7 +451,6 @@ namespace CoRpc {
         
         uint32_t serviceId = (uint32_t)(serviceDescriptor->options().GetExtension(corpc::global_service_id));
         
-        //uint64_t serviceId = serviceDescriptor->index();
         std::map<uint32_t, ServiceData>::iterator it = _services.find(serviceId);
         if (it != _services.end()) {
             return false;
@@ -462,9 +461,9 @@ namespace CoRpc {
         
         MethodData methodData;
         for (int i = 0; i < serviceDescriptor->method_count(); i++) {
-            methodData._method_descriptor = serviceDescriptor->method(i);
-            methodData._request_proto = &rpcService->GetRequestPrototype(methodData._method_descriptor);
-            methodData._response_proto= &rpcService->GetResponsePrototype(methodData._method_descriptor);
+            methodData.method_descriptor = serviceDescriptor->method(i);
+            methodData.request_proto = &rpcService->GetRequestPrototype(methodData.method_descriptor);
+            methodData.response_proto= &rpcService->GetResponsePrototype(methodData.method_descriptor);
             
             serviceData.methods.push_back(methodData);
         }
@@ -481,7 +480,7 @@ namespace CoRpc {
         return it->second.rpcService;
     }
     
-    const Server::MethodData *Server::getMethod(uint32_t serviceId, uint32_t methodId) const {
+    const MethodData *Server::getMethod(uint32_t serviceId, uint32_t methodId) const {
         std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
         if (it == _services.end()) {
             return NULL;
