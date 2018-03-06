@@ -1,10 +1,10 @@
 DerivedData
 libco_mac.xcworkspace/xcuserdata
 co/co.xcodeproj/xcuserdata
-echocli/echocli.xcodeproj/xcuserdata
-echosvr/echosvr.xcodeproj/xcuserdata
-rpc/rpccli/rpccli.xcodeproj/xcuserdata
-rpc/rpccli/rpccli.xcodeproj/project.xcworkspace/xcuserdata
-rpc/rpcsvr/rpcsvr.xcodeproj/xcuserdata
-test*
+corpc/corpc.xcodeproj/xcuserdata
+test/echocli/echocli.xcodeproj/xcuserdata
+test/echosvr/echosvr.xcodeproj/xcuserdata
+test/rpccli/rpccli.xcodeproj/xcuserdata
+test/rpcsvr/rpcsvr.xcodeproj/xcuserdata
+test/test*
 

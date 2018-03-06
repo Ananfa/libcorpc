@@ -98,6 +98,9 @@ typedef hostent* (*gethostbyname_pfn_t)(const char *name);
 typedef res_state (*__res_state_pfn_t)();
 typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 
+typedef unsigned int (*sleep_pfn_t)(unsigned int seconds);
+typedef int (*usleep_pfn_t)(useconds_t usec);
+
 static socket_pfn_t g_sys_socket_func 	= (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
 static connect_pfn_t g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
 static close_pfn_t g_sys_close_func 	= (close_pfn_t)dlsym(RTLD_NEXT,"close");
@@ -113,19 +116,20 @@ static recv_pfn_t g_sys_recv_func 		= (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
 
 static poll_pfn_t g_sys_poll_func 		= (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
 
-static setsockopt_pfn_t g_sys_setsockopt_func 
-										= (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
+static setsockopt_pfn_t g_sys_setsockopt_func = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
 static fcntl_pfn_t g_sys_fcntl_func 	= (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
 
 static setenv_pfn_t g_sys_setenv_func   = (setenv_pfn_t)dlsym(RTLD_NEXT,"setenv");
 static unsetenv_pfn_t g_sys_unsetenv_func = (unsetenv_pfn_t)dlsym(RTLD_NEXT,"unsetenv");
-static getenv_pfn_t g_sys_getenv_func   =  (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
-static __res_state_pfn_t g_sys___res_state_func  = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
+static getenv_pfn_t g_sys_getenv_func   = (getenv_pfn_t)dlsym(RTLD_NEXT,"getenv");
+static __res_state_pfn_t g_sys___res_state_func = (__res_state_pfn_t)dlsym(RTLD_NEXT,"__res_state");
 
 static gethostbyname_pfn_t g_sys_gethostbyname_func = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
 
-static __poll_pfn_t g_sys___poll_func = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
+static __poll_pfn_t g_sys___poll_func   = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
 
+static sleep_pfn_t g_sys_sleep_func     = (sleep_pfn_t)dlsym(RTLD_NEXT,"sleep");
+static usleep_pfn_t g_sys_usleep_func   = (usleep_pfn_t)dlsym(RTLD_NEXT,"usleep");
 
 /*
 static pthread_getspecific_pfn_t g_sys_pthread_getspecific_func 
@@ -610,6 +614,7 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
 
 }
+
 int setsockopt(int fd, int level, int option_name,
 			                 const void *option_value, socklen_t option_len)
 {
@@ -635,7 +640,6 @@ int setsockopt(int fd, int level, int option_name,
 	}
 	return g_sys_setsockopt_func( fd,level,option_name,option_value,option_len );
 }
-
 
 int fcntl(int fildes, int cmd, ...)
 {
@@ -724,6 +728,38 @@ int fcntl(int fildes, int cmd, ...)
 	va_end( arg_list );
 
 	return ret;
+}
+
+unsigned int sleep(unsigned int seconds)
+{
+    HOOK_SYS_FUNC( send );
+    
+    if( !co_is_enable_sys_hook() )
+    {
+        return g_sys_sleep_func( seconds );
+    }
+    
+    struct pollfd pf = { 0 };
+    pf.fd = -1;
+    poll( &pf,1,seconds * 1000 );
+    
+    return 0;
+}
+
+int usleep(useconds_t usec)
+{
+    HOOK_SYS_FUNC( send );
+    
+    if( !co_is_enable_sys_hook() )
+    {
+        return g_sys_usleep_func( usec );
+    }
+    
+    struct pollfd pf = { 0 };
+    pf.fd = -1;
+    poll( &pf,1,usec / 1000 );
+    
+    return 0;
 }
 
 int co_register_fd(int fd)

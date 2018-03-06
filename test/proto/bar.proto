@@ -1,0 +1,22 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message BarRequest {
+    required string text = 1;
+    optional int32 times = 2;
+}
+
+message BarResponse {
+    required string text = 1;
+    optional bool result = 2;
+}
+
+service BarService {
+    option (corpc.global_service_id) = 2;
+
+    rpc Bar(BarRequest) returns(BarResponse)
+    {
+        option (corpc.need_coroutine) = true; // default is false
+    }
+}

@@ -1,0 +1,19 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message FooRequest {
+    required string text = 1;
+    optional int32 times = 2;
+}
+
+message FooResponse {
+    required string text = 1;
+    optional bool result = 2;
+}
+
+service FooService {
+    option (corpc.global_service_id) = 1;
+
+    rpc Foo(FooRequest) returns(FooResponse);
+}

@@ -56,9 +56,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    struct pollfd pf = { 0 };
-                    pf.fd = -1;
-                    poll( &pf,1,10);
+                    usleep(10000);
                 }
             }
             
@@ -114,9 +112,7 @@ namespace CoRpc {
         // 等待写关闭
         while (!connection->_canClose) {
             // sleep 100 milisecond
-            struct pollfd pf = { 0 };
-            pf.fd = -1;
-            poll( &pf,1,100);
+            usleep(100000);
         }
         
         close(fd);
@@ -202,9 +198,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    struct pollfd pf = { 0 };
-                    pf.fd = -1;
-                    poll( &pf,1,10);
+                    usleep(10000);
                 }
             }
         

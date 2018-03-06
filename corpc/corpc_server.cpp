@@ -321,9 +321,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    struct pollfd pf = { 0 };
-                    pf.fd = -1;
-                    poll( &pf,1,10);
+                    usleep(10000);
                 }
             }
             
@@ -365,9 +363,7 @@ namespace CoRpc {
         co_enable_hook_sys();
 
         while (true) {
-            struct pollfd pf = { 0 };
-            pf.fd = -1;
-            poll( &pf,1,4);
+            usleep(4000);
             
             WorkerTask *task = tqueue->pop();
             while (task) {

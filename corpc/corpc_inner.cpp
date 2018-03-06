@@ -43,6 +43,10 @@ namespace CoRpc {
             }
         }
         
+        void Client::start() {
+            RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
+        }
+        
         void Client::response(stCoRoutine_t *co) {
             _queue.push(co);
         }
@@ -73,9 +77,7 @@ namespace CoRpc {
                         
                         // TODO: 如何处理？退出协程？
                         // sleep 10 milisecond
-                        struct pollfd pf = { 0 };
-                        pf.fd = -1;
-                        poll( &pf,1,10);
+                        usleep(10000);
                     }
                 }
                 
@@ -173,9 +175,7 @@ namespace CoRpc {
                         
                         // TODO: 如何处理？退出协程？
                         // sleep 10 milisecond
-                        struct pollfd pf = { 0 };
-                        pf.fd = -1;
-                        poll( &pf,1,10);
+                        usleep(10000);
                     }
                 }
                 
@@ -195,8 +195,6 @@ namespace CoRpc {
                         
                         // 处理结果发回给Client
                         request->client->response(request->co);
-                        
-                        delete request;
                     }
                     
                     request = queue.pop();
@@ -216,8 +214,6 @@ namespace CoRpc {
             
             // 处理结果发回给Client
             request->client->response(request->co);
-            
-            delete request;
             
             return NULL;
         }

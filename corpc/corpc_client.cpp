@@ -166,9 +166,7 @@ namespace CoRpc {
     std::shared_ptr<Client::Connection>& Client::Channel::getNextConnection() {
         _conIndex = (_conIndex + 1) % _connections.size();
         
-        if (_connections[_conIndex] == nullptr) {
-            _connections[_conIndex] = std::make_shared<Connection>(this);
-        } else if (_connections[_conIndex]->_st == Connection::CLOSED) {
+        if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
             _connections[_conIndex] = std::make_shared<Connection>(this);
         }
         
@@ -250,9 +248,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    struct pollfd pf = { 0 };
-                    pf.fd = -1;
-                    poll( &pf,1,10);
+                    usleep(10000);
                 }
             }
             
@@ -287,9 +283,7 @@ namespace CoRpc {
                         assert(connection->_st == Connection::CONNECTING);
                         if (connection->_channel->_connectDelay) {
                             // sleep 1 second
-                            struct pollfd pf = { 0 };
-                            pf.fd = -1;
-                            poll( &pf,1,1000);
+                            sleep(1);
                         }
                         
                         // 建立连接
@@ -474,9 +468,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    struct pollfd pf = { 0 };
-                    pf.fd = -1;
-                    poll( &pf,1,10);
+                    usleep(10000);
                 }
             }
             

@@ -43,6 +43,7 @@ namespace CoRpc {
 #endif
         
         class Client {
+        public:
             class Channel : public google::protobuf::RpcChannel {
             public:
                 Channel(Client *client, Server *server): _client(client), _server(server) {}
@@ -61,6 +62,8 @@ namespace CoRpc {
             
         public:
             Client() {}
+            
+            void start();
             
         private:
             ~Client() {}
