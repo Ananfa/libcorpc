@@ -33,7 +33,6 @@ namespace CoRpc {
             // 发送数据处理，将要发送的数据写入buf中，返回实际写入的数据量，不能大于space
             virtual int buildData(uint8_t *buf, int space) = 0;
             
-            // TODO: 加入关闭数据处理
             virtual void onClose() = 0;
         public:
             int getfd() { return _fd; }
