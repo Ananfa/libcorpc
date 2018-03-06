@@ -1,6 +1,6 @@
 //
-//  testrpc_cli.cpp
-//  rpccli
+//  testrpc_svr.cpp
+//  rpcsvr
 //
 //  Created by Xianke Liu on 2017/11/2.
 //  Copyright © 2017年 Dena. All rights reserved.

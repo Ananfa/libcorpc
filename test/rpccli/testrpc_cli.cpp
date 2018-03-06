@@ -23,77 +23,6 @@ static int iSuccCnt1 = 0;
 static int iFailCnt1 = 0;
 static int iSuccCnt2 = 0;
 static int iFailCnt2 = 0;
-static time_t iTime = 0;
-
-void AddSuccCnt1()
-{
-    time_t now = time(NULL);
-    if (now >iTime)
-    {
-        printf("time %ld foo Succ Cnt %d Fail Cnt %d bar Succ Cnt %d Fail Cnt %d\n", iTime, iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2);
-        iTime = now;
-        iSuccCnt1 = 0;
-        iFailCnt1 = 0;
-        iSuccCnt2 = 0;
-        iFailCnt2 = 0;
-    }
-    else
-    {
-        iSuccCnt1++;
-    }
-}
-void AddFailCnt1()
-{
-    time_t now = time(NULL);
-    if (now >iTime)
-    {
-        printf("time %ld foo Succ Cnt %d Fail Cnt %d bar Succ Cnt %d Fail Cnt %d\n", iTime, iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2);
-        iTime = now;
-        iSuccCnt1 = 0;
-        iFailCnt1 = 0;
-        iSuccCnt2 = 0;
-        iFailCnt2 = 0;
-    }
-    else
-    {
-        iFailCnt1++;
-    }
-}
-
-void AddSuccCnt2()
-{
-    time_t now = time(NULL);
-    if (now >iTime)
-    {
-        printf("time %ld foo Succ Cnt %d Fail Cnt %d bar Succ Cnt %d Fail Cnt %d\n", iTime, iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2);
-        iTime = now;
-        iSuccCnt1 = 0;
-        iFailCnt1 = 0;
-        iSuccCnt2 = 0;
-        iFailCnt2 = 0;
-    }
-    else
-    {
-        iSuccCnt2++;
-    }
-}
-void AddFailCnt2()
-{
-    time_t now = time(NULL);
-    if (now >iTime)
-    {
-        printf("time %ld foo Succ Cnt %d Fail Cnt %d bar Succ Cnt %d Fail Cnt %d\n", iTime, iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2);
-        iTime = now;
-        iSuccCnt1 = 0;
-        iFailCnt1 = 0;
-        iSuccCnt2 = 0;
-        iFailCnt2 = 0;
-    }
-    else
-    {
-        iFailCnt2++;
-    }
-}
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
@@ -101,6 +30,29 @@ struct Test_Stubs {
 };
 
 Test_Stubs g_stubs;
+
+static void *log_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    int totalSucc = 0;
+    int totalFail = 0;
+    
+    while (true) {
+        sleep(1);
+        
+        totalSucc += iSuccCnt1 + iSuccCnt2;
+        totalFail += iFailCnt1 + iFailCnt2;
+        printf("time %ld, foo:Succ %d Fail %d, bar:Succ %d Fail %d, total:Succ %d Fail %d\n", time(NULL), iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2, totalSucc, totalFail);
+        
+        iSuccCnt1 = 0;
+        iFailCnt1 = 0;
+        iSuccCnt2 = 0;
+        iFailCnt2 = 0;
+    }
+    
+    return NULL;
+}
 
 static void *rpc_routine( void *arg )
 {
@@ -118,15 +70,20 @@ static void *rpc_routine( void *arg )
         request->set_text("test1");
         request->set_times(1);
         
-        testStubs->foo_clt->Foo(controller, request, response, NULL);
-        
-        if (controller->Failed()) {
-            printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-            AddFailCnt1();
-        } else {
-            //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-            AddSuccCnt1();
-        }
+        do {
+            controller->Reset();
+            testStubs->foo_clt->Foo(controller, request, response, NULL);
+            
+            if (controller->Failed()) {
+                //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                iFailCnt1++;
+                
+                usleep(100000);
+            } else {
+                //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                iSuccCnt1++;
+            }
+        } while (controller->Failed());
         
         delete controller;
         delete response;
@@ -139,15 +96,20 @@ static void *rpc_routine( void *arg )
         request->set_text("test1");
         request->set_times(1);
         
-        testStubs->bar_clt->Bar(controller, request, response, NULL);
-        
-        if (controller->Failed()) {
-            printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-            AddFailCnt2();
-        } else {
-            //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-            AddSuccCnt2();
-        }
+        do {
+            controller->Reset();
+            testStubs->bar_clt->Bar(controller, request, response, NULL);
+            
+            if (controller->Failed()) {
+                //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                iFailCnt2++;
+                
+                usleep(100000);
+            } else {
+                //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                iSuccCnt2++;
+            }
+        } while (controller->Failed());
         
         delete controller;
         delete response;
@@ -212,6 +174,7 @@ int main(int argc, char *argv[]) {
     io->start();
     client->start();
     
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
     printf("running...\n");
