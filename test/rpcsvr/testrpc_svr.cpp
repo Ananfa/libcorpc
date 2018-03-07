@@ -24,6 +24,7 @@
 
 #include "foo.pb.h"
 #include "bar.pb.h"
+#include "baz.pb.h"
 #include <google/protobuf/service.h>
 #include <google/protobuf/descriptor.h>
 
@@ -61,8 +62,22 @@ public:
     }
 };
 
+class BazServiceImpl : public BazService {
+public:
+    BazServiceImpl() {}
+    virtual void Baz(::google::protobuf::RpcController* controller,
+                     const ::BazRequest* request,
+                     ::corpc::Void* response,
+                     ::google::protobuf::Closure* done) {
+        std::string str = request->text();
+        
+        //printf("BazServiceImpl::Baz: %s\n", str.c_str());
+    }
+};
+
 static FooServiceImpl g_fooService;
 static BarServiceImpl g_barService;
+static BazServiceImpl g_bazService;
 
 int main(int argc, char *argv[]) {
     if(argc<3){
@@ -71,7 +86,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     
-    //char *ip = argv[1];
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
     
@@ -83,6 +97,7 @@ int main(int argc, char *argv[]) {
     Server *server = new Server(io, true, 1, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
+    server->registerService(&g_bazService);
     
     if (io->start() && server->start()) {
         RoutineEnvironment::runEventLoop();

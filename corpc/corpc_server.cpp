@@ -83,8 +83,10 @@ namespace CoRpc {
             // 根据serverId和methodId查表
             const MethodData *methodData = _server->getMethod(_reqhead.serviceId, _reqhead.methodId);
             if (methodData != NULL) {
+                const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
+                
                 google::protobuf::Message *request = methodData->request_proto->New();
-                google::protobuf::Message *response = methodData->response_proto->New();
+                google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
                 Controller *controller = new Controller();
                 if (!request->ParseFromArray(_data_buf, _reqhead.size)) {
                     // 出错处理
@@ -98,7 +100,7 @@ namespace CoRpc {
                 task->connection = shared_from_this();
                 task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
                 task->rpcTask->service = _server->getService(_reqhead.serviceId);
-                task->rpcTask->method_descriptor = methodData->method_descriptor;
+                task->rpcTask->method_descriptor = method_descriptor;
                 task->rpcTask->request = request;
                 task->rpcTask->response = response;
                 task->rpcTask->controller = controller;
@@ -337,8 +339,10 @@ namespace CoRpc {
                     // rpc处理方法调用
                     task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
                     
-                    // 处理结果发给sender处理
-                    io->getSender()->send(task->connection, task->rpcTask);
+                    if (task->rpcTask->response != NULL) {
+                        // 处理结果发给sender处理
+                        io->getSender()->send(task->connection, task->rpcTask);
+                    }
                     
                     delete task;
                 }
@@ -396,8 +400,10 @@ namespace CoRpc {
         
         task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
         
-        // 处理结果发回给receiver处理
-        task->connection->send(task->rpcTask);
+        if (task->rpcTask->response != NULL) {
+            // 处理结果发给sender处理
+            task->connection->send(task->rpcTask);
+        }
         
         delete task;
         

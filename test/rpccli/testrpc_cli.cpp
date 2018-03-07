@@ -16,17 +16,21 @@
 
 #include "foo.pb.h"
 #include "bar.pb.h"
+#include "baz.pb.h"
 
 using namespace CoRpc;
 
-static int iSuccCnt1 = 0;
-static int iFailCnt1 = 0;
-static int iSuccCnt2 = 0;
-static int iFailCnt2 = 0;
+static int iFooSuccCnt = 0;
+static int iFooFailCnt = 0;
+static int iBarSuccCnt = 0;
+static int iBarFailCnt = 0;
+static int iBazSuccCnt = 0;
+static int iBazFailCnt = 0;
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
     BarService::Stub *bar_clt;
+    BazService::Stub *baz_clt;
 };
 
 Test_Stubs g_stubs;
@@ -41,14 +45,16 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        totalSucc += iSuccCnt1 + iSuccCnt2;
-        totalFail += iFailCnt1 + iFailCnt2;
-        printf("time %ld, foo:Succ %d Fail %d, bar:Succ %d Fail %d, total:Succ %d Fail %d\n", time(NULL), iSuccCnt1, iFailCnt1, iSuccCnt2, iFailCnt2, totalSucc, totalFail);
+        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt;
+        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt;
+        printf("time %ld, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d, total:Succ %d Fail %d\n", time(NULL), iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, totalSucc, totalFail);
         
-        iSuccCnt1 = 0;
-        iFailCnt1 = 0;
-        iSuccCnt2 = 0;
-        iFailCnt2 = 0;
+        iFooSuccCnt = 0;
+        iFooFailCnt = 0;
+        iBarSuccCnt = 0;
+        iBarFailCnt = 0;
+        iBazSuccCnt = 0;
+        iBazFailCnt = 0;
     }
     
     return NULL;
@@ -62,64 +68,99 @@ static void *rpc_routine( void *arg )
     
     // 注意：用于rpc调用参数的request,response和controller对象不能在栈中分配，必须在堆中分配，
     //      这是由于共享栈协程模式下，协程切换时栈会被当前协程栈覆盖，导致指向栈中地址的指针已经不是原来的对象
-    if (rand() % 2 == 0) {
-        FooRequest *request = new FooRequest();
-        FooResponse *response = new FooResponse();
-        Controller *controller = new Controller();
-        
-        request->set_text("test1");
-        request->set_times(1);
-        
-        do {
-            controller->Reset();
-            testStubs->foo_clt->Foo(controller, request, response, NULL);
+    int type = rand() % 3;
+    switch (type) {
+        case 0: {
+            FooRequest *request = new FooRequest();
+            FooResponse *response = new FooResponse();
+            Controller *controller = new Controller();
             
-            if (controller->Failed()) {
-                //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                iFailCnt1++;
-                
-                usleep(100000);
-            } else {
-                //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-                iSuccCnt1++;
-            }
-        } while (controller->Failed());
-        
-        delete controller;
-        delete response;
-        delete request;
-    } else {
-        BarRequest *request = new BarRequest();
-        BarResponse *response = new BarResponse();
-        Controller *controller = new Controller();
-        
-        request->set_text("test1");
-        request->set_times(1);
-        
-        do {
-            controller->Reset();
-            testStubs->bar_clt->Bar(controller, request, response, NULL);
+            request->set_text("test1");
+            request->set_times(1);
             
-            if (controller->Failed()) {
-                //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                iFailCnt2++;
+            do {
+                controller->Reset();
+                testStubs->foo_clt->Foo(controller, request, response, NULL);
                 
-                usleep(100000);
-            } else {
-                //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-                iSuccCnt2++;
-            }
-        } while (controller->Failed());
-        
-        delete controller;
-        delete response;
-        delete request;
+                if (controller->Failed()) {
+                    //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                    iFooFailCnt++;
+                    
+                    usleep(100000);
+                } else {
+                    //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                    iFooSuccCnt++;
+                }
+            } while (controller->Failed());
+            
+            delete controller;
+            delete response;
+            delete request;
+            break;
+        }
+        case 1: {
+            BarRequest *request = new BarRequest();
+            BarResponse *response = new BarResponse();
+            Controller *controller = new Controller();
+            
+            request->set_text("test1");
+            request->set_times(1);
+            
+            do {
+                controller->Reset();
+                testStubs->bar_clt->Bar(controller, request, response, NULL);
+                
+                if (controller->Failed()) {
+                    //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                    iBarFailCnt++;
+                    
+                    usleep(100000);
+                } else {
+                    //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                    iBarSuccCnt++;
+                }
+            } while (controller->Failed());
+            
+            delete controller;
+            delete response;
+            delete request;
+            
+            break;
+        }
+        case 2: {
+            BazRequest *request = new BazRequest();
+            Controller *controller = new Controller();
+            
+            request->set_text("test1");
+            
+            do {
+                controller->Reset();
+                testStubs->baz_clt->Baz(controller, request, NULL, NULL);
+                
+                if (controller->Failed()) {
+                    //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                    iBazFailCnt++;
+                    
+                    usleep(100000);
+                } else {
+                    //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                    iBazSuccCnt++;
+                }
+            } while (controller->Failed());
+            
+            delete controller;
+            delete request;
+            
+            break;
+        }
+        default:
+            break;
     }
-    
     
     return NULL;
 }
 
+int test_count = 1000000;
 static void *test_routine( void *arg )
 {
     co_enable_hook_sys();
@@ -128,7 +169,7 @@ static void *test_routine( void *arg )
     
     int waitNum = 0;
     
-    for (int i=0; i<1000000; i++) {
+    for (int i=0; i<test_count; i++) {
         if ( RoutineEnvironment::startCoroutine(rpc_routine, arg) == NULL ) {
             waitNum++;
             
@@ -148,13 +189,13 @@ static void *test_routine( void *arg )
 int main(int argc, char *argv[]) {
     if(argc<4){
         printf("Usage:\n"
-               "rpccli [IP] [PORT] [TASK_COUNT]\n");
+               "rpccli [IP] [PORT] [TEST_COUNT]\n");
         return -1;
     }
     
     char *ip = argv[1];
     unsigned short int port = atoi(argv[2]);
-    int cnt = 200000;//atoi( argv[3] );
+    test_count = atoi( argv[3] );
     
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
@@ -170,6 +211,7 @@ int main(int argc, char *argv[]) {
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
+    g_stubs.baz_clt = new BazService::Stub(channel);
     
     io->start();
     client->start();

@@ -7,5 +7,8 @@ extend google.protobuf.ServiceOptions {
 }
 
 extend google.protobuf.MethodOptions {
-    optional bool need_coroutine = 10002;
+    optional bool need_coroutine = 10002;       // 是否新开协程执行方法
+    optional bool not_care_response = 10003;      // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
 }
+
+message Void {}

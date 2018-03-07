@@ -7,11 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DB2B2F020492E6700114392 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DB2B2F120492E6700114392 /* libcorpc.dylib */; };
-		2DB2B3142049320100114392 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B30F2049320000114392 /* foo.pb.cc */; };
+		2D5D6ED7204FCF090000CD28 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D5D6ED8204FCF090000CD28 /* libco.dylib */; };
+		2D5D6ED9204FCF090000CD28 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DB2B2F120492E6700114392 /* libcorpc.dylib */; };
 		2DB2B3152049320100114392 /* testrpc_svr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B3122049320100114392 /* testrpc_svr.cpp */; };
-		2DB2B3162049320100114392 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B3132049320100114392 /* bar.pb.cc */; };
-		2DC09BFB1FAABBC100B94E05 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DC09BFA1FAABBC100B94E05 /* libco.dylib */; };
+		2DC30055204F8C920002F91F /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3004F204F8C920002F91F /* foo.pb.cc */; };
+		2DC30056204F8C920002F91F /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DC30051204F8C920002F91F /* bar.pb.cc */; };
+		2DC30057204F8C920002F91F /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DC30052204F8C920002F91F /* baz.pb.cc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,14 +28,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D5D6ED8204FCF090000CD28 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DB2B2F120492E6700114392 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DB2B30F2049320000114392 /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = foo.pb.cc; sourceTree = "<group>"; };
-		2DB2B3102049320000114392 /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = foo.pb.h; sourceTree = "<group>"; };
-		2DB2B3112049320000114392 /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = bar.pb.h; sourceTree = "<group>"; };
 		2DB2B3122049320100114392 /* testrpc_svr.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testrpc_svr.cpp; sourceTree = "<group>"; };
-		2DB2B3132049320100114392 /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bar.pb.cc; sourceTree = "<group>"; };
 		2DC09BDC1FAABA8700B94E05 /* rpcsvr */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = rpcsvr; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DC09BFA1FAABBC100B94E05 /* libco.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libco.dylib; path = ../../DerivedData/libco_mac/Build/Products/Debug/libco.dylib; sourceTree = "<group>"; };
+		2DC3004F204F8C920002F91F /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../proto/foo.pb.cc; sourceTree = "<group>"; };
+		2DC30050204F8C920002F91F /* baz.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baz.pb.h; path = ../proto/baz.pb.h; sourceTree = "<group>"; };
+		2DC30051204F8C920002F91F /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bar.pb.cc; path = ../proto/bar.pb.cc; sourceTree = "<group>"; };
+		2DC30052204F8C920002F91F /* baz.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baz.pb.cc; path = ../proto/baz.pb.cc; sourceTree = "<group>"; };
+		2DC30053204F8C920002F91F /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = bar.pb.h; path = ../proto/bar.pb.h; sourceTree = "<group>"; };
+		2DC30054204F8C920002F91F /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../proto/foo.pb.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,8 +46,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DC09BFB1FAABBC100B94E05 /* libco.dylib in Frameworks */,
-				2DB2B2F020492E6700114392 /* libcorpc.dylib in Frameworks */,
+				2D5D6ED7204FCF090000CD28 /* libco.dylib in Frameworks */,
+				2D5D6ED9204FCF090000CD28 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,10 +74,12 @@
 		2DC09BEC1FAABB8200B94E05 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				2DB2B3132049320100114392 /* bar.pb.cc */,
-				2DB2B3112049320000114392 /* bar.pb.h */,
-				2DB2B30F2049320000114392 /* foo.pb.cc */,
-				2DB2B3102049320000114392 /* foo.pb.h */,
+				2DC30051204F8C920002F91F /* bar.pb.cc */,
+				2DC30053204F8C920002F91F /* bar.pb.h */,
+				2DC30052204F8C920002F91F /* baz.pb.cc */,
+				2DC30050204F8C920002F91F /* baz.pb.h */,
+				2DC3004F204F8C920002F91F /* foo.pb.cc */,
+				2DC30054204F8C920002F91F /* foo.pb.h */,
 				2DB2B3122049320100114392 /* testrpc_svr.cpp */,
 			);
 			name = src;
@@ -82,6 +88,7 @@
 		2DC09BF91FAABBC100B94E05 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				2D5D6ED8204FCF090000CD28 /* libco.dylib */,
 				2DB2B2F120492E6700114392 /* libcorpc.dylib */,
 				2DC09BFA1FAABBC100B94E05 /* libco.dylib */,
 			);
@@ -145,9 +152,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DB2B3162049320100114392 /* bar.pb.cc in Sources */,
-				2DB2B3142049320100114392 /* foo.pb.cc in Sources */,
+				2DC30056204F8C920002F91F /* bar.pb.cc in Sources */,
 				2DB2B3152049320100114392 /* testrpc_svr.cpp in Sources */,
+				2DC30057204F8C920002F91F /* baz.pb.cc in Sources */,
+				2DC30055204F8C920002F91F /* foo.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

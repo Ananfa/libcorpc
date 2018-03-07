@@ -131,6 +131,19 @@ namespace CoRpc {
             used += msgSize;
             
             _datas.pop_front();
+            
+            if (rpcTask->response == NULL) {
+                // 注意: _waitResultCoMap需进行线程同步
+                {
+                    std::unique_lock<std::mutex> lock( _waitResultCoMapMutex );
+                    if (_waitResultCoMap.erase(reqhead.callId) == 0) {
+                        printf("ERROR: Client::Connection::buildData -- task not in waitResultCoMap\n");
+                        assert(false);
+                    }
+                }
+                
+                _channel->_client->_downQueue.push(rpcTask->co);
+            }
         }
         
         return used;
@@ -189,7 +202,13 @@ namespace CoRpc {
         clientTask->rpcTask = std::make_shared<RpcTask>();
         clientTask->rpcTask->co = co_self();
         clientTask->rpcTask->request = request;
-        clientTask->rpcTask->response = response;
+        
+        if (method->options().GetExtension(corpc::not_care_response)) {
+            clientTask->rpcTask->response = NULL;
+        } else {
+            clientTask->rpcTask->response = response;
+        }
+        
         clientTask->rpcTask->controller = controller;
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
