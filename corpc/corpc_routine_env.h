@@ -15,7 +15,7 @@
 #include <list>
 
 namespace CoRpc {
-    struct WaitingRoutine {
+    struct RoutineContext {
         pfn_co_routine_t pfn;
         void *arg;
     };
@@ -23,7 +23,6 @@ namespace CoRpc {
     // 协程环境是否应该与线程绑定，约定每个线程只有一个协程环境
     // 每个线程可初始化自己的协程环境，约定只能初始化一次，一般在线程开始时初始化
     class RoutineEnvironment {
-        static const unsigned int MAX_COROUTINE_NUM = 1000;
         static const unsigned int SHARE_STACK_COUNT = 50;
         static const unsigned int SHARE_STACK_SIZE = 128 * 1024;
         
@@ -49,9 +48,6 @@ namespace CoRpc {
         
     private:
         stCoRoutineAttr_t *_attr;
-        int _coCount;   // 协程数量（已启动的任务数量）
-        
-        std::list<WaitingRoutine*> _waitingRoutines; // 未启动的任务
         
         PipeType _endPipe; // 用于通知deamonRoutine“有已结束协程”
         std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）

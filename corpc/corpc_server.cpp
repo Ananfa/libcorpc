@@ -171,13 +171,13 @@ namespace CoRpc {
         
         int listen_fd = self->_listen_fd;
         // 侦听连接，并把接受的连接传给连接处理对象
+        printf("INFO: start accept from listen fd %d\n", listen_fd);
         for(;;)
         {
             struct sockaddr_in addr; //maybe sockaddr_un;
             memset( &addr,0,sizeof(addr) );
             socklen_t len = sizeof(addr);
             
-            printf("INFO: try accept from listen fd %d\n", listen_fd);
             int fd = co_accept(listen_fd, (struct sockaddr *)&addr, &len);
             if( fd < 0 )
             {

@@ -18,8 +18,6 @@ namespace CoRpc {
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
     
     RoutineEnvironment::RoutineEnvironment() {
-        _coCount = 0;
-        
         _attr = new stCoRoutineAttr_t;
         _attr->stack_size = SHARE_STACK_SIZE;
         _attr->share_stack = co_alloc_sharestack(SHARE_STACK_COUNT, SHARE_STACK_SIZE);
@@ -81,17 +79,12 @@ namespace CoRpc {
         // TODO: 若禁止新协程创建则返回false
         
         stCoRoutine_t *co = NULL;
-        WaitingRoutine *routine = new WaitingRoutine;
-        routine->pfn = pfn;
-        routine->arg = arg;
-        if (curenv->_coCount < MAX_COROUTINE_NUM) {
-            curenv->_coCount++;
-            
-            co_create( &co, curenv->_attr, routineEntry, routine);
-            co_resume( co );
-        } else {
-            curenv->_waitingRoutines.push_back(routine);
-        }
+        RoutineContext *context = new RoutineContext;
+        context->pfn = pfn;
+        context->arg = arg;
+        
+        co_create( &co, curenv->_attr, routineEntry, context);
+        co_resume( co );
         
         return co;
     }
@@ -103,11 +96,11 @@ namespace CoRpc {
     void *RoutineEnvironment::routineEntry( void *arg ) {
         co_enable_hook_sys();
         
-        WaitingRoutine *routine = (WaitingRoutine*)arg;
-        pfn_co_routine_t pfn = routine->pfn;
-        void *ar = routine->arg;
+        RoutineContext *context = (RoutineContext*)arg;
+        pfn_co_routine_t pfn = context->pfn;
+        void *ar = context->arg;
         
-        delete routine;
+        delete context;
         
         pfn(ar);
         
@@ -150,22 +143,7 @@ namespace CoRpc {
                 stCoRoutine_t *co = curenv->_endedCoroutines.front();
                 curenv->_endedCoroutines.pop_front();
                 
-                curenv->_coCount--;
-                assert(curenv->_coCount >= 0);
-                
                 co_release(co);
-            }
-            
-            // 启动待处理任务
-            while (curenv->_coCount < MAX_COROUTINE_NUM && !curenv->_waitingRoutines.empty()) {
-                WaitingRoutine *routine = curenv->_waitingRoutines.front();
-                curenv->_waitingRoutines.pop_front();
-                
-                curenv->_coCount++;
-                
-                stCoRoutine_t *co = NULL;
-                co_create( &co, curenv->_attr, routineEntry, routine);
-                co_resume( co );
             }
         }
         
