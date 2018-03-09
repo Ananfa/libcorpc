@@ -14,7 +14,7 @@
       location = "group:test/rpccli/rpccli.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testInnerRpc/testInnerRpc.xcodeproj">
+      location = "group:test/innerRpc/innerRpc.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:test/echosvr/echosvr.xcodeproj">

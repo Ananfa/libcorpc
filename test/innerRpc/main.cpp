@@ -1,24 +1,73 @@
 //
-//  testrpc_cli.cpp
-//  rpccli
+//  main.cpp
+//  testInnerRpc
 //
-//  Created by Xianke Liu on 2017/11/2.
-//  Copyright © 2017年 Dena. All rights reserved.
+//  Created by Xianke Liu on 2018/3/2.
+//  Copyright © 2018年 Dena. All rights reserved.
 //
 
 #include "corpc_routine_env.h"
-#include "corpc_client.h"
 #include "corpc_controller.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
+#include "corpc_inner.h"
 
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
+#include <google/protobuf/service.h>
+#include <google/protobuf/descriptor.h>
+
+#include <thread>
 
 using namespace CoRpc;
+
+class FooServiceImpl : public FooService {
+public:
+    FooServiceImpl() {}
+    virtual void Foo(::google::protobuf::RpcController* controller,
+                     const ::FooRequest* request,
+                     ::FooResponse* response,
+                     ::google::protobuf::Closure* done) {
+        std::string str = request->text();
+        std::string tmp = str;
+        for (int i = 1; i < request->times(); i++)
+            str += (" " + tmp);
+        response->set_text(str);
+        response->set_result(true);
+    }
+};
+
+class BarServiceImpl : public BarService {
+public:
+    BarServiceImpl() {}
+    virtual void Bar(::google::protobuf::RpcController* controller,
+                     const ::BarRequest* request,
+                     ::BarResponse* response,
+                     ::google::protobuf::Closure* done) {
+        std::string str = request->text();
+        std::string tmp = str;
+        for (int i = 1; i < request->times(); i++)
+            str += (" " + tmp);
+        response->set_text(str);
+        response->set_result(true);
+    }
+};
+
+class BazServiceImpl : public BazService {
+public:
+    BazServiceImpl() {}
+    virtual void Baz(::google::protobuf::RpcController* controller,
+                     const ::BazRequest* request,
+                     ::corpc::Void* response,
+                     ::google::protobuf::Closure* done) {
+        std::string str = request->text();
+        
+        //printf("BazServiceImpl::Baz: %s\n", str.c_str());
+    }
+};
+
+static FooServiceImpl g_fooService;
+static BarServiceImpl g_barService;
+static BazServiceImpl g_bazService;
 
 static int iFooSuccCnt = 0;
 static int iFooFailCnt = 0;
@@ -175,54 +224,52 @@ static void *rpc_routine( void *arg )
     return NULL;
 }
 
-int test_routine_count = 1000;
 static void *test_routine( void *arg )
 {
     co_enable_hook_sys();
     
     printf("test_routine begin\n");
     
-    for (int i=0; i<test_routine_count; i++) {
+    for (int i=0; i<500; i++) {
         RoutineEnvironment::startCoroutine(rpc_routine, arg);
     }
     
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
-    if(argc<4){
-        printf("Usage:\n"
-               "rpccli [IP] [PORT] [TEST_ROUTINE_COUNT]\n");
-        return -1;
-    }
+static void clientEntry( CoRpc::Inner::Server *server ) {
+    CoRpc::Inner::Client *client = new CoRpc::Inner::Client();
     
-    char *ip = argv[1];
-    unsigned short int port = atoi(argv[2]);
-    test_routine_count = atoi( argv[3] );
-    
-    struct sigaction sa;
-    sa.sa_handler = SIG_IGN;
-    sigaction( SIGPIPE, &sa, NULL );
-    
-    start_hook();
-    
-    IO *io = IO::create(1,1);
-    assert(io);
-    Client *client = new Client(io);
-    Client::Channel *channel = new Client::Channel(client, ip, port, 10);
-    
+    CoRpc::Inner::Client::Channel *channel = new CoRpc::Inner::Client::Channel(client, server);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
     
-    io->start();
     client->start();
     
-    RoutineEnvironment::startCoroutine(log_routine, NULL);
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
     printf("running...\n");
     
     RoutineEnvironment::runEventLoop(100);
 }
+
+int main(int argc, const char * argv[]) {
+    start_hook();
+    
+    CoRpc::Inner::Server *server = new CoRpc::Inner::Server();
+    server->registerService(&g_fooService);
+    server->registerService(&g_barService);
+    server->registerService(&g_bazService);
+    
+    server->start();
+    
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
+    std::thread t = std::thread(clientEntry, server);
+    
+    RoutineEnvironment::runEventLoop();
+    
+    return 0;
+}
+

@@ -6,5 +6,6 @@ test/echocli/echocli.xcodeproj/xcuserdata
 test/echosvr/echosvr.xcodeproj/xcuserdata
 test/rpccli/rpccli.xcodeproj/xcuserdata
 test/rpcsvr/rpcsvr.xcodeproj/xcuserdata
+test/innerRpc/innerRpc.xcodeproj/xcuserdata
 test/test*
 
