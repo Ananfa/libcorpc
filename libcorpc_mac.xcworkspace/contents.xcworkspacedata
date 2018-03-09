@@ -17,10 +17,10 @@
       location = "group:test/innerRpc/innerRpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/echosvr/echosvr.xcodeproj">
+      location = "group:test/testechosvr/testechosvr.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/echocli/echocli.xcodeproj">
+      location = "group:test/testechocli/testechocli.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:test/testMySQL/testMySQL.xcodeproj">

@@ -222,7 +222,7 @@ int main(int argc,char *argv[])
 	const char *ip = argv[1];
 	int port = atoi( argv[2] );
 	int cnt = atoi( argv[3] );
-	//int proccnt = atoi( argv[4] );
+	int proccnt = atoi( argv[4] );
 	bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
 
     start_hook();
