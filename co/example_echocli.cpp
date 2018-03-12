@@ -186,6 +186,8 @@ static void *readwrite_routine( void *arg )
 
 int main(int argc,char *argv[])
 {
+    co_start_hook();
+    
 	stEndPoint endpoint;
 	endpoint.ip = argv[1];
 	endpoint.port = atoi(argv[2]);
@@ -195,8 +197,6 @@ int main(int argc,char *argv[])
 	struct sigaction sa;
 	sa.sa_handler = SIG_IGN;
 	sigaction( SIGPIPE, &sa, NULL );
-    
-    start_hook();
     
 //	for(int k=0;k<proccnt;k++)
 //	{

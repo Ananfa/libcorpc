@@ -256,7 +256,7 @@ static void clientEntry( CoRpc::Inner::Server *server ) {
 }
 
 int main(int argc, const char * argv[]) {
-    start_hook();
+    co_start_hook();
     
     CoRpc::Inner::Server *server = new CoRpc::Inner::Server();
     server->registerService(&g_fooService);

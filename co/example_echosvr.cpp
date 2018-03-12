@@ -213,6 +213,8 @@ static int CreateTcpSocket(const unsigned short shPort /* = 0 */,const char *psz
 
 int main(int argc,char *argv[])
 {
+    co_start_hook();
+    
 	if(argc<5){
 		printf("Usage:\n"
                "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT]\n"
@@ -225,8 +227,6 @@ int main(int argc,char *argv[])
 	int proccnt = atoi( argv[4] );
 	bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
 
-    start_hook();
-	
     g_listen_fd = CreateTcpSocket( port,ip,true );
 	listen( g_listen_fd,1024 );
 	if(g_listen_fd==-1){

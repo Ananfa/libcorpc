@@ -83,7 +83,7 @@ namespace CoRpc {
     public:
         class Channel : public google::protobuf::RpcChannel {
         public:
-            Channel(Client *client, const char *ip, uint32_t port, uint32_t connectNum = 1);
+            Channel(Client *client, const std::string& ip, uint32_t port, uint32_t connectNum = 1);
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
             
         private:

@@ -190,21 +190,21 @@ static void *test_routine( void *arg )
 }
 
 int main(int argc, char *argv[]) {
+    co_start_hook();
+    
     if(argc<4){
         printf("Usage:\n"
                "rpccli [IP] [PORT] [TEST_ROUTINE_COUNT]\n");
         return -1;
     }
     
-    char *ip = argv[1];
+    std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
     test_routine_count = atoi( argv[3] );
     
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
-    
-    start_hook();
     
     IO *io = IO::create(1,1);
     assert(io);

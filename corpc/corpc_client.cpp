@@ -157,7 +157,7 @@ namespace CoRpc {
         _channel->_client->_connectionTaskQueue.push(connectionTask);
     }
     
-    Client::Channel::Channel(Client *client, const char* ip, uint32_t port, uint32_t connectNum)
+    Client::Channel::Channel(Client *client, const std::string& ip, uint32_t port, uint32_t connectNum)
     : _client(client), _ip(ip), _port(port), _conIndex(0), _connectDelay(false) {
         if (connectNum == 0) {
             connectNum = 1;

@@ -27,7 +27,7 @@ namespace CoRpc {
         static const unsigned int SHARE_STACK_SIZE = 128 * 1024;
         
     public:
-        static void destroy(); // 清理当前线程协程环境
+        void destroy(); // 清理当前线程协程环境
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
         static void runEventLoop( int max_wait_ms = 1000 ); // 事件循环
         

@@ -7,26 +7,11 @@
 //
 
 #include "corpc_routine_env.h"
-#include "corpc_controller.h"
 #include "corpc_server.h"
-
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <fcntl.h>
-#include <arpa/inet.h>
-
-#include <list>
 
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
-#include <google/protobuf/service.h>
-#include <google/protobuf/descriptor.h>
 
 using namespace CoRpc;
 
@@ -80,6 +65,8 @@ static BarServiceImpl g_barService;
 static BazServiceImpl g_bazService;
 
 int main(int argc, char *argv[]) {
+    co_start_hook();
+    
     if(argc<3){
         printf("Usage:\n"
                "rpcsvr [IP] [PORT]\n");
@@ -88,8 +75,6 @@ int main(int argc, char *argv[]) {
     
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
-    
-    start_hook();
     
     // 注册服务
     IO *io = IO::create(1,1);

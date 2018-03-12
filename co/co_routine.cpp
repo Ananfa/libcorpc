@@ -1117,7 +1117,7 @@ bool co_is_enable_sys_hook()
 	return ( co && co->cEnableSysHook );
 }
 
-void start_hook()
+void co_start_hook()
 {
     g_start_hook = true;
 }

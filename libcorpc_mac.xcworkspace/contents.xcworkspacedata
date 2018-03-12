@@ -2,6 +2,27 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:tutorial/tutorial1/Tutorial1Server.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial1/Tutorial1Client.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial2/Tutorial2Server.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial2/Tutorial2Middle.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial2/Tutorial2Client.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial3/Tutorial3Server.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial3/Tutorial3Client.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:co/co.xcodeproj">
    </FileRef>
    <FileRef
