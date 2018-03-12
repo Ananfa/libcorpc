@@ -1,0 +1,21 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message EchoRequest {
+    required string msg = 1;
+    required int32 seconds = 2;
+}
+
+message EchoResponse {
+    required string msg = 1;
+}
+
+service EchoService {
+    option (corpc.global_service_id) = 2;
+
+    rpc echo(EchoRequest) returns(EchoResponse)
+    {
+        option (corpc.need_coroutine) = true; // default is false
+    }
+}
