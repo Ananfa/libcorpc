@@ -1,0 +1,89 @@
+//
+//  main.cpp
+//  Tutorial5Server
+//
+//  Created by Xianke Liu on 2018/3/13.
+//  Copyright © 2018年 Dena. All rights reserved.
+//
+
+#include "corpc_routine_env.h"
+#include "corpc_client.h"
+#include "corpc_server.h"
+
+#include "factorial.pb.h"
+
+using namespace CoRpc;
+
+class FactorialServiceImpl : public FactorialService {
+public:
+    FactorialServiceImpl(const std::string& sip, uint32_t sport): _sip(sip), _sport(sport) {}
+    virtual void factorial(::google::protobuf::RpcController* controller,
+                     const ::FactorialRequest* request,
+                     ::FactorialResponse* response,
+                     ::google::protobuf::Closure* done) {
+        uint32_t n = request->n();
+        printf("FactorialServiceImpl::factorial is called for n: %d\n", n);
+        if (n > 20) { // 数太大，无法表示
+            response->set_result(0);
+        } else if (n > 1) {
+            FactorialRequest* req = new FactorialRequest();
+            FactorialResponse* resp = new FactorialResponse();
+            req->set_n(n - 1);
+            get_factorial_clt()->factorial(controller, req, resp, done);
+            
+            response->set_result(n * resp->result());
+        } else {
+            response->set_result(1);
+        }
+        
+        printf("FactorialServiceImpl::factorial result for %d is %llu\n", n, response->result());
+    }
+    
+private:
+    std::string _sip;
+    uint32_t _sport;
+    FactorialService::Stub *get_factorial_clt();
+    
+private:
+    static __thread FactorialService::Stub *_factorial_clt;
+};
+
+__thread FactorialService::Stub *FactorialServiceImpl::_factorial_clt(nullptr);
+
+FactorialService::Stub *FactorialServiceImpl::get_factorial_clt() {
+    if (!_factorial_clt) {
+        Client *client = Client::instance();
+        if (client) {
+            Client::Channel *channel = new Client::Channel(client, _sip, _sport, 1);
+            
+            _factorial_clt= new FactorialService::Stub(channel, ::google::protobuf::Service::STUB_OWNS_CHANNEL);
+        }
+    }
+    
+    return _factorial_clt;
+}
+
+int main(int argc, const char * argv[]) {
+    co_start_hook();
+    
+    if(argc<5){
+        printf("Usage:\n"
+               "Tutorial2Middle [IP] [PORT] [ServerIP] [ServerPort] \n");
+        return -1;
+    }
+    
+    std::string ip = argv[1];
+    unsigned short int port = atoi(argv[2]);
+    std::string sip = argv[3];
+    unsigned short int sport = atoi(argv[4]);
+    
+    // 注册服务
+    IO::initialize(1, 1);
+    
+    Server *server = Server::create(false, 1, ip, port);
+    
+    FactorialServiceImpl *factorialService = new FactorialServiceImpl(sip, sport);
+    server->registerService(factorialService);
+    
+    RoutineEnvironment::runEventLoop();
+}

@@ -1,0 +1,20 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message FactorialRequest {
+    required uint32 n = 1;
+}
+
+message FactorialResponse {
+    required uint64 result = 1;
+}
+
+service FactorialService {
+    option (corpc.global_service_id) = 3;
+
+    rpc factorial(FactorialRequest) returns(FactorialResponse)
+    {
+        option (corpc.need_coroutine) = true; // default is false
+    }
+}

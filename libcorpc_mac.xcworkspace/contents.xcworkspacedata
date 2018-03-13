@@ -35,6 +35,12 @@
       location = "group:tutorial/tutorial4/Tutorial4.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:tutorial/tutorial5/Tutorial5Client.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial5/Tutorial5Server.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:test/rpcsvr/rpcsvr.xcodeproj">
    </FileRef>
    <FileRef

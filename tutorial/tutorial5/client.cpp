@@ -1,8 +1,8 @@
 //
 //  main.cpp
-//  Tutorial2Client
+//  Tutorial5Client
 //
-//  Created by Xianke Liu on 2018/3/9.
+//  Created by Xianke Liu on 2018/3/13.
 //  Copyright © 2018年 Dena. All rights reserved.
 //
 
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "helloworld.pb.h"
+#include "factorial.pb.h"
 
 using namespace CoRpc;
 
@@ -26,30 +26,27 @@ static void *rpc_routine( void *arg )
     
     Client::Channel *channel = (Client::Channel*)arg;
     
-    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
+    FactorialService::Stub *factorial_clt = new FactorialService::Stub(channel);
     
-    //while (true) {
-        FooRequest *request = new FooRequest();
-        FooResponse *response = new FooResponse();
-        Controller *controller = new Controller();
-        
-        request->set_msg1("Hello");
-        request->set_msg2("World");
-        
-        helloworld_clt->foo(controller, request, response, NULL);
-        
-        if (controller->Failed()) {
-            printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-        } else {
-            printf("========= %s =========\n", response->msg().c_str());
-        }
-        
-        delete controller;
-        delete response;
-        delete request;
-    //}
+    FactorialRequest *request = new FactorialRequest();
+    FactorialResponse *response = new FactorialResponse();
+    Controller *controller = new Controller();
     
-    delete helloworld_clt;
+    request->set_n(10);
+    
+    factorial_clt->factorial(controller, request, response, NULL);
+    
+    if (controller->Failed()) {
+        printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+    } else {
+        printf("========= %llu =========\n", response->result());
+    }
+    
+    delete controller;
+    delete response;
+    delete request;
+    
+    delete factorial_clt;
     
     return NULL;
 }
