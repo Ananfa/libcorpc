@@ -41,16 +41,13 @@ int main(int argc, const char * argv[]) {
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
     
-    // 注册服务
-    IO *io = IO::create(1,1);
-    assert(io);
-    Server *server = new Server(io, false, 0, ip, port);
+    IO::initialize(1, 1);
+    
+    Server *server = Server::create(false, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     server->registerService(helloWorldService);
     
-    if (io->start() && server->start()) {
-        RoutineEnvironment::runEventLoop();
-    }
+    RoutineEnvironment::runEventLoop();
 }
 

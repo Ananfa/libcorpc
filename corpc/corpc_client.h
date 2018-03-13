@@ -123,15 +123,15 @@ namespace CoRpc {
 #endif
        
     public:
-        Client(IO *io): _io(io), _upRoutineHang(false), _upRoutine(NULL) {}
+        static Client* create();
         
         bool registerChannel(Channel *channel);
         
-        void start();
-    
         void destroy() { delete this; } // 销毁Client
         
     private:
+        Client(IO *io): _io(io), _upRoutineHang(false), _upRoutine(NULL) {}
+        
         ~Client() {}
         
         static void *connectionRoutine( void * arg );  // 负责为connection连接建立和断线处理
@@ -139,6 +139,8 @@ namespace CoRpc {
         static void *upRoutine( void * arg );   // 负责将rpc调用请求通过connection交由sender发出
         
         static void *downRoutine( void * arg ); // 负责接收rpc结果并唤醒rpc调用协程
+        
+        void start();
         
     private:
         IO *_io;

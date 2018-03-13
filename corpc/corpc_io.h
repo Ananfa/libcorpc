@@ -218,7 +218,8 @@ namespace CoRpc {
         };
         
     public:
-        static IO *create(uint16_t receiveThreadNum, uint16_t sendThreadNum);
+        static bool initialize(uint16_t receiveThreadNum, uint16_t sendThreadNum);
+        static IO* instance() { return _io; }
         
         bool start();
         
@@ -235,6 +236,8 @@ namespace CoRpc {
         ~IO() {}  // 不允许在栈上创建IO
         
     private:
+        static IO* _io;
+        
         uint16_t _receiveThreadNum;
         uint16_t _sendThreadNum;
         

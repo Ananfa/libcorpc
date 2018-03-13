@@ -12,6 +12,8 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
+    IO* IO::_io(nullptr);
+    
     IO::Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _isClosing(false), _canClose(false) {
     }
     
@@ -386,13 +388,21 @@ namespace CoRpc {
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
     }
     
-    IO *IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
-        if (receiveThreadNum == 0 && sendThreadNum == 0) {
-            printf("ERROR: IO::start() -- sender and receiver can't run at same thread.\n");
-            return NULL;
+    bool IO::initialize(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
+        if (_io != nullptr) {
+            printf("ERROR: IO::initialize() -- already initialized.\n");
+            return false;
         }
         
-        return new IO(receiveThreadNum, sendThreadNum);
+        if (receiveThreadNum == 0 && sendThreadNum == 0) {
+            printf("ERROR: IO::initialize() -- sender and receiver can't run at same thread.\n");
+            return false;
+        }
+        
+        _io = new IO(receiveThreadNum, sendThreadNum);
+        _io->start();
+        
+        return true;
     }
     
     bool IO::start() {

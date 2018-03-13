@@ -181,7 +181,7 @@ namespace CoRpc {
         };
         
     public:
-        Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        static Server* create(bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -189,15 +189,16 @@ namespace CoRpc {
         
         const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
         
-        bool start();
-        
         void destroy() { delete this; } // 销毁Server
         
         const std::string &getIP() { return _ip; }
         uint16_t getPort() { return _port; }
         
     private:
+        Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         ~Server();  // 不允许在栈上创建server
+        
+        bool start();
         
     private:
         std::map<uint32_t, ServiceData> _services;

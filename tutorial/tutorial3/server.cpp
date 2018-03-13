@@ -60,20 +60,14 @@ int main(int argc, const char * argv[]) {
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
     
-    // 注册服务
-    IO *io = IO::create(1,1);
-    assert(io);
+    IO::initialize(1, 1);
     
-    io->start();
-    
-    Server *server = new Server(io, false, 0, ip, port);
+    Server *server = Server::create(false, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     EchoServiceImpl *echoService = new EchoServiceImpl();
     server->registerService(helloWorldService);
     server->registerService(echoService);
-    
-    server->start();
     
     RoutineEnvironment::runEventLoop();
 }

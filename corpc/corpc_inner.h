@@ -61,12 +61,13 @@ namespace CoRpc {
             };
             
         public:
-            Client() {}
-            
-            void start();
+            static Client* create();
             
         private:
+            Client() {}
             ~Client() {}
+            
+            void start();
             
             void response(stCoRoutine_t *co);
             
@@ -83,7 +84,7 @@ namespace CoRpc {
         class Server {
             
         public:
-            Server() {}
+            static Server* create();
             
             bool registerService(::google::protobuf::Service *rpcService);
             
@@ -91,12 +92,13 @@ namespace CoRpc {
             
             const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
             
-            void start();
-            
             void destroy() { delete this; } // 销毁Server
             
         private:
+            Server() {}
             ~Server() {}  // 不允许在栈上创建server
+            
+            void start();
             
             void request(Request *request);
             

@@ -23,6 +23,9 @@
       location = "group:tutorial/tutorial3/Tutorial3Client.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:tutorial/tutorial4/Tutorial4.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:co/co.xcodeproj">
    </FileRef>
    <FileRef

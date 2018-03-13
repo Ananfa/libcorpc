@@ -13,8 +13,6 @@
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
-#include <google/protobuf/service.h>
-#include <google/protobuf/descriptor.h>
 
 #include <thread>
 
@@ -237,16 +235,14 @@ static void *test_routine( void *arg )
     return NULL;
 }
 
-static void clientEntry( CoRpc::Inner::Server *server ) {
-    CoRpc::Inner::Client *client = new CoRpc::Inner::Client();
+static void clientEntry( Inner::Server *server ) {
+    Inner::Client *client = Inner::Client::create();
     
-    CoRpc::Inner::Client::Channel *channel = new CoRpc::Inner::Client::Channel(client, server);
+    Inner::Client::Channel *channel = new Inner::Client::Channel(client, server);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
-    
-    client->start();
     
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
@@ -258,12 +254,10 @@ static void clientEntry( CoRpc::Inner::Server *server ) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    CoRpc::Inner::Server *server = new CoRpc::Inner::Server();
+    Inner::Server *server = Inner::Server::create();
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
-    
-    server->start();
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     std::thread t = std::thread(clientEntry, server);

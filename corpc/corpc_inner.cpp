@@ -43,6 +43,12 @@ namespace CoRpc {
             }
         }
         
+        Client* Client::create() {
+            Client *client = new Client();
+            client->start();
+            return client;
+        }
+        
         void Client::start() {
             RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
         }
@@ -91,6 +97,12 @@ namespace CoRpc {
             }
             
             return NULL;
+        }
+        
+        Server* Server::create() {
+            Server *server = new Server();
+            server->start();
+            return server;
         }
         
         bool Server::registerService(::google::protobuf::Service *rpcService) {

@@ -40,7 +40,7 @@ static void *rpc_routine( void *arg )
     if (controller->Failed()) {
         printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
     } else {
-        printf("%s\n", response->msg().c_str());
+        printf("========= %s =========\n", response->msg().c_str());
     }
     
     delete controller;
@@ -68,14 +68,10 @@ int main(int argc, const char * argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
-    IO *io = IO::create(1,1);
-    assert(io);
-    io->start();
+    IO::initialize(1, 1);
     
-    Client *client = new Client(io);
+    Client *client = Client::create();
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
-    
-    client->start();
     
     RoutineEnvironment::startCoroutine(rpc_routine, channel);
     

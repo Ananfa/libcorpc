@@ -228,6 +228,17 @@ namespace CoRpc {
         }
     }
     
+    Client* Client::create() {
+        IO *io = IO::instance();
+        if (io) {
+            Client *client = new Client(io);
+            client->start();
+            return client;
+        }
+        
+        return nullptr;
+    }
+    
     bool Client::registerChannel(Channel *channel) {
         if (_channelSet.find(channel) != _channelSet.end()) {
             return false;

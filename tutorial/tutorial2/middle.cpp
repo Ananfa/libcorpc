@@ -46,21 +46,15 @@ int main(int argc, const char * argv[]) {
     unsigned short int sport = atoi(argv[4]);
     
     // 注册服务
-    IO *io = IO::create(1,1);
-    assert(io);
-    io->start();
+    IO::initialize(1, 1);
     
-    Client *client = new Client(io);
+    Client *client = Client::create();
     Client::Channel *channel = new Client::Channel(client, sip, sport, 1);
     
-    client->start();
-    
-    Server *server = new Server(io, false, 0, ip, port);
+    Server *server = Server::create(false, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(new HelloWorldService::Stub(channel));
     server->registerService(helloWorldService);
-    
-    server->start();
     
     RoutineEnvironment::runEventLoop();
 }
