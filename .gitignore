@@ -11,7 +11,8 @@ test/test*
 tutorial/tutorial1/Tutorial1Client.xcodeproj/xcuserdata
 tutorial/tutorial1/Tutorial1Server.xcodeproj/xcuserdata
 tutorial/tutorial2/Tutorial2Client.xcodeproj/xcuserdata
-tutorial/tutorial2/Tutorial2Middle.xcodeproj/xcuserdata
+tutorial/tutorial2/Tutorial2Middle1.xcodeproj/xcuserdata
+tutorial/tutorial2/Tutorial2Middle2.xcodeproj/xcuserdata
 tutorial/tutorial2/Tutorial2Server.xcodeproj/xcuserdata
 tutorial/tutorial3/Tutorial3Client.xcodeproj/xcuserdata
 tutorial/tutorial3/Tutorial3Server.xcodeproj/xcuserdata

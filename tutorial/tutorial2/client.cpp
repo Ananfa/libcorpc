@@ -28,24 +28,26 @@ static void *rpc_routine( void *arg )
     
     HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
     
-    FooRequest *request = new FooRequest();
-    FooResponse *response = new FooResponse();
-    Controller *controller = new Controller();
-    
-    request->set_msg1("Hello");
-    request->set_msg2("World");
-    
-    helloworld_clt->foo(controller, request, response, NULL);
-    
-    if (controller->Failed()) {
-        printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-    } else {
-        printf("========= %s =========\n", response->msg().c_str());
-    }
-    
-    delete controller;
-    delete response;
-    delete request;
+    //while (true) {
+        FooRequest *request = new FooRequest();
+        FooResponse *response = new FooResponse();
+        Controller *controller = new Controller();
+        
+        request->set_msg1("Hello");
+        request->set_msg2("World");
+        
+        helloworld_clt->foo(controller, request, response, NULL);
+        
+        if (controller->Failed()) {
+            printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        } else {
+            printf("========= %s =========\n", response->msg().c_str());
+        }
+        
+        delete controller;
+        delete response;
+        delete request;
+    //}
     
     delete helloworld_clt;
     
@@ -70,7 +72,7 @@ int main(int argc, const char * argv[]) {
     
     IO::initialize(1, 1);
     
-    Client *client = Client::create();
+    Client *client = Client::instance();
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
     
     RoutineEnvironment::startCoroutine(rpc_routine, channel);

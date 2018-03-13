@@ -61,7 +61,7 @@ namespace CoRpc {
             };
             
         public:
-            static Client* create();
+            static Client* instance();
             
         private:
             Client() {}
@@ -75,6 +75,8 @@ namespace CoRpc {
             
         private:
             ResponseQueue _queue;
+            
+            static __thread Client *_instance;
             
         public:
             friend class Server;

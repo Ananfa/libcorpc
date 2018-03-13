@@ -105,7 +105,7 @@ int main(int argc, const char * argv[]) {
     
     IO::initialize(1, 1);
     
-    Client *client = Client::create();
+    Client *client = Client::instance();
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
     
     RoutineEnvironment::startCoroutine(echo_routine, channel);

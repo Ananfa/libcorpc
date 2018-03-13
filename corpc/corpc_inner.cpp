@@ -19,6 +19,7 @@
 namespace CoRpc {
     
     namespace Inner {
+        __thread Client *Client::_instance(nullptr);
         
         void Client::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
             Request *req = new Request;
@@ -43,10 +44,13 @@ namespace CoRpc {
             }
         }
         
-        Client* Client::create() {
-            Client *client = new Client();
-            client->start();
-            return client;
+        Client* Client::instance() {
+            if (!_instance) {
+                _instance = new Client();
+                _instance->start();
+            }
+            
+            return _instance;
         }
         
         void Client::start() {

@@ -206,18 +206,14 @@ int main(int argc, char *argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
-    IO *io = IO::create(1,1);
-    assert(io);
-    Client *client = new Client(io);
-    Client::Channel *channel = new Client::Channel(client, ip, port, 10);
+    IO::initialize(1, 1);
     
+    Client *client = Client::instance();
+    Client::Channel *channel = new Client::Channel(client, ip, port, 10);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
-    
-    io->start();
-    client->start();
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);

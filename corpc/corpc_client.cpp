@@ -22,6 +22,8 @@
 
 namespace CoRpc {
     
+    __thread Client *Client::_instance(nullptr);
+    
     Client::Connection::Connection(Channel *channel): IO::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED), _respdata(CORPC_MAX_RESPONSE_SIZE,0), _headNum(0), _dataNum(0) {
         _head_buf = (char *)(&_resphead);
         _data_buf = (uint8_t *)_respdata.data();
@@ -228,15 +230,18 @@ namespace CoRpc {
         }
     }
     
-    Client* Client::create() {
-        IO *io = IO::instance();
-        if (io) {
-            Client *client = new Client(io);
-            client->start();
-            return client;
+    Client* Client::instance() {
+        if (!_instance) {
+            IO *io = IO::instance();
+            if (io) {
+                _instance = new Client(io);
+                _instance->start();
+            } else {
+                printf("Error: Client::instance: IO hasn't initialized.\n");
+            }
         }
         
-        return nullptr;
+        return _instance;
     }
     
     bool Client::registerChannel(Channel *channel) {

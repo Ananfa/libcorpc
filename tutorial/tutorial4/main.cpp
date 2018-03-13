@@ -65,7 +65,7 @@ static void *rpc_routine( void *arg )
 }
 
 static void clientEntry( Inner::Server *server ) {
-    Inner::Client *client = Inner::Client::create();
+    Inner::Client *client = Inner::Client::instance();
     
     Inner::Client::Channel *channel = new Inner::Client::Channel(client, server);
     

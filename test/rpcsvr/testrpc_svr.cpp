@@ -77,14 +77,12 @@ int main(int argc, char *argv[]) {
     unsigned short int port = atoi(argv[2]);
     
     // 注册服务
-    IO *io = IO::create(1,1);
-    assert(io);
-    Server *server = new Server(io, true, 1, ip, port);
+    IO::initialize(1, 1);
+    
+    Server *server = Server::create(true, 1, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
     
-    if (io->start() && server->start()) {
-        RoutineEnvironment::runEventLoop();
-    }
+    RoutineEnvironment::runEventLoop();
 }
