@@ -14,7 +14,7 @@
 namespace CoRpc {
     IO* IO::_io(nullptr);
     
-    IO::Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _isClosing(false), _canClose(false) {
+    IO::Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _isClosing(false), _canClose(false) {
     }
     
     IO::Connection::~Connection() {

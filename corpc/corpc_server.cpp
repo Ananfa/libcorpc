@@ -6,10 +6,9 @@
 //  Copyright © 2017年 Dena. All rights reserved.
 //
 #include "corpc_routine_env.h"
-
 #include "corpc_server.h"
-
 #include "corpc_controller.h"
+#include "corpc_utils.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -163,45 +162,6 @@ namespace CoRpc {
         delete controller;
     }
     
-    void *Server::Acceptor::acceptRoutine( void * arg ) {
-        Acceptor *self = (Acceptor *)arg;
-        co_enable_hook_sys();
-        
-        IO *io = self->_server->_io;
-        
-        int listen_fd = self->_listen_fd;
-        // 侦听连接，并把接受的连接传给连接处理对象
-        printf("INFO: start accept from listen fd %d\n", listen_fd);
-        for(;;)
-        {
-            struct sockaddr_in addr; //maybe sockaddr_un;
-            memset( &addr,0,sizeof(addr) );
-            socklen_t len = sizeof(addr);
-            
-            int fd = co_accept(listen_fd, (struct sockaddr *)&addr, &len);
-            if( fd < 0 )
-            {
-                struct pollfd pf = { 0 };
-                pf.fd = listen_fd;
-                pf.events = (POLLIN|POLLERR|POLLHUP);
-                co_poll( co_get_epoll_ct(),&pf,1,1000 );
-                continue;
-            }
-            
-            printf("INFO: accept fd %d\n", fd);
-            
-            // 设置读写超时时间，默认为1秒
-            co_set_timeout(fd, -1, 1000);
-            
-            std::shared_ptr<IO::Connection> connection(new Connection(fd, self->_server));
-            
-            // 将接受的连接分别发给Receiver和Sender
-            io->addConnection(connection);
-        }
-        
-        return NULL;
-    }
-    
     Server::Acceptor::~Acceptor() {
         
     }
@@ -260,6 +220,47 @@ namespace CoRpc {
         fcntl(_listen_fd, F_SETFL, iFlags);
         
         return true;
+    }
+    
+    void *Server::Acceptor::acceptRoutine( void * arg ) {
+        Acceptor *self = (Acceptor *)arg;
+        co_enable_hook_sys();
+        
+        IO *io = self->_server->_io;
+        
+        int listen_fd = self->_listen_fd;
+        // 侦听连接，并把接受的连接传给连接处理对象
+        printf("INFO: start accept from listen fd %d\n", listen_fd);
+        for(;;)
+        {
+            struct sockaddr_in addr; //maybe sockaddr_un;
+            memset( &addr,0,sizeof(addr) );
+            socklen_t len = sizeof(addr);
+            
+            int fd = co_accept(listen_fd, (struct sockaddr *)&addr, &len);
+            if( fd < 0 )
+            {
+                struct pollfd pf = { 0 };
+                pf.fd = listen_fd;
+                pf.events = (POLLIN|POLLERR|POLLHUP);
+                co_poll( co_get_epoll_ct(),&pf,1,1000 );
+                continue;
+            }
+            
+            printf("INFO: accept fd %d\n", fd);
+            // 保持连接
+            setKeepAlive(fd, 10);
+            
+            // 设置读写超时时间，默认为1秒
+            co_set_timeout(fd, -1, 1000);
+            
+            std::shared_ptr<IO::Connection> connection(new Connection(fd, self->_server));
+            
+            // 将接受的连接分别发给Receiver和Sender
+            io->addConnection(connection);
+        }
+        
+        return NULL;
     }
     
     void Server::ThreadAcceptor::threadEntry(ThreadAcceptor *self) {

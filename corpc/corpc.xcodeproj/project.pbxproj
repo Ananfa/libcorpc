@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D161BEB2058CAF10062BA35 /* corpc_utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161BE92058CAF10062BA35 /* corpc_utils.cpp */; };
+		2D161BEC2058CAF10062BA35 /* corpc_utils.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D161BEA2058CAF10062BA35 /* corpc_utils.h */; };
 		2DB2B301204931A500114392 /* corpc_define.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F2204931A300114392 /* corpc_define.h */; };
 		2DB2B302204931A500114392 /* corpc_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2F3204931A300114392 /* corpc_client.cpp */; };
 		2DB2B303204931A500114392 /* corpc_controller.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F4204931A300114392 /* corpc_controller.h */; };
@@ -25,6 +27,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D161BE92058CAF10062BA35 /* corpc_utils.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_utils.cpp; sourceTree = "<group>"; };
+		2D161BEA2058CAF10062BA35 /* corpc_utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_utils.h; sourceTree = "<group>"; };
 		2DB2B2C72049297900114392 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DB2B2ED204929EE00114392 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DB2B2F2204931A300114392 /* corpc_define.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_define.h; sourceTree = "<group>"; };
@@ -89,6 +93,8 @@
 				2DB2B2F6204931A300114392 /* corpc_routine_env.h */,
 				2DB2B2FB204931A400114392 /* corpc_server.cpp */,
 				2DB2B2F9204931A300114392 /* corpc_server.h */,
+				2D161BE92058CAF10062BA35 /* corpc_utils.cpp */,
+				2D161BEA2058CAF10062BA35 /* corpc_utils.h */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -115,6 +121,7 @@
 				2DB2B308204931A500114392 /* corpc_server.h in Headers */,
 				2DB2B30D204931A500114392 /* corpc_inner.h in Headers */,
 				2DB2B307204931A500114392 /* corpc_client.h in Headers */,
+				2D161BEC2058CAF10062BA35 /* corpc_utils.h in Headers */,
 				2DB2B304204931A500114392 /* corpc_option.pb.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -177,6 +184,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DB2B30C204931A500114392 /* corpc_option.pb.cc in Sources */,
+				2D161BEB2058CAF10062BA35 /* corpc_utils.cpp in Sources */,
 				2DB2B302204931A500114392 /* corpc_client.cpp in Sources */,
 				2DB2B309204931A500114392 /* corpc_inner.cpp in Sources */,
 				2DB2B30A204931A500114392 /* corpc_server.cpp in Sources */,
