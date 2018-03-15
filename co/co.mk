@@ -31,9 +31,9 @@ CPPSHARE = $(CPP) -fPIC -shared -O2 -pipe -L$(SRCROOT)/solib/ -o
 CSHARE = $(CC) -fPIC -shared -O2 -pipe -L$(SRCROOT)/solib/ -o 
 
 ifeq ($v,release)
-CFLAGS= -O2 $(INCLS) -fPIC  -DLINUX -pipe -Wno-deprecated -c
+CFLAGS= -O2 $(INCLS) -std=gnu++11 -fPIC  -DLINUX -pipe -Wno-deprecated -c
 else
-CFLAGS= -g $(INCLS) -fPIC -DLINUX -pipe -c -fno-inline
+CFLAGS= -g $(INCLS) -std=gnu++11 -fPIC -DLINUX -pipe -c -fno-inline
 endif
 
 ifneq ($v,release)
@@ -53,12 +53,14 @@ LINKS += -L$(STATICLIBPATH)
 endif
 
 CPPSRCS  = $(wildcard *.cpp)
+CCSRCS = $(wildcard *.cc)
 CSRCS  = $(wildcard *.c)
 CPPOBJS  = $(patsubst %.cpp,%.o,$(CPPSRCS))
+CCOBJS = $(patsubst %.cc,%.o,$(CCSRCS))
 COBJS  = $(patsubst %.c,%.o,$(CSRCS))
 
-SRCS = $(CPPSRCS) $(CSRCS)
-OBJS = $(CPPOBJS) $(COBJS)
+SRCS = $(CPPSRCS) $(CCSRCS) $(CSRCS)
+OBJS = $(CPPOBJS) $(CCOBJS) $(COBJS)
 
 CPPCOMPI=$(CPP) $(CFLAGS) -Wno-deprecated
 CCCOMPI=$(CC) $(CFLAGS)
@@ -80,6 +82,8 @@ BUILDSHARELIB = $(CPPSHARE) $@.tmp $^ $(BS_FLAGS); \
 				mv -f $@.tmp $(DYNAMICLIBPATH)/$@;
 
 .cpp.o:
+	$(CPPCOMPILE)
+.cc.o:
 	$(CPPCOMPILE)
 .c.o:
 	$(CCCOMPILE)
