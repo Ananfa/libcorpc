@@ -63,6 +63,7 @@ namespace CoRpc {
     };
     
     // 多生产者单消费者无锁队列实现
+    // 注意：该实现只能在gcc 4.8.3之上版本使用，否则会出错，详见（https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60272）
     template <typename T, T defaultValue>
     class MPSC_NoLockQueue {
         struct Node {
@@ -78,8 +79,8 @@ namespace CoRpc {
             Node *newNode = new Node;
             newNode->value = v;
             
+            newNode->next = _head;
             do {
-                newNode->next = _head;
             } while (!_head.compare_exchange_weak(newNode->next, newNode));
         }
         
@@ -88,8 +89,8 @@ namespace CoRpc {
         
             if (!_outqueue) {
                 if (_head != NULL) {
+                    _outqueue = _head;
                     do {
-                        _outqueue = _head;
                     } while (!_head.compare_exchange_weak(_outqueue, NULL));
                     
                     // 翻转
@@ -209,8 +210,7 @@ namespace CoRpc {
             SyncQueue<T, defaultValue>::push(v);
             
             char buf = 'K';
-            ssize_t ret = write(getWriteFd(), &buf, 1);
-            assert(ret == 1);
+            write(getWriteFd(), &buf, 1);
         }
         
     private:

@@ -23,7 +23,7 @@ include ../../co/co.mk
 
 ########## options ##########
 CFLAGS += -g -fno-strict-aliasing -O2 -Wall -export-dynamic \
-    -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
+	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
 
 UNAME := $(shell uname -s)
 
@@ -42,7 +42,7 @@ PROGS = innerRpc
 all:$(PROGS)
 
 innerRpc: $(INNER_RPC_OBJS)
-    $(BUILDEXE)
+	$(BUILDEXE)
 
 clean:
-    $(CLEAN) *.o $(PROGS)
+	$(CLEAN) *.o $(PROGS)

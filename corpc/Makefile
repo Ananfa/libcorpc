@@ -22,7 +22,7 @@ v=debug
 include ../co/co.mk
 
 ########## options ##########
-CFLAGS += -g -fno-strict-aliasing -O2 -Wall -export-dynamic \
+CFLAGS += -fno-strict-aliasing -Wall -export-dynamic \
 	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
 
 UNAME := $(shell uname -s)

@@ -59,5 +59,5 @@ corpc_option.proto
 ### benchmark
 - 测试环境：MacBook Pro, macOS 10.12.6, cpu: 2.6GHz i5, 一台机器
 - 进程间rpc调用benchmark程序：服务器test/rpcsvr、客户端test/rpccli，在一台机器中测试，平均每秒7到8万次rpc
-- 进程内rpc调用benchmark程序：test/innerRpc，平均每秒30万次
+- 进程内rpc调用benchmark程序：test/innerRpc，平均每秒30万+次
 
