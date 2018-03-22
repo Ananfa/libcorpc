@@ -18,7 +18,6 @@
 #define corpc_inner_h
 
 #include "co_routine.h"
-#include "corpc_inner.h"
 
 #include <map>
 #include <google/protobuf/service.h>

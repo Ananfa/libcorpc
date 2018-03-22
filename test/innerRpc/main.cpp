@@ -252,7 +252,11 @@ static void clientEntry( Inner::Server *server ) {
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
     
-    RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
+    //RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
+    
+    for (int i=0; i<500; i++) {
+        RoutineEnvironment::startCoroutine(rpc_routine, &g_stubs);
+    }
     
     printf("running...\n");
     

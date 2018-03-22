@@ -52,6 +52,7 @@ namespace CoRpc {
         
         static void *deamonRoutine( void *arg ); // 守护协程（定期清理结束的协程，并启动等待的任务）
         
+        
         void addEndedCoroutine( stCoRoutine_t *co ); // 协程结束
         
     private:
@@ -60,6 +61,13 @@ namespace CoRpc {
         PipeType _endPipe; // 用于通知deamonRoutine“有已结束协程”
         std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）
         
+#ifdef MONITOR_ROUTINE
+        // 监控状态
+        static void *monitorRoutine( void *arg ); // 监控协程
+        
+        int _routineNum; // 当前协程总数量（包括活着的和等待消耗的协程）
+        int _livingRoutineNum; // 活着的协程数量
+#endif
     };
     
 }

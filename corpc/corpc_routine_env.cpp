@@ -33,6 +33,11 @@ namespace CoRpc {
         pipe(_endPipe.pipefd);
         co_register_fd(_endPipe.pipefd[1]);
         co_set_nonblock(_endPipe.pipefd[1]);
+        
+#ifdef MONITOR_ROUTINE
+        _routineNum = 0;
+        _livingRoutineNum = 0;
+#endif
     }
 
     RoutineEnvironment::~RoutineEnvironment() {
@@ -59,8 +64,15 @@ namespace CoRpc {
         RoutineEnvironment *env = new RoutineEnvironment();
         g_routineEnvPerThread[pid] = env;
         
-        // 启动deamon协程
         stCoRoutine_t *co = NULL;
+        
+#ifdef MONITOR_ROUTINE
+        // 启动监控协程
+        co_create( &co, env->_attr, monitorRoutine, env);
+        co_resume( co );
+#endif
+        
+        // 启动deamon协程
         co_create( &co, env->_attr, deamonRoutine, env);
         co_resume( co );
         
@@ -104,6 +116,12 @@ namespace CoRpc {
     void *RoutineEnvironment::routineEntry( void *arg ) {
         co_enable_hook_sys();
         
+#ifdef MONITOR_ROUTINE
+        RoutineEnvironment *curenv = getEnv();
+        curenv->_routineNum++;
+        curenv->_livingRoutineNum++;
+#endif
+        
         RoutineContext *context = (RoutineContext*)arg;
         pfn_co_routine_t pfn = context->pfn;
         void *ar = context->arg;
@@ -111,6 +129,10 @@ namespace CoRpc {
         delete context;
         
         pfn(ar);
+        
+#ifdef MONITOR_ROUTINE
+        curenv->_livingRoutineNum--;
+#endif
         
         getEnv()->addEndedCoroutine(co_self());
         
@@ -152,11 +174,31 @@ namespace CoRpc {
                 curenv->_endedCoroutines.pop_front();
                 
                 co_release(co);
+                
+#ifdef MONITOR_ROUTINE
+                curenv->_routineNum--;
+#endif
             }
         }
         
         return NULL;
     }
+    
+#ifdef MONITOR_ROUTINE
+    void *RoutineEnvironment::monitorRoutine( void *arg ) {
+        co_enable_hook_sys();
+        
+        RoutineEnvironment *curenv = (RoutineEnvironment *)arg;
+        
+        while( true ) {
+            sleep(1);
+            
+            printf("monitorRoutine -- env: %ld, living: %d, dead: %d\n", curenv, curenv->_livingRoutineNum, curenv->_routineNum - curenv->_livingRoutineNum);
+        }
+        
+        return NULL;
+    }
+#endif
     
     void RoutineEnvironment::addEndedCoroutine( stCoRoutine_t *co ) {
         _endedCoroutines.push_back(co);
