@@ -22,7 +22,8 @@ TODO: 类介绍
 ***
 
 ### proto
-corpc_option.proto
+- 采用google protobuf 2.6.1
+- corpc_option.proto
 
     import "google/protobuf/descriptor.proto";
 
@@ -61,3 +62,7 @@ corpc_option.proto
 - 进程间rpc调用benchmark程序：服务器test/rpcsvr、客户端test/rpccli，在一台机器中测试，平均每秒7到8万次rpc
 - 进程内rpc调用benchmark程序：test/innerRpc，平均每秒30万+次
 
+***
+
+### build
+- 需要GCC 4.8.3以上版本

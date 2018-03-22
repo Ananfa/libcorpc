@@ -7,14 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D55382A20576CA000328EC4 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D55382920576CA000328EC4 /* main.cpp */; };
-		2D55382D20576CBE00328EC4 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D55382C20576CBE00328EC4 /* helloworld.pb.cc */; };
-		2D55382F205770FA00328EC4 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D553831205770FA00328EC4 /* libco.dylib */; };
-		2D553830205770FA00328EC4 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D553832205770FA00328EC4 /* libcorpc.dylib */; };
+		2D161CF22063625F0062BA35 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161CF12063625F0062BA35 /* main.cpp */; };
+		2D161CF52063626A0062BA35 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161CF42063626A0062BA35 /* helloworld.pb.cc */; };
+		2D161CF7206362BD0062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161CF9206362BD0062BA35 /* libco.dylib */; };
+		2D161CF8206362BD0062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161CFA206362BD0062BA35 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		2D55381C20576C5900328EC4 /* CopyFiles */ = {
+		2D161CE4206361FF0062BA35 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -26,59 +26,59 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2D55381E20576C5900328EC4 /* Tutorial4 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Tutorial4; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D55382920576CA000328EC4 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		2D55382B20576CBE00328EC4 /* helloworld.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = helloworld.pb.h; path = ../proto/helloworld.pb.h; sourceTree = "<group>"; };
-		2D55382C20576CBE00328EC4 /* helloworld.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = helloworld.pb.cc; path = ../proto/helloworld.pb.cc; sourceTree = "<group>"; };
-		2D553831205770FA00328EC4 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D553832205770FA00328EC4 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161CE6206361FF0062BA35 /* tutorial4 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial4; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161CF12063625F0062BA35 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		2D161CF32063626A0062BA35 /* helloworld.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = helloworld.pb.h; path = ../proto/helloworld.pb.h; sourceTree = "<group>"; };
+		2D161CF42063626A0062BA35 /* helloworld.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = helloworld.pb.cc; path = ../proto/helloworld.pb.cc; sourceTree = "<group>"; };
+		2D161CF9206362BD0062BA35 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161CFA206362BD0062BA35 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		2D55381B20576C5900328EC4 /* Frameworks */ = {
+		2D161CE3206361FF0062BA35 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D55382F205770FA00328EC4 /* libco.dylib in Frameworks */,
-				2D553830205770FA00328EC4 /* libcorpc.dylib in Frameworks */,
+				2D161CF7206362BD0062BA35 /* libco.dylib in Frameworks */,
+				2D161CF8206362BD0062BA35 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2D55381520576C5900328EC4 = {
+		2D161CDD206361FF0062BA35 = {
 			isa = PBXGroup;
 			children = (
-				2D55382820576C9700328EC4 /* src */,
-				2D55381F20576C5900328EC4 /* Products */,
-				2D55382E205770FA00328EC4 /* Frameworks */,
+				2D161CF0206362550062BA35 /* src */,
+				2D161CE7206361FF0062BA35 /* Products */,
+				2D161CF6206362BD0062BA35 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		2D55381F20576C5900328EC4 /* Products */ = {
+		2D161CE7206361FF0062BA35 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2D55381E20576C5900328EC4 /* Tutorial4 */,
+				2D161CE6206361FF0062BA35 /* tutorial4 */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2D55382820576C9700328EC4 /* src */ = {
+		2D161CF0206362550062BA35 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				2D55382C20576CBE00328EC4 /* helloworld.pb.cc */,
-				2D55382B20576CBE00328EC4 /* helloworld.pb.h */,
-				2D55382920576CA000328EC4 /* main.cpp */,
+				2D161CF42063626A0062BA35 /* helloworld.pb.cc */,
+				2D161CF32063626A0062BA35 /* helloworld.pb.h */,
+				2D161CF12063625F0062BA35 /* main.cpp */,
 			);
 			name = src;
 			sourceTree = "<group>";
 		};
-		2D55382E205770FA00328EC4 /* Frameworks */ = {
+		2D161CF6206362BD0062BA35 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				2D553831205770FA00328EC4 /* libco.dylib */,
-				2D553832205770FA00328EC4 /* libcorpc.dylib */,
+				2D161CF9206362BD0062BA35 /* libco.dylib */,
+				2D161CFA206362BD0062BA35 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -86,69 +86,69 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2D55381D20576C5900328EC4 /* Tutorial4 */ = {
+		2D161CE5206361FF0062BA35 /* tutorial4 */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2D55382520576C5900328EC4 /* Build configuration list for PBXNativeTarget "Tutorial4" */;
+			buildConfigurationList = 2D161CED206361FF0062BA35 /* Build configuration list for PBXNativeTarget "tutorial4" */;
 			buildPhases = (
-				2D55381A20576C5900328EC4 /* Sources */,
-				2D55381B20576C5900328EC4 /* Frameworks */,
-				2D55381C20576C5900328EC4 /* CopyFiles */,
+				2D161CE2206361FF0062BA35 /* Sources */,
+				2D161CE3206361FF0062BA35 /* Frameworks */,
+				2D161CE4206361FF0062BA35 /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = Tutorial4;
-			productName = Tutorial4;
-			productReference = 2D55381E20576C5900328EC4 /* Tutorial4 */;
+			name = tutorial4;
+			productName = tutorial4;
+			productReference = 2D161CE6206361FF0062BA35 /* tutorial4 */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2D55381620576C5900328EC4 /* Project object */ = {
+		2D161CDE206361FF0062BA35 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0920;
 				ORGANIZATIONNAME = Dena;
 				TargetAttributes = {
-					2D55381D20576C5900328EC4 = {
+					2D161CE5206361FF0062BA35 = {
 						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 2D55381920576C5900328EC4 /* Build configuration list for PBXProject "Tutorial4" */;
+			buildConfigurationList = 2D161CE1206361FF0062BA35 /* Build configuration list for PBXProject "tutorial4" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 			);
-			mainGroup = 2D55381520576C5900328EC4;
-			productRefGroup = 2D55381F20576C5900328EC4 /* Products */;
+			mainGroup = 2D161CDD206361FF0062BA35;
+			productRefGroup = 2D161CE7206361FF0062BA35 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2D55381D20576C5900328EC4 /* Tutorial4 */,
+				2D161CE5206361FF0062BA35 /* tutorial4 */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2D55381A20576C5900328EC4 /* Sources */ = {
+		2D161CE2206361FF0062BA35 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D55382D20576CBE00328EC4 /* helloworld.pb.cc in Sources */,
-				2D55382A20576CA000328EC4 /* main.cpp in Sources */,
+				2D161CF52063626A0062BA35 /* helloworld.pb.cc in Sources */,
+				2D161CF22063625F0062BA35 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		2D55382320576C5900328EC4 /* Debug */ = {
+		2D161CEB206361FF0062BA35 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -196,14 +196,21 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					../../co,
+					../../corpc,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = "-lprotobuf";
 				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
-		2D55382420576C5900328EC4 /* Release */ = {
+		2D161CEC206361FF0062BA35 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -245,38 +252,31 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					../../co,
+					../../corpc,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_LDFLAGS = "-lprotobuf";
 				SDKROOT = macosx;
 			};
 			name = Release;
 		};
-		2D55382620576C5900328EC4 /* Debug */ = {
+		2D161CEE206361FF0062BA35 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2D55382720576C5900328EC4 /* Release */ = {
+		2D161CEF206361FF0062BA35 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -284,25 +284,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2D55381920576C5900328EC4 /* Build configuration list for PBXProject "Tutorial4" */ = {
+		2D161CE1206361FF0062BA35 /* Build configuration list for PBXProject "tutorial4" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2D55382320576C5900328EC4 /* Debug */,
-				2D55382420576C5900328EC4 /* Release */,
+				2D161CEB206361FF0062BA35 /* Debug */,
+				2D161CEC206361FF0062BA35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2D55382520576C5900328EC4 /* Build configuration list for PBXNativeTarget "Tutorial4" */ = {
+		2D161CED206361FF0062BA35 /* Build configuration list for PBXNativeTarget "tutorial4" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2D55382620576C5900328EC4 /* Debug */,
-				2D55382720576C5900328EC4 /* Release */,
+				2D161CEE206361FF0062BA35 /* Debug */,
+				2D161CEF206361FF0062BA35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2D55381620576C5900328EC4 /* Project object */;
+	rootObject = 2D161CDE206361FF0062BA35 /* Project object */;
 }

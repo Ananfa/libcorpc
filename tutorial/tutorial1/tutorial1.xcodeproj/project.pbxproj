@@ -7,18 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D6EEED72057CFB30018650F /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D6EEED62057CFB20018650F /* server.cpp */; };
-		2D6EEEDA2057CFBD0018650F /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D6EEED62057CFB20018650F /* server.cpp */; };
-		2D6EEEE32057D02C0018650F /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D6EEEE12057D02C0018650F /* factorial.pb.cc */; };
-		2D6EEEE52057D0600018650F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D6EEEE72057D0600018650F /* libco.dylib */; };
-		2D6EEEE62057D0600018650F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D6EEEE82057D0600018650F /* libcorpc.dylib */; };
-		2D6EEEE92057D1070018650F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D6EEEE72057D0600018650F /* libco.dylib */; };
-		2D6EEEEA2057D1070018650F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D6EEEE82057D0600018650F /* libcorpc.dylib */; };
-		2D6EEEEB2057D4460018650F /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D6EEEE12057D02C0018650F /* factorial.pb.cc */; };
+		2D161C6A206350DB0062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2020634D0D0062BA35 /* server.cpp */; };
+		2D161C6B206350DE0062BA35 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2420634D1C0062BA35 /* helloworld.pb.cc */; };
+		2D161C77206350F60062BA35 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2420634D1C0062BA35 /* helloworld.pb.cc */; };
+		2D161C78206350F90062BA35 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C1F20634D0D0062BA35 /* client.cpp */; };
+		2D161C792063512C0062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3620634E1B0062BA35 /* libco.dylib */; };
+		2D161C7A2063512C0062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3720634E1B0062BA35 /* libcorpc.dylib */; };
+		2D161C7B206351320062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3620634E1B0062BA35 /* libco.dylib */; };
+		2D161C7C206351320062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3720634E1B0062BA35 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		2D6EEEC92057CF540018650F /* CopyFiles */ = {
+		2D161C61206350CA0062BA35 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -27,7 +27,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
-		2D6EEEDC2057CFBD0018650F /* CopyFiles */ = {
+		2D161C6E206350EF0062BA35 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -39,70 +39,72 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2D6EEECB2057CF540018650F /* Tutorial5Server1 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Tutorial5Server1; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D6EEED62057CFB20018650F /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
-		2D6EEEE02057CFBD0018650F /* Tutorial5Server2 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Tutorial5Server2; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D6EEEE12057D02C0018650F /* factorial.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = factorial.pb.cc; path = ../proto/factorial.pb.cc; sourceTree = "<group>"; };
-		2D6EEEE22057D02C0018650F /* factorial.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = factorial.pb.h; path = ../proto/factorial.pb.h; sourceTree = "<group>"; };
-		2D6EEEE72057D0600018650F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D6EEEE82057D0600018650F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161C1F20634D0D0062BA35 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
+		2D161C2020634D0D0062BA35 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
+		2D161C2320634D1C0062BA35 /* helloworld.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = helloworld.pb.h; path = ../proto/helloworld.pb.h; sourceTree = "<group>"; };
+		2D161C2420634D1C0062BA35 /* helloworld.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = helloworld.pb.cc; path = ../proto/helloworld.pb.cc; sourceTree = "<group>"; };
+		2D161C3620634E1B0062BA35 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161C3720634E1B0062BA35 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161C63206350CA0062BA35 /* tutorial1svr */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial1svr; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D161C70206350EF0062BA35 /* tutorial1clt */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial1clt; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		2D6EEEC82057CF540018650F /* Frameworks */ = {
+		2D161C60206350CA0062BA35 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D6EEEE52057D0600018650F /* libco.dylib in Frameworks */,
-				2D6EEEE62057D0600018650F /* libcorpc.dylib in Frameworks */,
+				2D161C7B206351320062BA35 /* libco.dylib in Frameworks */,
+				2D161C7C206351320062BA35 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		2D6EEEDB2057CFBD0018650F /* Frameworks */ = {
+		2D161C6D206350EF0062BA35 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D6EEEE92057D1070018650F /* libco.dylib in Frameworks */,
-				2D6EEEEA2057D1070018650F /* libcorpc.dylib in Frameworks */,
+				2D161C792063512C0062BA35 /* libco.dylib in Frameworks */,
+				2D161C7A2063512C0062BA35 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2D6EEEC22057CF540018650F = {
+		2D161C0B20634CBF0062BA35 = {
 			isa = PBXGroup;
 			children = (
-				2D6EEED52057CFA70018650F /* src */,
-				2D6EEECC2057CF540018650F /* Products */,
-				2D6EEEE42057D0600018650F /* Frameworks */,
+				2D161C1E20634CF70062BA35 /* src */,
+				2D161C1520634CBF0062BA35 /* Products */,
+				2D161C3320634E1B0062BA35 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		2D6EEECC2057CF540018650F /* Products */ = {
+		2D161C1520634CBF0062BA35 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2D6EEECB2057CF540018650F /* Tutorial5Server1 */,
-				2D6EEEE02057CFBD0018650F /* Tutorial5Server2 */,
+				2D161C63206350CA0062BA35 /* tutorial1svr */,
+				2D161C70206350EF0062BA35 /* tutorial1clt */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2D6EEED52057CFA70018650F /* src */ = {
+		2D161C1E20634CF70062BA35 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				2D6EEEE12057D02C0018650F /* factorial.pb.cc */,
-				2D6EEEE22057D02C0018650F /* factorial.pb.h */,
-				2D6EEED62057CFB20018650F /* server.cpp */,
+				2D161C2420634D1C0062BA35 /* helloworld.pb.cc */,
+				2D161C2320634D1C0062BA35 /* helloworld.pb.h */,
+				2D161C1F20634D0D0062BA35 /* client.cpp */,
+				2D161C2020634D0D0062BA35 /* server.cpp */,
 			);
 			name = src;
 			sourceTree = "<group>";
 		};
-		2D6EEEE42057D0600018650F /* Frameworks */ = {
+		2D161C3320634E1B0062BA35 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				2D6EEEE72057D0600018650F /* libco.dylib */,
-				2D6EEEE82057D0600018650F /* libcorpc.dylib */,
+				2D161C3620634E1B0062BA35 /* libco.dylib */,
+				2D161C3720634E1B0062BA35 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -110,99 +112,100 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2D6EEECA2057CF540018650F /* Tutorial5Server1 */ = {
+		2D161C62206350CA0062BA35 /* tutorial1svr */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2D6EEED22057CF540018650F /* Build configuration list for PBXNativeTarget "Tutorial5Server1" */;
+			buildConfigurationList = 2D161C67206350CA0062BA35 /* Build configuration list for PBXNativeTarget "tutorial1svr" */;
 			buildPhases = (
-				2D6EEEC72057CF540018650F /* Sources */,
-				2D6EEEC82057CF540018650F /* Frameworks */,
-				2D6EEEC92057CF540018650F /* CopyFiles */,
+				2D161C5F206350CA0062BA35 /* Sources */,
+				2D161C60206350CA0062BA35 /* Frameworks */,
+				2D161C61206350CA0062BA35 /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = Tutorial5Server1;
-			productName = Tutorial5Server;
-			productReference = 2D6EEECB2057CF540018650F /* Tutorial5Server1 */;
+			name = tutorial1svr;
+			productName = tutorial1svr;
+			productReference = 2D161C63206350CA0062BA35 /* tutorial1svr */;
 			productType = "com.apple.product-type.tool";
 		};
-		2D6EEED82057CFBD0018650F /* Tutorial5Server2 */ = {
+		2D161C6F206350EF0062BA35 /* tutorial1clt */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2D6EEEDD2057CFBD0018650F /* Build configuration list for PBXNativeTarget "Tutorial5Server2" */;
+			buildConfigurationList = 2D161C74206350EF0062BA35 /* Build configuration list for PBXNativeTarget "tutorial1clt" */;
 			buildPhases = (
-				2D6EEED92057CFBD0018650F /* Sources */,
-				2D6EEEDB2057CFBD0018650F /* Frameworks */,
-				2D6EEEDC2057CFBD0018650F /* CopyFiles */,
+				2D161C6C206350EF0062BA35 /* Sources */,
+				2D161C6D206350EF0062BA35 /* Frameworks */,
+				2D161C6E206350EF0062BA35 /* CopyFiles */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = Tutorial5Server2;
-			productName = Tutorial5Server;
-			productReference = 2D6EEEE02057CFBD0018650F /* Tutorial5Server2 */;
+			name = tutorial1clt;
+			productName = tutorial1clt;
+			productReference = 2D161C70206350EF0062BA35 /* tutorial1clt */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2D6EEEC32057CF540018650F /* Project object */ = {
+		2D161C0C20634CBF0062BA35 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0920;
 				ORGANIZATIONNAME = Dena;
 				TargetAttributes = {
-					2D6EEECA2057CF540018650F = {
+					2D161C62206350CA0062BA35 = {
 						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Automatic;
 					};
-					2D6EEED82057CFBD0018650F = {
+					2D161C6F206350EF0062BA35 = {
+						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 2D6EEEC62057CF540018650F /* Build configuration list for PBXProject "Tutorial5Server" */;
+			buildConfigurationList = 2D161C0F20634CBF0062BA35 /* Build configuration list for PBXProject "tutorial1" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 			);
-			mainGroup = 2D6EEEC22057CF540018650F;
-			productRefGroup = 2D6EEECC2057CF540018650F /* Products */;
+			mainGroup = 2D161C0B20634CBF0062BA35;
+			productRefGroup = 2D161C1520634CBF0062BA35 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2D6EEECA2057CF540018650F /* Tutorial5Server1 */,
-				2D6EEED82057CFBD0018650F /* Tutorial5Server2 */,
+				2D161C62206350CA0062BA35 /* tutorial1svr */,
+				2D161C6F206350EF0062BA35 /* tutorial1clt */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2D6EEEC72057CF540018650F /* Sources */ = {
+		2D161C5F206350CA0062BA35 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D6EEEE32057D02C0018650F /* factorial.pb.cc in Sources */,
-				2D6EEED72057CFB30018650F /* server.cpp in Sources */,
+				2D161C6B206350DE0062BA35 /* helloworld.pb.cc in Sources */,
+				2D161C6A206350DB0062BA35 /* server.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		2D6EEED92057CFBD0018650F /* Sources */ = {
+		2D161C6C206350EF0062BA35 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D6EEEEB2057D4460018650F /* factorial.pb.cc in Sources */,
-				2D6EEEDA2057CFBD0018650F /* server.cpp in Sources */,
+				2D161C77206350F60062BA35 /* helloworld.pb.cc in Sources */,
+				2D161C78206350F90062BA35 /* client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		2D6EEED02057CF540018650F /* Debug */ = {
+		2D161C1920634CBF0062BA35 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -250,14 +253,21 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					../../co,
+					../../corpc,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = "-lprotobuf";
 				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
-		2D6EEED12057CF540018650F /* Release */ = {
+		2D161C1A20634CBF0062BA35 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -299,68 +309,47 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					../../co,
+					../../corpc,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_LDFLAGS = "-lprotobuf";
 				SDKROOT = macosx;
 			};
 			name = Release;
 		};
-		2D6EEED32057CF540018650F /* Debug */ = {
+		2D161C68206350CA0062BA35 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2D6EEED42057CF540018650F /* Release */ = {
+		2D161C69206350CA0062BA35 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
 		};
-		2D6EEEDE2057CFBD0018650F /* Debug */ = {
+		2D161C75206350EF0062BA35 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2D6EEEDF2057CFBD0018650F /* Release */ = {
+		2D161C76206350EF0062BA35 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = (
-					/usr/local/include,
-					../../co,
-					../../corpc,
-				);
-				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -368,34 +357,34 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2D6EEEC62057CF540018650F /* Build configuration list for PBXProject "Tutorial5Server" */ = {
+		2D161C0F20634CBF0062BA35 /* Build configuration list for PBXProject "tutorial1" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2D6EEED02057CF540018650F /* Debug */,
-				2D6EEED12057CF540018650F /* Release */,
+				2D161C1920634CBF0062BA35 /* Debug */,
+				2D161C1A20634CBF0062BA35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2D6EEED22057CF540018650F /* Build configuration list for PBXNativeTarget "Tutorial5Server1" */ = {
+		2D161C67206350CA0062BA35 /* Build configuration list for PBXNativeTarget "tutorial1svr" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2D6EEED32057CF540018650F /* Debug */,
-				2D6EEED42057CF540018650F /* Release */,
+				2D161C68206350CA0062BA35 /* Debug */,
+				2D161C69206350CA0062BA35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2D6EEEDD2057CFBD0018650F /* Build configuration list for PBXNativeTarget "Tutorial5Server2" */ = {
+		2D161C74206350EF0062BA35 /* Build configuration list for PBXNativeTarget "tutorial1clt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2D6EEEDE2057CFBD0018650F /* Debug */,
-				2D6EEEDF2057CFBD0018650F /* Release */,
+				2D161C75206350EF0062BA35 /* Debug */,
+				2D161C76206350EF0062BA35 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2D6EEEC32057CF540018650F /* Project object */;
+	rootObject = 2D161C0C20634CBF0062BA35 /* Project object */;
 }

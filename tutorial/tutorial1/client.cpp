@@ -26,7 +26,7 @@
 
 using namespace CoRpc;
 
-static void *rpc_routine( void *arg )
+static void *helloworld_routine( void *arg )
 {
     co_enable_hook_sys();
     
@@ -81,7 +81,7 @@ int main(int argc, const char * argv[]) {
     Client *client = Client::instance();
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
     
-    RoutineEnvironment::startCoroutine(rpc_routine, channel);
+    RoutineEnvironment::startCoroutine(helloworld_routine, channel);
     
     printf("running...\n");
     

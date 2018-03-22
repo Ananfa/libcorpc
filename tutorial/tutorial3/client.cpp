@@ -27,7 +27,7 @@
 
 using namespace CoRpc;
 
-static void *rpc_routine( void *arg )
+static void *helloworld_routine( void *arg )
 {
     co_enable_hook_sys();
     
@@ -83,7 +83,7 @@ static void *echo_routine( void *arg )
     if (controller->Failed()) {
         printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
     } else {
-        printf("%s\n", response->msg().c_str());
+        printf("========= %s =========\n", response->msg().c_str());
     }
     
     delete controller;
@@ -117,7 +117,7 @@ int main(int argc, const char * argv[]) {
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
     
     RoutineEnvironment::startCoroutine(echo_routine, channel);
-    RoutineEnvironment::startCoroutine(rpc_routine, channel);
+    RoutineEnvironment::startCoroutine(helloworld_routine, channel);
     
     printf("running...\n");
     
