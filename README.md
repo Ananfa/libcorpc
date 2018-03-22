@@ -25,26 +25,50 @@ TODO: 类介绍
 - 采用google protobuf 2.6.1
 - corpc_option.proto
 
-    import "google/protobuf/descriptor.proto";
+```protobuf
+import "google/protobuf/descriptor.proto";
 
-    package corpc;
+package corpc;
 
-    extend google.protobuf.ServiceOptions {
-        optional uint32 global_service_id = 10000;  // 用于定义每个service的id
-    }
+extend google.protobuf.ServiceOptions {
+    optional uint32 global_service_id = 10000;  // 用于定义每个service的id
+}
 
-    extend google.protobuf.MethodOptions {
-        optional bool need_coroutine = 10002;       // 是否新开协程执行方法
-        optional bool not_care_response = 10003;    // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
-    }
+extend google.protobuf.MethodOptions {
+    optional bool need_coroutine = 10002;       // 是否新开协程执行方法
+    optional bool not_care_response = 10003;    // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
+}
 
-    message Void {}
+message Void {}
+```
 
 - 定义rpc服务proto文件时，需要先 import "corpc_option.proto";
+
 - global_service_id为每个service定义id，注册到同一个CoRpc::Server中的service的id不能重复
-- need_coroutine设置是否启动新协程来调用rpc服务实现方法（tutorial3和tutorial5有关于该选项的用例）
-- not_care_response设置为true时相当于单向消息传递
-- 具体proto例子可以参考tutorial/proto
+- need_coroutine设置是否启动新协程来调用rpc服务实现方法，默认为false（tutorial3和tutorial5有关于该选项的用例）
+- not_care_response设置为true时相当于单向消息传递，默认为false
+- 例子：helloworld.proto
+
+```protobuf
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message FooRequest {
+    required string msg1 = 1;
+    required string msg2 = 2;
+}
+
+message FooResponse {
+    required string msg = 1;
+}
+
+service HelloWorldService {
+    option (corpc.global_service_id) = 1;
+
+    rpc foo(FooRequest) returns(FooResponse);
+}
+```
 
 ***
 
