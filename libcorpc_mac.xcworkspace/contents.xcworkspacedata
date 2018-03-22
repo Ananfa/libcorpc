@@ -2,21 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:tutorial/tutorial5/tutorial5.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:tutorial/tutorial4/tutorial4.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:tutorial/tutorial3/tutorial3.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:tutorial/tutorial2/tutorial2.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:tutorial/tutorial1/tutorial1.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "group:co/co.xcodeproj">
    </FileRef>
    <FileRef
@@ -30,6 +15,21 @@
    </FileRef>
    <FileRef
       location = "group:test/innerRpc/innerRpc.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial5/tutorial5.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial4/tutorial4.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial3/tutorial3.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial2/tutorial2.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:tutorial/tutorial1/tutorial1.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:test/testechosvr/testechosvr.xcodeproj">
