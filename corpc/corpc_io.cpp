@@ -123,7 +123,9 @@ namespace CoRpc {
         // 等待写关闭
         while (!connection->_canClose) {
             // sleep 100 milisecond
-            usleep(100000);
+            struct pollfd pf = { 0 };
+            pf.fd = -1;
+            poll( &pf,1,100 );
         }
         
         close(fd);

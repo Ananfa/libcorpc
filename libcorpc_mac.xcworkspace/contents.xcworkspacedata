@@ -8,10 +8,7 @@
       location = "group:corpc/corpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/rpcsvr/rpcsvr.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:test/rpccli/rpccli.xcodeproj">
+      location = "group:test/interRpc/interRpc.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:test/innerRpc/innerRpc.xcodeproj">

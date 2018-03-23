@@ -210,8 +210,6 @@ namespace CoRpc {
                 // 处理任务队列
                 Request *request = queue.pop();
                 while (request) {
-                    // TODO: 控制此循环时间，让其他协程有机会执行（主要是RoutineEnvironment::deamonRoutine）
-                    // 根据RoutineEnvironment::deamonRoutine执行时等待消耗的协程数量来调节
                     const MethodData *methodData = server->getMethod(request->serviceId, request->methodId);
                     
                     bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
@@ -227,6 +225,7 @@ namespace CoRpc {
                         request->client->response(request->co);
                     }
                     
+                    // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
                     gettimeofday(&t2, NULL);
                     if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
                         struct pollfd pf = { 0 };

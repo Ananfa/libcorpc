@@ -337,6 +337,9 @@ namespace CoRpc {
                 }
             }
             
+            struct timeval t1,t2;
+            gettimeofday(&t1, NULL);
+            
             // 处理任务队列
             WorkerTask *task = tqueue.pop();
             while (task) {
@@ -355,6 +358,16 @@ namespace CoRpc {
                     }
                     
                     delete task;
+                }
+                
+                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                gettimeofday(&t2, NULL);
+                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
+                    struct pollfd pf = { 0 };
+                    pf.fd = -1;
+                    poll( &pf,1,1 );
+                    
+                    gettimeofday(&t1, NULL);
                 }
                 
                 task = tqueue.pop();
