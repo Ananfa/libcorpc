@@ -17,6 +17,8 @@
 #include "corpc_routine_env.h"
 #include "corpc_server.h"
 
+#include <signal.h>
+
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
@@ -83,6 +85,10 @@ int main(int argc, char *argv[]) {
     
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
+    
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigaction( SIGPIPE, &sa, NULL );
     
     // 注册服务
     IO::initialize(1, 1);
