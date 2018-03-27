@@ -17,6 +17,8 @@
 #include "corpc_routine_env.h"
 
 #include "corpc_io.h"
+#include "corpc_utils.h"
+#include <sys/time.h>
 
 // TODO: 使用统一的Log接口记录Log
 
@@ -67,7 +69,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    usleep(10000);
+                    msleep(10);
                 }
             }
             
@@ -123,9 +125,7 @@ namespace CoRpc {
         // 等待写关闭
         while (!connection->_canClose) {
             // sleep 100 milisecond
-            struct pollfd pf = { 0 };
-            pf.fd = -1;
-            poll( &pf,1,100 );
+            msleep(100);
         }
         
         close(fd);
@@ -211,7 +211,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    usleep(10000);
+                    msleep(10);
                 }
             }
         

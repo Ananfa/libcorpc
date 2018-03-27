@@ -17,6 +17,16 @@
 #ifndef corpc_utils_h
 #define corpc_utils_h
 
+#include <sys/poll.h>
+
 int setKeepAlive(int fd, int interval);
+
+inline void msleep(int msec)
+{
+    struct pollfd pf = { 0 };
+    pf.fd = -1;
+    poll( &pf,1,msec );
+}
+
 
 #endif /* corpc_utils_h */

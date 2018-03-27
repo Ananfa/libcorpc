@@ -732,7 +732,7 @@ int fcntl(int fildes, int cmd, ...)
 
 unsigned int sleep(unsigned int seconds)
 {
-    HOOK_SYS_FUNC( send );
+    HOOK_SYS_FUNC( sleep );
     
     if( !co_is_enable_sys_hook() )
     {
@@ -748,7 +748,7 @@ unsigned int sleep(unsigned int seconds)
 
 int usleep(useconds_t usec)
 {
-    HOOK_SYS_FUNC( send );
+    HOOK_SYS_FUNC( usleep );
     
     if( !co_is_enable_sys_hook() )
     {

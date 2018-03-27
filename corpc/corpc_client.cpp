@@ -17,6 +17,7 @@
 #include "corpc_routine_env.h"
 
 #include "corpc_client.h"
+#include "corpc_utils.h"
 
 #include <errno.h>
 #include <sys/socket.h>
@@ -292,7 +293,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    usleep(10000);
+                    msleep(10);
                 }
             }
             
@@ -512,7 +513,7 @@ namespace CoRpc {
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    usleep(10000);
+                    msleep(10);
                 }
             }
             
