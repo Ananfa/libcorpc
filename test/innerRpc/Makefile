@@ -19,30 +19,80 @@ COMM_MAKE = 1
 COMM_ECHO = 1
 version=0.1
 v=debug
-include ../../co/co.mk
 
-########## options ##########
-CFLAGS += -g -fno-strict-aliasing -O2 -Wall -export-dynamic \
-	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
+DIR_SRC = ./ ../proto/
+DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
+DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_OBJ = ./${v}/obj/
+DIR_BIN = ./${v}/bin/
 
-UNAME := $(shell uname -s)
+PROTO_OBJS = foo.pb.o bar.pb.o baz.pb.o
+OBJS = ${PROTO_OBJS} main.o
+OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
-INCLS += -I../proto -I../../co -I../../corpc
+empty =  
+space =${empty} ${empty}  
+VPATH := ${subst ${space},:,${DIR_SRC}}:${DIR_BIN}  
+vpath %.o ${DIR_OBJ}  
+vpath %.d ${DIR_OBJ}  
 
-ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L../../co/lib -L../../corpc/lib -L/usr/local/lib -lcorpclib -lcolib -lprotobuf -lpthread
+INCLS = ${foreach n,${DIR_INC},-I${n}}
+
+CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
+    -fno-strict-aliasing -Wall -export-dynamic \
+    -D_GNU_SOURCE -D_REENTRANT -Wno-deprecated -m64
+
+ifeq ($v,release)
+CFLAGS += -O2
 else
-LINKS += -g -L../../co/lib -L../../corpc/lib -L/usr/local/lib -lcorpclib -lcolib -lprotobuf -lpthread -ldl
+CFLAGS += -g -Ddebug -fno-inline
 endif
 
-INNER_RPC_OBJS=../proto/foo.pb.o ../proto/bar.pb.o ../proto/baz.pb.o main.o
+ifneq ($v,release)
+BFLAGS = -g
+endif
 
-PROGS = innerRpc
+UNAME := ${shell uname -s}
 
-all:$(PROGS)
+ifeq (${UNAME}, FreeBSD)
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread
+else
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread -ldl
+endif
 
-innerRpc: $(INNER_RPC_OBJS)
-	$(BUILDEXE)
+CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
+BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
 
+BUILDDEP = ${CXX} $(CFLAGS) -MM -MT "$(subst .c,.o,${notdir $<}) $(subst .c,.d,${notdir $<})" -MF "$(subst .c,.d,${DIR_OBJ}${notdir $<})" $< 
+
+PROGS = inner
+
+%.o: %.cpp
+	${CPPCOMPILE}
+%.o: %.cc
+	${CPPCOMPILE}
+
+%.d:%.cpp
+	${CXX} $(CFLAGS) -MM -MT "${subst .cpp,.o,${notdir $<}} ${subst .cpp,.d,${notdir $<}}" -MF "${subst .cpp,.d,${DIR_OBJ}${notdir $<}}" $< 
+%.d:%.cc
+	${CXX} $(CFLAGS) -MM -MT "${subst .cc,.o,${notdir $<}} ${subst .cc,.d,${notdir $<}}" -MF "${subst .cc,.d,${DIR_OBJ}${notdir $<}}" $< 
+  
+.PHONY: all
+all: directories ${PROGS}
+
+inner: ${OBJS:.o=.d} ${OBJS}
+	${BUILDEXE}
+
+.PHONY: directories 
+directories:
+	mkdir -p ${DIR_OBJ}
+	mkdir -p ${DIR_BIN}
+
+ifneq ($(MAKECMDGOALS),clean)
+-include ${OBJS_WITH_PATH:.o=.d}
+endif
+
+.PHONY: clean
 clean:
-	$(CLEAN) *.o $(PROGS)
+	rm -rf ${DIR_OBJ}
+	rm -rf ${DIR_BIN}

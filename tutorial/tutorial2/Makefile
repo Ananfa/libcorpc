@@ -19,39 +19,90 @@ COMM_MAKE = 1
 COMM_ECHO = 1
 version=0.1
 v=debug
-include ../../co/co.mk
 
-########## options ##########
-CFLAGS += -g -fno-strict-aliasing -O2 -Wall -export-dynamic \
-	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
+DIR_SRC = ./ ../proto/
+DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
+DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_OBJ = ./${v}/obj/
+DIR_BIN = ./${v}/bin/
 
-UNAME := $(shell uname -s)
+PROTO_OBJS = helloworld.pb.o
+SERVER_OBJS = ${PROTO_OBJS} server.o
+MIDDLE1_OBJS = ${PROTO_OBJS} middle1.o
+MIDDLE2_OBJS = ${PROTO_OBJS} middle2.o
+CLIENT_OBJS = ${PROTO_OBJS} client.o
+ALL_OBJS = ${PROTO_OBJS} server.o middle1.o middle2.o client.o
+ALL_OBJS_WITH_PATH = ${foreach n,${ALL_OBJS},${DIR_OBJ}${n}}
 
-INCLS += -I../proto -I../../co -I../../corpc
+empty =  
+space =${empty} ${empty}  
+VPATH := ${subst ${space},:,${DIR_SRC}}:${DIR_BIN}  
+vpath %.o ${DIR_OBJ}  
+vpath %.d ${DIR_OBJ}  
 
-ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L../../co/lib -L../../corpc/lib -L/usr/local/lib -lcorpclib -lcolib -lprotobuf -lpthread
+INCLS = ${foreach n,${DIR_INC},-I${n}}
+
+CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
+    -fno-strict-aliasing -Wall -export-dynamic \
+    -D_GNU_SOURCE -D_REENTRANT -Wno-deprecated -m64
+
+ifeq ($v,release)
+CFLAGS += -O2
 else
-LINKS += -g -L../../co/lib -L../../corpc/lib -L/usr/local/lib -lcorpclib -lcolib -lprotobuf -lpthread -ldl
+CFLAGS += -g -Ddebug -fno-inline
 endif
 
-TUTORIAL2_SERVER_OBJS=../proto/helloworld.pb.o server.o
-TUTORIAL2_MIDDLE1_OBJS=../proto/helloworld.pb.o middle1.o
-TUTORIAL2_MIDDLE2_OBJS=../proto/helloworld.pb.o middle2.o
-TUTORIAL2_CLIENT_OBJS=../proto/helloworld.pb.o client.o
+ifneq ($v,release)
+BFLAGS = -g
+endif
+
+UNAME := ${shell uname -s}
+
+ifeq (${UNAME}, FreeBSD)
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread
+else
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread -ldl
+endif
+
+CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
+BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
+
+BUILDDEP = ${CXX} $(CFLAGS) -MM -MT "$(subst .c,.o,${notdir $<}) $(subst .c,.d,${notdir $<})" -MF "$(subst .c,.d,${DIR_OBJ}${notdir $<})" $< 
 
 PROGS = server middle1 middle2 client
 
-all:$(PROGS)
+%.o: %.cpp
+	${CPPCOMPILE}
+%.o: %.cc
+	${CPPCOMPILE}
 
-server: $(TUTORIAL2_SERVER_OBJS)
-	$(BUILDEXE) 
-middle1: $(TUTORIAL2_MIDDLE1_OBJS)
-	$(BUILDEXE) 
-middle2: $(TUTORIAL2_MIDDLE2_OBJS)
-	$(BUILDEXE) 
-client: $(TUTORIAL2_CLIENT_OBJS)
-	$(BUILDEXE) 
+%.d:%.cpp
+	${CXX} $(CFLAGS) -MM -MT "${subst .cpp,.o,${notdir $<}} ${subst .cpp,.d,${notdir $<}}" -MF "${subst .cpp,.d,${DIR_OBJ}${notdir $<}}" $< 
+%.d:%.cc
+	${CXX} $(CFLAGS) -MM -MT "${subst .cc,.o,${notdir $<}} ${subst .cc,.d,${notdir $<}}" -MF "${subst .cc,.d,${DIR_OBJ}${notdir $<}}" $< 
+  
+.PHONY: all
+all: directories ${PROGS}
 
+server: ${SERVER_OBJS:.o=.d} ${SERVER_OBJS}
+	${BUILDEXE}
+middle1: ${MIDDLE1_OBJS:.o=.d} $(MIDDLE1_OBJS)
+	${BUILDEXE}
+middle2: ${MIDDLE2_OBJS:.o=.d} $(MIDDLE2_OBJS)
+	${BUILDEXE}
+client: ${CLIENT_OBJS:.o=.d} $(CLIENT_OBJS)
+	${BUILDEXE}
+
+.PHONY: directories 
+directories:
+	mkdir -p ${DIR_OBJ}
+	mkdir -p ${DIR_BIN}
+
+ifneq ($(MAKECMDGOALS),clean)
+-include ${ALL_OBJS_WITH_PATH:.o=.d}
+endif
+
+.PHONY: clean
 clean:
-	$(CLEAN) *.o $(PROGS)
+	rm -rf ${DIR_OBJ}
+	rm -rf ${DIR_BIN}
