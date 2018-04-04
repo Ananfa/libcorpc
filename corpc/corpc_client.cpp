@@ -34,12 +34,14 @@ namespace CoRpc {
     
     __thread Client *Client::_instance(nullptr);
     
-    Client::Connection::Connection(Channel *channel): IO::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED), _respdata(CORPC_MAX_RESPONSE_SIZE,0), _headNum(0), _dataNum(0) {
+    Client::Splitter::Splitter(): _respdata(CORPC_MAX_RESPONSE_SIZE,0), _headNum(0), _dataNum(0) {
         _head_buf = (char *)(&_resphead);
         _data_buf = (uint8_t *)_respdata.data();
     }
     
-    bool Client::Connection::parseData(uint8_t *buf, int size) {
+    Client::Splitter::~Splitter() {}
+    
+    bool Client::Splitter::split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size) {
         // 解析数据
         int offset = 0;
         while (size > offset) {
@@ -60,7 +62,7 @@ namespace CoRpc {
             }
             
             if (_resphead.size > CORPC_MAX_RESPONSE_SIZE) { // 数据超长
-                printf("ERROR: Client::Connection::parseData -- response too large for fd:%d in thread:%d\n", _fd, GetPid());
+                printf("ERROR: Client::Splitter::split -- request too large in thread:%d\n", GetPid());
                 
                 return false;
             }
@@ -81,32 +83,9 @@ namespace CoRpc {
                 }
             }
             
-            ClientTask *task = NULL;
-            // 注意: _waitResultCoMap需进行线程同步
-            {
-                std::unique_lock<std::mutex> lock( _waitResultCoMapMutex );
-                WaitTaskMap::iterator itor = _waitResultCoMap.find(_resphead.callId);
-                
-                if (itor == _waitResultCoMap.end()) {
-                    // 打印出错信息
-                    printf("Client::Connection::parseData can't find task : %llu\n", _resphead.callId);
-                    assert(false);
-                    return false;
-                }
-                
-                task = itor->second;
-                
-                // 唤醒结果对应的等待结果协程进行处理
-                _waitResultCoMap.erase(itor);
-            }
-            
-            // 解析包体（RpcResponseData）
-            if (!task->rpcTask->response->ParseFromArray(_data_buf, _resphead.size)) {
-                printf("ERROR: Client::Connection::parseData -- parse response body fail\n");
+            if (!connection->getPipeline()->getDecoder()->decode(connection, &_resphead, _data_buf, _resphead.size)) {
                 return false;
             }
-            
-            _channel->_client->_downQueue.push(task->rpcTask->co);
             
             // 处理完一个请求消息，复位状态
             _headNum = 0;
@@ -116,55 +95,132 @@ namespace CoRpc {
         return true;
     }
     
-    int Client::Connection::buildData(uint8_t *buf, int space) {
-        int used = 0;
-        while (_datas.size() > 0) {
-            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(_datas.front());
-            int msgSize = rpcTask->request->GetCachedSize();
-            if (msgSize == 0) {
-                msgSize = rpcTask->request->ByteSize();
+    Client::Decoder::~Decoder() {}
+    
+    bool Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        RpcResponseHead *resphead = (RpcResponseHead *)head;
+        
+        ClientTask *task = NULL;
+        // 注意: _waitResultCoMap需进行线程同步
+        {
+            std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
+            Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(resphead->callId);
+            
+            if (itor == conn->_waitResultCoMap.end()) {
+                // 打印出错信息
+                printf("Client::Connection::parseData can't find task : %llu\n", resphead->callId);
+                assert(false);
+                return false;
             }
             
-            if (msgSize + sizeof(RpcRequestHead) >= space - used) {
-                break;
-            }
+            task = itor->second;
             
-            // head
-            RpcRequestHead reqhead;
-            reqhead.serviceId = rpcTask->serviceId;
-            reqhead.methodId = rpcTask->methodId;
-            reqhead.callId = uint64_t(rpcTask->co);
-            reqhead.size = msgSize;
-            
-            memcpy(buf + used, &reqhead, sizeof(RpcRequestHead));
-            used += sizeof(RpcRequestHead);
-            
-            rpcTask->request->SerializeWithCachedSizesToArray(buf + used);
-            used += msgSize;
-            
-            _datas.pop_front();
-            
-            if (rpcTask->response == NULL) {
-                // 注意: _waitResultCoMap需进行线程同步
-                {
-                    std::unique_lock<std::mutex> lock( _waitResultCoMapMutex );
-                    if (_waitResultCoMap.erase(reqhead.callId) == 0) {
-                        printf("ERROR: Client::Connection::buildData -- task not in waitResultCoMap\n");
-                        assert(false);
-                    }
-                }
-                
-                _channel->_client->_downQueue.push(rpcTask->co);
-            }
+            // 唤醒结果对应的等待结果协程进行处理
+            conn->_waitResultCoMap.erase(itor);
         }
         
-        return used;
+        // 解析包体（RpcResponseData）
+        if (!task->rpcTask->response->ParseFromArray(body, resphead->size)) {
+            printf("ERROR: Client::Connection::parseData -- parse response body fail\n");
+            return false;
+        }
+        
+        if (!connection->getPipeline()->getRouter()->route(connection, 0, task)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    Client::Router::~Router() {}
+    
+    bool Client::Router::route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        
+        ClientTask *task = (ClientTask *)msg;
+        
+        conn->_channel->_client->_downQueue.push(task->rpcTask->co);
+        
+        return true;
+    }
+    
+    Client::Encoder::~Encoder() {}
+    
+    bool Client::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        
+        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        int msgSize = rpcTask->request->GetCachedSize();
+        if (msgSize == 0) {
+            msgSize = rpcTask->request->ByteSize();
+        }
+        
+        if (msgSize + sizeof(RpcRequestHead) >= space) {
+            return true;
+        }
+        
+        // head
+        RpcRequestHead reqhead;
+        reqhead.serviceId = rpcTask->serviceId;
+        reqhead.methodId = rpcTask->methodId;
+        reqhead.callId = uint64_t(rpcTask->co);
+        reqhead.size = msgSize;
+        
+        memcpy(buf, &reqhead, sizeof(RpcRequestHead));
+        size = sizeof(RpcRequestHead);
+        
+        rpcTask->request->SerializeWithCachedSizesToArray(buf + size);
+        size += msgSize;
+        
+        if (rpcTask->response == NULL) {
+            // 注意: _waitResultCoMap需进行线程同步
+            {
+                std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
+                if (conn->_waitResultCoMap.erase(reqhead.callId) == 0) {
+                    printf("ERROR: Client::Connection::buildData -- task not in waitResultCoMap\n");
+                    assert(false);
+                }
+            }
+            
+            conn->_channel->_client->_downQueue.push(rpcTask->co);
+        }
+        
+        return true;
+    }
+    
+    std::shared_ptr<CoRpc::Pipeline> Client::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection) );
+        
+        std::shared_ptr<CoRpc::Splitter> splitter( new Splitter() );
+        
+        pipeline->setSplitter(splitter);
+        
+        if (!_decoder) {
+            _decoder.reset( new Decoder() );
+        }
+        pipeline->setDecoder(_decoder);
+        
+        if (!_router) {
+            _router.reset( new Router() );
+        }
+        pipeline->setRouter(_router);
+        
+        if (!_encoder) {
+            _encoder.reset( new Encoder() );
+        }
+        pipeline->addEncoder(_encoder);
+        
+        return pipeline;
+    }
+    
+    Client::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED) {
     }
     
     void Client::Connection::onClose() {
         ConnectionTask *connectionTask = new ConnectionTask;
         connectionTask->type = ConnectionTask::CLOSE;
-        connectionTask->connection = std::static_pointer_cast<Connection>(IO::Connection::shared_from_this());
+        connectionTask->connection = std::static_pointer_cast<Connection>(CoRpc::Connection::shared_from_this());
         
         _channel->_client->_connectionTaskQueue.push(connectionTask);
     }
@@ -193,6 +249,11 @@ namespace CoRpc {
         
         if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
             _connections[_conIndex] = std::make_shared<Connection>(this);
+            
+            std::shared_ptr<CoRpc::Connection> connection = _connections[_conIndex];
+            
+            std::shared_ptr<CoRpc::Pipeline> pipeline = PipelineFactory::Instance().buildPipeline(connection);
+            connection->setPipeline(pipeline);
         }
         
         if (_connections[_conIndex]->_st == Connection::CLOSED) {
@@ -415,7 +476,7 @@ namespace CoRpc {
                         connection->_channel->_connectDelay = false;
                         
                         // 加入到IO中
-                        std::shared_ptr<IO::Connection> ioConnection = std::static_pointer_cast<IO::Connection>(connection);
+                        std::shared_ptr<CoRpc::Connection> ioConnection = std::static_pointer_cast<CoRpc::Connection>(connection);
                         self->_io->addConnection(ioConnection);
                         
                         // 发送等待发送队列中的任务
@@ -423,7 +484,7 @@ namespace CoRpc {
                             ClientTask *task = connection->_waitSendTaskCoList.front();
                             connection->_waitSendTaskCoList.pop_front();
                             
-                            std::shared_ptr<IO::Connection> ioConn = std::static_pointer_cast<IO::Connection>(connection);
+                            std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(connection);
                             
                             {
                                 std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
@@ -476,7 +537,7 @@ namespace CoRpc {
             if (conn->_st == Connection::CONNECTING) {
                 conn->_waitSendTaskCoList.push_back(task);
             } else {
-                std::shared_ptr<IO::Connection> ioConn = std::static_pointer_cast<IO::Connection>(conn);
+                std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(conn);
                 
                 {
                     std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);

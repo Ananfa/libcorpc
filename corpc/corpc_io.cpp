@@ -23,25 +23,72 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    IO* IO::_io(nullptr);
     
-    IO::Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _isClosing(false), _canClose(false) {
+    Splitter::~Splitter() {}
+    
+    Decoder::~Decoder() {}
+    
+    Router::~Router() {}
+    
+    Encoder::~Encoder() {}
+    
+    bool Pipeline::upflow(uint8_t *buf, int size) {
+        std::shared_ptr<Connection> connection = _connection.lock();
+        assert(connection);
+        
+        return _splitter->split(connection, buf, size);
     }
     
-    IO::Connection::~Connection() {
+    bool Pipeline::downflow(uint8_t *buf, int space, int &size) {
+        std::shared_ptr<Connection> connection = _connection.lock();
+        assert(connection);
+        
+        size = 0;
+        while (connection->_datas.size() > 0) {
+            bool encoded = false;
+            for (std::vector<std::shared_ptr<Encoder>>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
+                int tmp = 0;
+                if ((*it)->encode(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
+                    if (!tmp) { // 数据放不进buf中（等下次放入）
+                        return true;
+                    }
+                    
+                    size += tmp;
+                    encoded = true;
+                    break;
+                }
+            }
+            
+            if (!encoded) {
+                // 找不到可处理的编码器
+                return false;
+            }
+            
+            connection->_datas.pop_front();
+        }
+        
+        return true;
+    }
+    
+    PipelineFactory::~PipelineFactory() {}
+    
+    Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _isClosing(false), _canClose(false) {
+    }
+    
+    Connection::~Connection() {
         
     }
     
-    void IO::Connection::send(std::shared_ptr<void> data) {
+    void Connection::send(std::shared_ptr<void> data) {
         std::shared_ptr<Connection> self = shared_from_this();
         _io->_sender->send(self, data);
     }
     
-    IO::Receiver::~Receiver() {
+    Receiver::~Receiver() {
         
     }
     
-    void *IO::Receiver::connectionDispatchRoutine( void * arg ) {
+    void *Receiver::connectionDispatchRoutine( void * arg ) {
         QueueContext *context = (QueueContext*)arg;
         
         ReceiverTaskQueue& queue = context->_queue;
@@ -83,7 +130,7 @@ namespace CoRpc {
         }
     }
     
-    void *IO::Receiver::connectionRoutine( void * arg ) {
+    void *Receiver::connectionRoutine( void * arg ) {
         co_enable_hook_sys();
         ReceiverTask *recvTask = (ReceiverTask *)arg;
         std::shared_ptr<Connection> connection = recvTask->connection;
@@ -114,7 +161,7 @@ namespace CoRpc {
                 break;
             }
             
-            if (!connection->parseData(buf, ret)) {
+            if (!connection->getPipeline()->upflow(buf, ret)) {
                 break;
             }
         }
@@ -136,14 +183,14 @@ namespace CoRpc {
         return NULL;
     }
     
-    void IO::MultiThreadReceiver::threadEntry(ThreadData *tdata) {
+    void MultiThreadReceiver::threadEntry(ThreadData *tdata) {
         // 启动处理待处理连接协程
         RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &tdata->_queueContext);
         
         RoutineEnvironment::runEventLoop();
     }
     
-    bool IO::MultiThreadReceiver::start() {
+    bool MultiThreadReceiver::start() {
         // 启动线程
         for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
             it->_queueContext._receiver = this;
@@ -153,7 +200,7 @@ namespace CoRpc {
         return true;
     }
     
-    void IO::MultiThreadReceiver::addConnection(std::shared_ptr<Connection>& connection) {
+    void MultiThreadReceiver::addConnection(std::shared_ptr<Connection>& connection) {
         _lastThreadIndex = (_lastThreadIndex + 1) % _threadNum;
         
         connection->setRecvThreadIndex(_lastThreadIndex);
@@ -164,13 +211,13 @@ namespace CoRpc {
         _threadDatas[_lastThreadIndex]._queueContext._queue.push(recvTask);
     }
     
-    bool IO::CoroutineReceiver::start() {
+    bool CoroutineReceiver::start() {
         RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &_queueContext);
         
         return true;
     }
     
-    void IO::CoroutineReceiver::addConnection(std::shared_ptr<Connection>& connection) {
+    void CoroutineReceiver::addConnection(std::shared_ptr<Connection>& connection) {
         connection->setRecvThreadIndex(0);
         
         ReceiverTask *recvTask = new ReceiverTask;
@@ -179,11 +226,11 @@ namespace CoRpc {
         _queueContext._queue.push(recvTask);
     }
     
-    IO::Sender::~Sender() {
+    Sender::~Sender() {
         
     }
     
-    void *IO::Sender::taskQueueRoutine( void * arg ) {
+    void *Sender::taskQueueRoutine( void * arg ) {
         QueueContext *context = (QueueContext*)arg;
         
         SenderTaskQueue& queue = context->_queue;
@@ -257,7 +304,7 @@ namespace CoRpc {
         return NULL;
     }
     
-    void *IO::Sender::connectionRoutine( void * arg ) {
+    void *Sender::connectionRoutine( void * arg ) {
         // 注意: 参数不能传shared_ptr所管理的指针，另外要考虑shared_ptr的多线程问题
         SenderTask *task = (SenderTask*)arg;
         assert(task->type == SenderTask::INIT);
@@ -278,7 +325,12 @@ namespace CoRpc {
                 break;
             }
             
-            endIndex += connection->buildData(buf + endIndex, CORPC_MAX_BUFFER_SIZE - endIndex);
+            int tmp = 0;
+            if (!connection->getPipeline()->downflow(buf + endIndex, CORPC_MAX_BUFFER_SIZE - endIndex, tmp)) {
+                break;
+            }
+            
+            endIndex += tmp;
             
             int dataSize = endIndex - startIndex;
             if (dataSize == 0) {
@@ -317,7 +369,7 @@ namespace CoRpc {
         return NULL;
     }
     
-    bool IO::MultiThreadSender::start() {
+    bool MultiThreadSender::start() {
         // 启动线程
         for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
             it->_queueContext._sender = this;
@@ -327,7 +379,7 @@ namespace CoRpc {
         return true;
     }
     
-    void IO::MultiThreadSender::addConnection(std::shared_ptr<Connection>& connection) {
+    void MultiThreadSender::addConnection(std::shared_ptr<Connection>& connection) {
         _lastThreadIndex = (_lastThreadIndex + 1) % _threadNum;
         
         connection->setSendThreadIndex(_lastThreadIndex);
@@ -339,7 +391,7 @@ namespace CoRpc {
         _threadDatas[_lastThreadIndex]._queueContext._queue.push(senderTask);
     }
     
-    void IO::MultiThreadSender::removeConnection(std::shared_ptr<Connection>& connection) {
+    void MultiThreadSender::removeConnection(std::shared_ptr<Connection>& connection) {
         SenderTask *senderTask = new SenderTask;
         senderTask->type = SenderTask::CLOSE;
         senderTask->connection = connection;
@@ -347,7 +399,7 @@ namespace CoRpc {
         _threadDatas[connection->getSendThreadIndex()]._queueContext._queue.push(senderTask);
     }
     
-    void IO::MultiThreadSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
+    void MultiThreadSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
         SenderTask *senderTask = new SenderTask;
         senderTask->type = SenderTask::DATA;
         senderTask->connection = connection;
@@ -356,20 +408,20 @@ namespace CoRpc {
         _threadDatas[connection->getSendThreadIndex()]._queueContext._queue.push(senderTask);
     }
     
-    void IO::MultiThreadSender::threadEntry( ThreadData *tdata ) {
+    void MultiThreadSender::threadEntry( ThreadData *tdata ) {
         // 启动send协程
         RoutineEnvironment::startCoroutine(taskQueueRoutine, &tdata->_queueContext);
         
         RoutineEnvironment::runEventLoop();
     }
     
-    bool IO::CoroutineSender::start() {
+    bool CoroutineSender::start() {
         RoutineEnvironment::startCoroutine(taskQueueRoutine, &_queueContext);
         
         return true;
     }
     
-    void IO::CoroutineSender::addConnection(std::shared_ptr<Connection>& connection) {
+    void CoroutineSender::addConnection(std::shared_ptr<Connection>& connection) {
         connection->setSendThreadIndex(0);
         
         SenderTask *senderTask = new SenderTask;
@@ -379,7 +431,7 @@ namespace CoRpc {
         _queueContext._queue.push(senderTask);
     }
     
-    void IO::CoroutineSender::removeConnection(std::shared_ptr<Connection>& connection) {
+    void CoroutineSender::removeConnection(std::shared_ptr<Connection>& connection) {
         SenderTask *senderTask = new SenderTask;
         senderTask->type = SenderTask::CLOSE;
         senderTask->connection = connection;
@@ -387,7 +439,7 @@ namespace CoRpc {
         _queueContext._queue.push(senderTask);
     }
     
-    void IO::CoroutineSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
+    void CoroutineSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
         SenderTask *senderTask = new SenderTask;
         senderTask->type = SenderTask::DATA;
         senderTask->connection = connection;
@@ -395,6 +447,8 @@ namespace CoRpc {
         
         _queueContext._queue.push(senderTask);
     }
+    
+    IO* IO::_io(nullptr);
     
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
     }

@@ -17,7 +17,7 @@
 #include "corpc_routine_env.h"
 #include "corpc_server.h"
 #include "corpc_controller.h"
-#include "corpc_utils.h"
+//#include "corpc_pipeline.h"
 #include "corpc_utils.h"
 
 #include <sys/socket.h>
@@ -37,16 +37,14 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    Server::Connection::Connection(int fd, Server* server): IO::Connection(fd, server->_io), _server(server), _reqdata(CORPC_MAX_REQUEST_SIZE,0), _headNum(0), _dataNum(0) {
+    Server::Splitter::Splitter(): _reqdata(CORPC_MAX_REQUEST_SIZE,0), _headNum(0), _dataNum(0) {
         _head_buf = (char *)(&_reqhead);
         _data_buf = (uint8_t *)_reqdata.data();
     }
     
-    Server::Connection::~Connection() {
-        printf("INFO: Server::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
-    }
+    Server::Splitter::~Splitter() {}
     
-    bool Server::Connection::parseData(uint8_t *buf, int size) {
+    bool Server::Splitter::split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size) {
         // 解析数据
         int offset = 0;
         while (size > offset) {
@@ -67,7 +65,7 @@ namespace CoRpc {
             }
             
             if (_reqhead.size > CORPC_MAX_REQUEST_SIZE) { // 数据超长
-                printf("ERROR: Server::Connection::parseData -- request too large for fd:%d in thread:%d\n", _fd, GetPid());
+                printf("ERROR: Server::Splitter::split -- request too large in thread:%d\n", GetPid());
                 
                 return false;
             }
@@ -88,39 +86,7 @@ namespace CoRpc {
                 }
             }
             
-            // 生成ServerRpcTask
-            // 根据serverId和methodId查表
-            const MethodData *methodData = _server->getMethod(_reqhead.serviceId, _reqhead.methodId);
-            if (methodData != NULL) {
-                const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
-                
-                google::protobuf::Message *request = methodData->request_proto->New();
-                google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
-                Controller *controller = new Controller();
-                if (!request->ParseFromArray(_data_buf, _reqhead.size)) {
-                    // 出错处理
-                    printf("ERROR: Server::Connection::parseData -- parse request body fail\n");
-                    
-                    return false;
-                }
-                
-                // 将收到的请求传给worker
-                WorkerTask *task = new WorkerTask;
-                task->connection = shared_from_this();
-                task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
-                task->rpcTask->service = _server->getService(_reqhead.serviceId);
-                task->rpcTask->method_descriptor = method_descriptor;
-                task->rpcTask->request = request;
-                task->rpcTask->response = response;
-                task->rpcTask->controller = controller;
-                task->rpcTask->callId = _reqhead.callId;
-                
-                // 传给worker
-                _server->_worker->postRpcTask(task);
-            } else {
-                // 出错处理
-                printf("ERROR: Server::Connection::parseData -- can't find method object of serviceId: %u methodId: %u\n", _reqhead.serviceId, _reqhead.methodId);
-                
+            if (!connection->getPipeline()->getDecoder()->decode(connection, &_reqhead, _data_buf, _reqhead.size)) {
                 return false;
             }
             
@@ -132,34 +98,124 @@ namespace CoRpc {
         return true;
     }
     
-    int Server::Connection::buildData(uint8_t *buf, int space) {
-        int used = 0;
-        while (_datas.size() > 0) {
-            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(_datas.front());
-            int msgSize = rpcTask->response->GetCachedSize();
-            if (msgSize == 0) {
-                msgSize = rpcTask->response->ByteSize();
+    Server::Decoder::~Decoder() {}
+    
+    bool Server::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        
+        Server *server = conn->getServer();
+        RpcRequestHead *reqhead = (RpcRequestHead *)head;
+        
+        // 生成ServerRpcTask
+        // 根据serverId和methodId查表
+        const MethodData *methodData = server->getMethod(reqhead->serviceId, reqhead->methodId);
+        if (methodData != NULL) {
+            const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
+            
+            google::protobuf::Message *request = methodData->request_proto->New();
+            google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
+            Controller *controller = new Controller();
+            if (!request->ParseFromArray(body, size)) {
+                // 出错处理
+                printf("ERROR: Server::Decoder::decode -- parse request body fail\n");
+                
+                return false;
             }
             
-            if (msgSize + sizeof(RpcResponseHead) >= space - used) {
-                break;
+            // 将收到的请求传给worker
+            WorkerTask *task = new WorkerTask;
+            task->connection = conn;
+            task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
+            task->rpcTask->service = server->getService(reqhead->serviceId);
+            task->rpcTask->method_descriptor = method_descriptor;
+            task->rpcTask->request = request;
+            task->rpcTask->response = response;
+            task->rpcTask->controller = controller;
+            task->rpcTask->callId = reqhead->callId;
+            
+            if (!connection->getPipeline()->getRouter()->route(connection, 0, task)) {
+                return false;
             }
+        } else {
+            // 出错处理
+            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", reqhead->serviceId, reqhead->methodId);
             
-            // head
-            RpcResponseHead resphead;
-            resphead.callId = rpcTask->callId;
-            resphead.size = msgSize;
-            
-            memcpy(buf + used, &resphead, sizeof(RpcResponseHead));
-            used += sizeof(RpcResponseHead);
-            
-            rpcTask->response->SerializeWithCachedSizesToArray(buf + used);
-            used += msgSize;
-            
-            _datas.pop_front();
+            return false;
         }
         
-        return used;
+        return true;
+    }
+    
+    Server::Router::~Router() {}
+    
+    bool Server::Router::route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        
+        Server *server = conn->getServer();
+        
+        WorkerTask *task = (WorkerTask *)msg;
+        server->_worker->postRpcTask(task);
+        
+        return true;
+    }
+    
+    Server::Encoder::~Encoder() {}
+    
+    bool Server::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        int msgSize = rpcTask->response->GetCachedSize();
+        if (msgSize == 0) {
+            msgSize = rpcTask->response->ByteSize();
+        }
+        
+        if (msgSize + sizeof(RpcResponseHead) >= space) {
+            return true;
+        }
+        
+        // head
+        RpcResponseHead resphead;
+        resphead.callId = rpcTask->callId;
+        resphead.size = msgSize;
+        
+        memcpy(buf, &resphead, sizeof(RpcResponseHead));
+        size = sizeof(RpcResponseHead);
+        
+        rpcTask->response->SerializeWithCachedSizesToArray(buf + size);
+        size += msgSize;
+        
+        return true;
+    }
+    
+    std::shared_ptr<CoRpc::Pipeline> Server::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection) );
+        
+        std::shared_ptr<CoRpc::Splitter> splitter( new Splitter() );
+        
+        pipeline->setSplitter(splitter);
+        
+        if (!_decoder) {
+            _decoder.reset( new Decoder() );
+        }
+        pipeline->setDecoder(_decoder);
+        
+        if (!_router) {
+            _router.reset( new Router() );
+        }
+        pipeline->setRouter(_router);
+        
+        if (!_encoder) {
+            _encoder.reset( new Encoder() );
+        }
+        pipeline->addEncoder(_encoder);
+        
+        return pipeline;
+    }
+    
+    Server::Connection::Connection(int fd, Server* server): CoRpc::Connection(fd, server->_io), _server(server) {
+    }
+    
+    Server::Connection::~Connection() {
+        printf("INFO: Server::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
     }
     
     Server::RpcTask::RpcTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {
@@ -264,7 +320,9 @@ namespace CoRpc {
             // 设置读写超时时间，默认为1秒
             co_set_timeout(fd, -1, 1000);
             
-            std::shared_ptr<IO::Connection> connection(new Connection(fd, self->_server));
+            std::shared_ptr<CoRpc::Connection> connection(new Connection(fd, self->_server));
+            std::shared_ptr<CoRpc::Pipeline> pipeline = PipelineFactory::Instance().buildPipeline(connection);
+            connection->setPipeline(pipeline);
             
             // 将接受的连接分别发给Receiver和Sender
             io->addConnection(connection);

@@ -29,19 +29,14 @@
 namespace CoRpc {
 
     class Server {
-        
-        class Connection: public IO::Connection {
+        class Splitter: public CoRpc::Splitter {
         public:
-            Connection(int fd, Server* server);
-            virtual ~Connection();
+            Splitter();
+            virtual ~Splitter();
             
-            virtual bool parseData(uint8_t *buf, int size);
-            virtual int buildData(uint8_t *buf, int space);
+            virtual bool split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size);
             
-            virtual void onClose() {}
         private:
-            Server *_server;
-            
             // 接收数据时的包头和包体
             RpcRequestHead _reqhead;
             char *_head_buf;
@@ -50,6 +45,74 @@ namespace CoRpc {
             std::string _reqdata;
             uint8_t *_data_buf;
             int _dataNum;
+        };
+        
+        class Decoder: public CoRpc::Decoder {
+        public:
+            Decoder() {}
+            virtual ~Decoder();
+            
+            virtual bool decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size);
+            
+        };
+        
+        class Router: public CoRpc::Router {
+        public:
+            Router() {}
+            virtual ~Router();
+            
+            virtual bool route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg);
+        };
+        
+        class Encoder: public CoRpc::Encoder {
+        public:
+            Encoder() {}
+            virtual ~Encoder();
+            
+            virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
+        };
+        
+        // singleton
+        class PipelineFactory: public CoRpc::PipelineFactory {
+        public:
+            static PipelineFactory& Instance() {
+                static PipelineFactory factory;
+                return factory;
+            }
+            
+            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
+            
+        private:
+            PipelineFactory() {}
+            PipelineFactory(PipelineFactory const&);
+            PipelineFactory& operator=(PipelineFactory const&);
+            ~PipelineFactory() {}
+            
+        private:
+            std::shared_ptr<CoRpc::Decoder> _decoder;
+            std::shared_ptr<CoRpc::Router> _router;
+            std::shared_ptr<CoRpc::Encoder> _encoder;
+        };
+        
+        class Connection: public CoRpc::Connection {
+        public:
+            Connection(int fd, Server* server);
+            virtual ~Connection();
+            
+            virtual void onClose() {}
+            
+            Server *getServer() { return _server; }
+        private:
+            Server *_server;
+            
+            // 接收数据时的包头和包体
+            //RpcRequestHead _reqhead;
+            //char *_head_buf;
+            //int _headNum;
+            
+            //std::string _reqdata;
+            //uint8_t *_data_buf;
+            //int _dataNum;
             
         };
         
@@ -68,7 +131,7 @@ namespace CoRpc {
         };
         
         struct WorkerTask {
-            std::shared_ptr<IO::Connection> connection;
+            std::shared_ptr<CoRpc::Connection> connection;
             std::shared_ptr<RpcTask> rpcTask;
         };
         

@@ -14,10 +14,6 @@
 # limitations under the License.
 #
 
-
-COMM_MAKE = 1
-COMM_ECHO = 1
-version=0.1
 v=debug
 
 DIR_SRC = ./ ../proto/

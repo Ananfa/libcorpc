@@ -51,7 +51,71 @@ namespace CoRpc {
     public:
         class Channel;
     private:
-        class Connection: public IO::Connection {
+        class Splitter: public CoRpc::Splitter {
+        public:
+            Splitter();
+            virtual ~Splitter();
+            
+            virtual bool split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size);
+            
+        private:
+            // 接收数据时的包头和包体
+            RpcResponseHead _resphead;
+            char *_head_buf;
+            int _headNum;
+            
+            std::string _respdata;
+            uint8_t *_data_buf;
+            int _dataNum;
+        };
+        
+        class Decoder: public CoRpc::Decoder {
+        public:
+            Decoder() {}
+            virtual ~Decoder();
+            
+            virtual bool decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size);
+        };
+        
+        class Router: public CoRpc::Router {
+        public:
+            Router() {}
+            virtual ~Router();
+            
+            virtual bool route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg);
+        };
+        
+        class Encoder: public CoRpc::Encoder {
+        public:
+            Encoder() {}
+            virtual ~Encoder();
+            
+            virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
+        };
+        
+        // singleton
+        class PipelineFactory: public CoRpc::PipelineFactory {
+        public:
+            static PipelineFactory& Instance() {
+                static PipelineFactory factory;
+                return factory;
+            }
+            
+            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
+            
+        private:
+            PipelineFactory() {}
+            PipelineFactory(PipelineFactory const&);
+            PipelineFactory& operator=(PipelineFactory const&);
+            ~PipelineFactory() {}
+            
+        private:
+            std::shared_ptr<CoRpc::Decoder> _decoder;
+            std::shared_ptr<CoRpc::Router> _router;
+            std::shared_ptr<CoRpc::Encoder> _encoder;
+        };
+        
+        class Connection: public CoRpc::Connection {
             enum Status {CLOSED, CONNECTING, CONNECTED};
             typedef std::list<ClientTask*> WaitTaskList;
             typedef std::map<uint64_t, ClientTask*> WaitTaskMap;
@@ -59,9 +123,6 @@ namespace CoRpc {
         public:
             Connection(Channel *channel);
             ~Connection() {}
-            
-            virtual bool parseData(uint8_t *buf, int size);
-            virtual int buildData(uint8_t *buf, int space);
             
             virtual void onClose();
             
@@ -75,17 +136,19 @@ namespace CoRpc {
             std::mutex _waitResultCoMapMutex; // _waitResultCoMap需要进行线程同步
             
             // 接收数据时的包头和包体
-            RpcResponseHead _resphead;
-            char *_head_buf;
-            int _headNum;
+            //RpcResponseHead _resphead;
+            //char *_head_buf;
+            //int _headNum;
             
-            std::string _respdata;
-            uint8_t *_data_buf;
-            int _dataNum;
+            //std::string _respdata;
+            //uint8_t *_data_buf;
+            //int _dataNum;
             
         public:
             friend class Channel;
             friend class Client;
+            friend class Decoder;
+            friend class Encoder;
         };
         
     public:
@@ -112,6 +175,7 @@ namespace CoRpc {
         public:
             friend class ClientConnection;
             friend class Client;
+            friend class Encoder;
         };
         
         typedef std::map<Channel*, Channel*> ChannelSet;
