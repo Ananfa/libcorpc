@@ -35,17 +35,20 @@
 #define CORPC_MAX_REQUEST_SIZE 0x10000
 #define CORPC_MAX_RESPONSE_SIZE 0x100000
 
+#define CORPC_REQUEST_HEAD_SIZE 20
+#define CORPC_RESPONSE_HEAD_SIZE 12
+
 namespace CoRpc {
-    
-    struct RpcResponseHead {
-        uint32_t size;
-        uint64_t callId;
-    };
     
     struct RpcRequestHead {
         uint32_t size;
         uint32_t serviceId;
         uint32_t methodId;
+        uint64_t callId;
+    };
+    
+    struct RpcResponseHead {
+        uint32_t size;
         uint64_t callId;
     };
     

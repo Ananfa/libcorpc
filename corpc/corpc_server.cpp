@@ -17,7 +17,6 @@
 #include "corpc_routine_env.h"
 #include "corpc_server.h"
 #include "corpc_controller.h"
-//#include "corpc_pipeline.h"
 #include "corpc_utils.h"
 
 #include <sys/socket.h>
@@ -37,78 +36,26 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    Server::Splitter::Splitter(): _reqdata(CORPC_MAX_REQUEST_SIZE,0), _headNum(0), _dataNum(0) {
-        _head_buf = (char *)(&_reqhead);
-        _data_buf = (uint8_t *)_reqdata.data();
-    }
-    
-    Server::Splitter::~Splitter() {}
-    
-    bool Server::Splitter::split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size) {
-        // 解析数据
-        int offset = 0;
-        while (size > offset) {
-            // 先解析头部
-            if (_headNum < sizeof(RpcRequestHead)) {
-                int needNum = sizeof(RpcRequestHead) - _headNum;
-                if (size - offset > needNum) {
-                    memcpy(_head_buf + _headNum, buf + offset, needNum);
-                    _headNum = sizeof(RpcRequestHead);
-                    
-                    offset += needNum;
-                } else {
-                    memcpy(_head_buf + _headNum, buf + offset, size - offset);
-                    _headNum += size - offset;
-                    
-                    break;
-                }
-            }
-            
-            if (_reqhead.size > CORPC_MAX_REQUEST_SIZE) { // 数据超长
-                printf("ERROR: Server::Splitter::split -- request too large in thread:%d\n", GetPid());
-                
-                return false;
-            }
-            
-            // 从缓存中解析数据
-            if (_dataNum < _reqhead.size) {
-                int needNum = _reqhead.size - _dataNum;
-                if (size - offset >= needNum) {
-                    memcpy(_data_buf + _dataNum, buf + offset, needNum);
-                    _dataNum = _reqhead.size;
-                    
-                    offset += needNum;
-                } else {
-                    memcpy(_data_buf + _dataNum, buf + offset, size - offset);
-                    _dataNum += size - offset;
-                    
-                    break;
-                }
-            }
-            
-            if (!connection->getPipeline()->getDecoder()->decode(connection, &_reqhead, _data_buf, _reqhead.size)) {
-                return false;
-            }
-            
-            // 处理完一个请求消息，复位状态
-            _headNum = 0;
-            _dataNum = 0;
-        }
-        
-        return true;
-    }
-    
     Server::Decoder::~Decoder() {}
     
-    bool Server::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size) {
+    bool Server::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         Server *server = conn->getServer();
-        RpcRequestHead *reqhead = (RpcRequestHead *)head;
+        
+        RpcRequestHead reqhead;
+        reqhead.size = *(uint32_t *)head;
+        reqhead.size = ntohl(reqhead.size);
+        reqhead.serviceId = *(uint32_t *)(head + 4);
+        reqhead.serviceId = ntohl(reqhead.serviceId);
+        reqhead.methodId = *(uint32_t *)(head + 8);
+        reqhead.methodId = ntohl(reqhead.methodId);
+        reqhead.callId = *(uint64_t *)(head + 12);
+        reqhead.callId = ntohll(reqhead.callId);
         
         // 生成ServerRpcTask
         // 根据serverId和methodId查表
-        const MethodData *methodData = server->getMethod(reqhead->serviceId, reqhead->methodId);
+        const MethodData *methodData = server->getMethod(reqhead.serviceId, reqhead.methodId);
         if (methodData != NULL) {
             const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
             
@@ -126,19 +73,19 @@ namespace CoRpc {
             WorkerTask *task = new WorkerTask;
             task->connection = conn;
             task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
-            task->rpcTask->service = server->getService(reqhead->serviceId);
+            task->rpcTask->service = server->getService(reqhead.serviceId);
             task->rpcTask->method_descriptor = method_descriptor;
             task->rpcTask->request = request;
             task->rpcTask->response = response;
             task->rpcTask->controller = controller;
-            task->rpcTask->callId = reqhead->callId;
+            task->rpcTask->callId = reqhead.callId;
             
             if (!connection->getPipeline()->getRouter()->route(connection, 0, task)) {
                 return false;
             }
         } else {
             // 出错处理
-            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", reqhead->serviceId, reqhead->methodId);
+            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", reqhead.serviceId, reqhead.methodId);
             
             return false;
         }
@@ -163,25 +110,20 @@ namespace CoRpc {
     
     bool Server::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
-        int msgSize = rpcTask->response->GetCachedSize();
+        uint32_t msgSize = rpcTask->response->GetCachedSize();
         if (msgSize == 0) {
             msgSize = rpcTask->response->ByteSize();
         }
         
-        if (msgSize + sizeof(RpcResponseHead) >= space) {
+        if (msgSize + CORPC_RESPONSE_HEAD_SIZE >= space) {
             return true;
         }
         
-        // head
-        RpcResponseHead resphead;
-        resphead.callId = rpcTask->callId;
-        resphead.size = msgSize;
+        *(uint32_t *)buf = htonl(msgSize);
+        *(uint64_t *)(buf + 4) = htonll(rpcTask->callId);
         
-        memcpy(buf, &resphead, sizeof(RpcResponseHead));
-        size = sizeof(RpcResponseHead);
-        
-        rpcTask->response->SerializeWithCachedSizesToArray(buf + size);
-        size += msgSize;
+        rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
+        size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
         
         return true;
     }
@@ -189,7 +131,7 @@ namespace CoRpc {
     std::shared_ptr<CoRpc::Pipeline> Server::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
         std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection) );
         
-        std::shared_ptr<CoRpc::Splitter> splitter( new Splitter() );
+        std::shared_ptr<CoRpc::Splitter> splitter( new CoRpc::CommonSplitter(CORPC_REQUEST_HEAD_SIZE, 0, CoRpc::CommonSplitter::FOUR_BYTES, CORPC_MAX_REQUEST_SIZE) );
         
         pipeline->setSplitter(splitter);
         

@@ -47,12 +47,38 @@ namespace CoRpc {
         virtual bool split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size) = 0;
     };
     
+    class CommonSplitter: public Splitter {
+    public:
+        enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
+        
+    public:
+        CommonSplitter(uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize);
+        virtual ~CommonSplitter() {}
+        
+        virtual bool split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size);
+        
+    private:
+        uint _headSize;
+        uint _bodySizeOffset;
+        SIZE_TYPE _bodySizeType;
+        uint _maxSize;
+        int _bodySize;
+        
+        std::string _head;
+        uint8_t *_headBuf;
+        int _headNum;
+        
+        std::string _body;
+        uint8_t *_bodyBuf;
+        int _bodyNum;
+    };
+    
     class Decoder {
     public:
         Decoder() {}
         virtual ~Decoder() = 0;
         
-        virtual bool decode(std::shared_ptr<Connection> &connection, void *head, uint8_t *body, int size) = 0;
+        virtual bool decode(std::shared_ptr<Connection> &connection, uint8_t *head, uint8_t *body, int size) = 0;
     };
     
     class Router {

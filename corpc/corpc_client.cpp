@@ -34,82 +34,26 @@ namespace CoRpc {
     
     __thread Client *Client::_instance(nullptr);
     
-    Client::Splitter::Splitter(): _respdata(CORPC_MAX_RESPONSE_SIZE,0), _headNum(0), _dataNum(0) {
-        _head_buf = (char *)(&_resphead);
-        _data_buf = (uint8_t *)_respdata.data();
-    }
-    
-    Client::Splitter::~Splitter() {}
-    
-    bool Client::Splitter::split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size) {
-        // 解析数据
-        int offset = 0;
-        while (size > offset) {
-            // 先解析头部
-            if (_headNum < sizeof(RpcResponseHead)) {
-                int needNum = sizeof(RpcResponseHead) - _headNum;
-                if (size - offset > needNum) {
-                    memcpy(_head_buf + _headNum, buf + offset, needNum);
-                    _headNum = sizeof(RpcResponseHead);
-                    
-                    offset += needNum;
-                } else {
-                    memcpy(_head_buf + _headNum, buf + offset, size - offset);
-                    _headNum += size - offset;
-                    
-                    break;
-                }
-            }
-            
-            if (_resphead.size > CORPC_MAX_RESPONSE_SIZE) { // 数据超长
-                printf("ERROR: Client::Splitter::split -- request too large in thread:%d\n", GetPid());
-                
-                return false;
-            }
-            
-            // 从缓存中解析数据
-            if (_dataNum < _resphead.size) {
-                int needNum = _resphead.size - _dataNum;
-                if (size - offset >= needNum) {
-                    memcpy(_data_buf + _dataNum, buf + offset, needNum);
-                    _dataNum = _resphead.size;
-                    
-                    offset += needNum;
-                } else {
-                    memcpy(_data_buf + _dataNum, buf + offset, size - offset);
-                    _dataNum += size - offset;
-                    
-                    break;
-                }
-            }
-            
-            if (!connection->getPipeline()->getDecoder()->decode(connection, &_resphead, _data_buf, _resphead.size)) {
-                return false;
-            }
-            
-            // 处理完一个请求消息，复位状态
-            _headNum = 0;
-            _dataNum = 0;
-        }
-        
-        return true;
-    }
-    
     Client::Decoder::~Decoder() {}
     
-    bool Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size) {
+    bool Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
-        RpcResponseHead *resphead = (RpcResponseHead *)head;
+        
+        RpcResponseHead resphead;
+        resphead.size = *(uint32_t *)head;
+        resphead.size = ntohl(resphead.size);
+        resphead.callId = *(uint64_t *)(head + 4);
+        resphead.callId = ntohll(resphead.callId);
         
         ClientTask *task = NULL;
         // 注意: _waitResultCoMap需进行线程同步
         {
             std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
-            Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(resphead->callId);
+            Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(resphead.callId);
             
             if (itor == conn->_waitResultCoMap.end()) {
                 // 打印出错信息
-                printf("Client::Connection::parseData can't find task : %llu\n", resphead->callId);
+                printf("Client::Decoder::decode can't find task : %llu\n", resphead.callId);
                 assert(false);
                 return false;
             }
@@ -121,8 +65,8 @@ namespace CoRpc {
         }
         
         // 解析包体（RpcResponseData）
-        if (!task->rpcTask->response->ParseFromArray(body, resphead->size)) {
-            printf("ERROR: Client::Connection::parseData -- parse response body fail\n");
+        if (!task->rpcTask->response->ParseFromArray(body, resphead.size)) {
+            printf("ERROR: Client::Decoder::decode -- parse response body fail\n");
             return false;
         }
         
@@ -156,29 +100,25 @@ namespace CoRpc {
             msgSize = rpcTask->request->ByteSize();
         }
         
-        if (msgSize + sizeof(RpcRequestHead) >= space) {
+        if (msgSize + CORPC_REQUEST_HEAD_SIZE >= space) {
             return true;
         }
         
-        // head
-        RpcRequestHead reqhead;
-        reqhead.serviceId = rpcTask->serviceId;
-        reqhead.methodId = rpcTask->methodId;
-        reqhead.callId = uint64_t(rpcTask->co);
-        reqhead.size = msgSize;
+        *(uint32_t *)buf = htonl(msgSize);
+        *(uint32_t *)(buf + 4) = htonl(rpcTask->serviceId);
+        *(uint32_t *)(buf + 8) = htonl(rpcTask->methodId);
+        uint64_t callId = uint64_t(rpcTask->co);
+        *(uint64_t *)(buf + 12) = htonll(callId);
         
-        memcpy(buf, &reqhead, sizeof(RpcRequestHead));
-        size = sizeof(RpcRequestHead);
-        
-        rpcTask->request->SerializeWithCachedSizesToArray(buf + size);
-        size += msgSize;
+        rpcTask->request->SerializeWithCachedSizesToArray(buf + CORPC_REQUEST_HEAD_SIZE);
+        size = CORPC_REQUEST_HEAD_SIZE + msgSize;
         
         if (rpcTask->response == NULL) {
             // 注意: _waitResultCoMap需进行线程同步
             {
                 std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
-                if (conn->_waitResultCoMap.erase(reqhead.callId) == 0) {
-                    printf("ERROR: Client::Connection::buildData -- task not in waitResultCoMap\n");
+                if (conn->_waitResultCoMap.erase(callId) == 0) {
+                    printf("ERROR: Client::Encoder::encode -- task not in waitResultCoMap\n");
                     assert(false);
                 }
             }
@@ -192,7 +132,7 @@ namespace CoRpc {
     std::shared_ptr<CoRpc::Pipeline> Client::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
         std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection) );
         
-        std::shared_ptr<CoRpc::Splitter> splitter( new Splitter() );
+        std::shared_ptr<CoRpc::Splitter> splitter( new CoRpc::CommonSplitter(CORPC_RESPONSE_HEAD_SIZE, 0, CoRpc::CommonSplitter::FOUR_BYTES, CORPC_MAX_RESPONSE_SIZE) );
         
         pipeline->setSplitter(splitter);
         

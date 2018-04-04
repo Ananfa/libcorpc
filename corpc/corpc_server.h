@@ -29,30 +29,12 @@
 namespace CoRpc {
 
     class Server {
-        class Splitter: public CoRpc::Splitter {
-        public:
-            Splitter();
-            virtual ~Splitter();
-            
-            virtual bool split(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *buf, int size);
-            
-        private:
-            // 接收数据时的包头和包体
-            RpcRequestHead _reqhead;
-            char *_head_buf;
-            int _headNum;
-            
-            std::string _reqdata;
-            uint8_t *_data_buf;
-            int _dataNum;
-        };
-        
         class Decoder: public CoRpc::Decoder {
         public:
             Decoder() {}
             virtual ~Decoder();
             
-            virtual bool decode(std::shared_ptr<CoRpc::Connection> &connection, void *head, uint8_t *body, int size);
+            virtual bool decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
             
         };
         

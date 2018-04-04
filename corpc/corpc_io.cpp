@@ -26,6 +26,78 @@ namespace CoRpc {
     
     Splitter::~Splitter() {}
     
+    CommonSplitter::CommonSplitter(uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxSize): _headSize(headSize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _maxSize(maxSize), _head(headSize,0), _bodySize(0), _headNum(0), _bodyNum(0) {
+        _headBuf = (uint8_t *)_head.data();
+        _bodyBuf = (uint8_t *)_body.data();
+    }
+    
+    bool CommonSplitter::split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size) {
+        // 解析数据
+        int offset = 0;
+        while (size > offset) {
+            // 先解析头部
+            if (_headNum < _headSize) {
+                int needNum = _headSize - _headNum;
+                if (size - offset > needNum) {
+                    memcpy(_headBuf + _headNum, buf + offset, needNum);
+                    _headNum = _headSize;
+                    
+                    offset += needNum;
+                } else {
+                    memcpy(_headBuf + _headNum, buf + offset, size - offset);
+                    _headNum += size - offset;
+                    
+                    break;
+                }
+            }
+            
+            if (!_bodySize) {
+                // 解析消息长度值
+                if (_bodySizeType == TWO_BYTES) {
+                    uint16_t x = *(uint16_t*)(_headBuf + _bodySizeOffset);
+                    _bodySize = ntohs(x);
+                } else {
+                    assert(_bodySizeType == FOUR_BYTES);
+                    uint32_t x = *(uint32_t*)(_headBuf + _bodySizeOffset);
+                    _bodySize = ntohl(x);
+                }
+                
+                if (_bodySize > _maxSize) { // 数据超长
+                    printf("ERROR: CommonSplitter::split -- request too large in thread:%d\n", GetPid());
+                    
+                    return false;
+                }
+            }
+            
+            // 从缓存中解析数据
+            if (_bodyNum < _bodySize) {
+                int needNum = _bodySize - _bodyNum;
+                if (size - offset >= needNum) {
+                    memcpy(_bodyBuf + _bodyNum, buf + offset, needNum);
+                    _bodyNum = _bodySize;
+                    
+                    offset += needNum;
+                } else {
+                    memcpy(_bodyBuf + _bodyNum, buf + offset, size - offset);
+                    _bodyNum += size - offset;
+                    
+                    break;
+                }
+            }
+            
+            if (!connection->getPipeline()->getDecoder()->decode(connection, _headBuf, _bodyBuf, _bodySize)) {
+                return false;
+            }
+            
+            // 处理完一个请求消息，复位状态
+            _headNum = 0;
+            _bodyNum = 0;
+            _bodySize = 0;
+        }
+        
+        return true;
+    }
+    
     Decoder::~Decoder() {}
     
     Router::~Router() {}
