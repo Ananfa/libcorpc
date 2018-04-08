@@ -234,7 +234,7 @@ namespace CoRpc {
         };
         
     public:
-        static Server* create(bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        static Server* create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
         

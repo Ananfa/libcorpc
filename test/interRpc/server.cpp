@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
     sigaction( SIGPIPE, &sa, NULL );
     
     // 注册服务
-    IO::initialize(1, 1);
+    IO *io = IO::create(1, 1);
     
-    Server *server = Server::create(true, 1, ip, port);
+    Server *server = Server::create(io, true, 0, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);

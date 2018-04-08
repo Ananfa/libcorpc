@@ -22,6 +22,39 @@
 
 using namespace CoRpc;
 
+class ThreadSpecialResource {
+public:
+    static ThreadSpecialResource& Instance() {
+        static ThreadSpecialResource inst;
+        return inst;
+    }
+    
+    void setIO(IO *io) { _io = io; }
+    
+    Client *get_client();
+    
+private:
+    ThreadSpecialResource() {}
+    ThreadSpecialResource(ThreadSpecialResource const&);
+    ThreadSpecialResource& operator=(ThreadSpecialResource const&);
+    ~ThreadSpecialResource() {}
+    
+private:
+    IO *_io;
+    
+    static __thread Client *_client;
+};
+
+__thread Client *ThreadSpecialResource::_client(nullptr);
+
+Client *ThreadSpecialResource::get_client() {
+    if (!_client) {
+        _client = Client::create(_io);
+    }
+    
+    return _client;
+}
+
 class HelloWorldServiceImpl : public HelloWorldService {
 public:
     HelloWorldServiceImpl(const std::string& sip, uint32_t sport): _sip(sip), _sport(sport) {}
@@ -47,7 +80,7 @@ __thread HelloWorldService::Stub *HelloWorldServiceImpl::_helloworld_clt(nullptr
 
 HelloWorldService::Stub *HelloWorldServiceImpl::get_helloworld_clt() {
     if (!_helloworld_clt) {
-        Client *client = Client::instance();
+        Client *client = ThreadSpecialResource::Instance().get_client();
         if (client) {
             Client::Channel *channel = new Client::Channel(client, _sip, _sport, 1);
             
@@ -73,9 +106,11 @@ int main(int argc, const char * argv[]) {
     unsigned short int sport = atoi(argv[4]);
     
     // 注册服务
-    IO::initialize(1, 1);
+    IO *io = IO::create(1, 1);
     
-    Server *server = Server::create(false, 1, ip, port);
+    ThreadSpecialResource::Instance().setIO(io);
+    
+    Server *server = Server::create(io, false, 1, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(sip, sport);
     server->registerService(helloWorldService);

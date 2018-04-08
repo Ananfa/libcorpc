@@ -117,15 +117,6 @@ namespace CoRpc {
             WaitTaskMap _waitResultCoMap; // 等待接受RPC结果的任务
             std::mutex _waitResultCoMapMutex; // _waitResultCoMap需要进行线程同步
             
-            // 接收数据时的包头和包体
-            //RpcResponseHead _resphead;
-            //char *_head_buf;
-            //int _headNum;
-            
-            //std::string _respdata;
-            //uint8_t *_data_buf;
-            //int _dataNum;
-            
         public:
             friend class Channel;
             friend class Client;
@@ -177,7 +168,8 @@ namespace CoRpc {
 #endif
        
     public:
-        static Client* instance();
+        //static Client* instance();
+        static Client* create(IO *io);
         
         bool registerChannel(Channel *channel);
         
@@ -197,7 +189,7 @@ namespace CoRpc {
         void start();
         
     private:
-        static __thread Client *_instance;
+        //static __thread Client *_instance;
         
         IO *_io;
         

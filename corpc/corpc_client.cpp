@@ -32,7 +32,7 @@
 
 namespace CoRpc {
     
-    __thread Client *Client::_instance(nullptr);
+    //__thread Client *Client::_instance(nullptr);
     
     Client::Decoder::~Decoder() {}
     
@@ -241,6 +241,7 @@ namespace CoRpc {
         }
     }
     
+    /*
     Client* Client::instance() {
         if (!_instance) {
             IO *io = IO::instance();
@@ -253,6 +254,15 @@ namespace CoRpc {
         }
         
         return _instance;
+    }
+     */
+    
+    Client* Client::create(IO *io) {
+        assert(io);
+        Client *client = new Client(io);
+        
+        client->start();
+        return client;
     }
     
     bool Client::registerChannel(Channel *channel) {

@@ -53,13 +53,13 @@ int main(int argc, const char * argv[]) {
     unsigned short int sport = atoi(argv[4]);
     
     // 注册服务
-    IO::initialize(1, 1);
+    IO *io = IO::create(1, 1);
     
-    Client *client = Client::instance();
+    Client *client = Client::create(io);
     Client::Channel *channel = new Client::Channel(client, sip, sport, 1);
     
-    Server *server = Server::create(false, 0, ip, port);
-    //Server *server = Server::create(false, 1, ip, port); // this will error
+    Server *server = Server::create(io, false, 0, ip, port);
+    //Server *server = Server::create(io, false, 1, ip, port); // this will error
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(new HelloWorldService::Stub(channel));
     server->registerService(helloWorldService);

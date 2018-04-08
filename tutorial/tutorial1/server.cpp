@@ -49,9 +49,9 @@ int main(int argc, const char * argv[]) {
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
     
-    IO::initialize(1, 1);
+    IO *io = IO::create(1, 1);
     
-    Server *server = Server::create(false, 0, ip, port);
+    Server *server = Server::create(io, false, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     server->registerService(helloWorldService);

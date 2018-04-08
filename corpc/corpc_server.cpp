@@ -470,16 +470,12 @@ namespace CoRpc {
     Server::Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): _io(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
     }
     
-    Server* Server::create(bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
-        IO *io = IO::instance();
-        if (io) {
-            Server *server = new Server(io, acceptInNewThread, workThreadNum, ip, port);
-            
-            server->start();
-            return server;
-        }
+    Server* Server::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
+        assert(io);
+        Server *server = new Server(io, acceptInNewThread, workThreadNum, ip, port);
         
-        return nullptr;
+        server->start();
+        return server;
     }
     
     bool Server::registerService(::google::protobuf::Service *rpcService) {

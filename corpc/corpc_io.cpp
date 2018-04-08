@@ -520,11 +520,12 @@ namespace CoRpc {
         _queueContext._queue.push(senderTask);
     }
     
-    IO* IO::_io(nullptr);
+    //IO* IO::_io(nullptr);
     
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
     }
     
+    /*
     bool IO::initialize(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
         if (_io != nullptr) {
             printf("ERROR: IO::initialize() -- already initialized.\n");
@@ -540,6 +541,19 @@ namespace CoRpc {
         _io->start();
         
         return true;
+    }
+     */
+    
+    IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
+        if (receiveThreadNum == 0 && sendThreadNum == 0) {
+            printf("ERROR: IO::create() -- sender and receiver can't run at same thread.\n");
+            return nullptr;
+        }
+        
+        IO *io = new IO(receiveThreadNum, sendThreadNum);
+        io->start();
+        
+        return io;
     }
     
     bool IO::start() {

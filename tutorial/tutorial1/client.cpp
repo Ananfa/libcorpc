@@ -76,9 +76,9 @@ int main(int argc, const char * argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
-    IO::initialize(1, 1);
+    IO *io = IO::create(1, 1);
     
-    Client *client = Client::instance();
+    Client *client = Client::create(io);
     Client::Channel *channel = new Client::Channel(client, ip, port, 1);
     
     RoutineEnvironment::startCoroutine(helloworld_routine, channel);
