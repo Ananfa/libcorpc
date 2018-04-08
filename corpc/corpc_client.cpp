@@ -36,7 +36,7 @@ namespace CoRpc {
     
     Client::Decoder::~Decoder() {}
     
-    bool Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         RpcResponseHead resphead;
@@ -55,7 +55,7 @@ namespace CoRpc {
                 // 打印出错信息
                 printf("Client::Decoder::decode can't find task : %llu\n", resphead.callId);
                 assert(false);
-                return false;
+                return nullptr;
             }
             
             task = itor->second;
@@ -67,26 +67,20 @@ namespace CoRpc {
         // 解析包体（RpcResponseData）
         if (!task->rpcTask->response->ParseFromArray(body, resphead.size)) {
             printf("ERROR: Client::Decoder::decode -- parse response body fail\n");
-            return false;
+            return nullptr;
         }
         
-        if (!connection->getPipeline()->getRouter()->route(connection, 0, task)) {
-            return false;
-        }
-        
-        return true;
+        return task;
     }
     
     Client::Router::~Router() {}
     
-    bool Client::Router::route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg) {
+    void Client::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         ClientTask *task = (ClientTask *)msg;
         
         conn->_channel->_client->_downQueue.push(task->rpcTask->co);
-        
-        return true;
     }
     
     Client::Encoder::~Encoder() {}
@@ -130,11 +124,7 @@ namespace CoRpc {
     }
     
     std::shared_ptr<CoRpc::Pipeline> Client::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection) );
-        
-        std::shared_ptr<CoRpc::Splitter> splitter( new CoRpc::CommonSplitter(CORPC_RESPONSE_HEAD_SIZE, 0, CoRpc::CommonSplitter::FOUR_BYTES, CORPC_MAX_RESPONSE_SIZE) );
-        
-        pipeline->setSplitter(splitter);
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection, CORPC_RESPONSE_HEAD_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES, CORPC_MAX_RESPONSE_SIZE) );
         
         if (!_decoder) {
             _decoder.reset( new Decoder() );

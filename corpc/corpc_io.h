@@ -32,53 +32,19 @@ namespace CoRpc {
     class Pipeline;
     
     // 接收数据和发送数据的pipeline流水线处理，流水线中的处理单元是有状态的，难点：1.流水线中的处理单元的处理数据类型 2.会增加内存分配和数据拷贝影响效率
-    // 上流流水线处理单元：
-    //   第一个处理单元是分割器（splicer）从buf中分隔出一个个的未decode的消息原始数据，输入是(uint8_t *)buf，输出是(uint8_t *)rawdata，该单元缓存数据状态
-    //   第二个处理单元是解码器（decoder）将原始数据解码成消息对象，输入是(uint8_t *)rawdata，输出是(std::shared_ptr<void>)msg，该单元无状态
-    //   第三个处理单元是路由器（router）根据消息类型将消息放到对应的消息队列中，该单元无状态
-    // 下流流水线处理单元：
-    //   第一个处理单元是编码器链（encoder）根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
-    
-    class Splitter {
-    public:
-        Splitter() {}
-        virtual ~Splitter() = 0;
-        
-        virtual bool split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size) = 0;
-    };
-    
-    class CommonSplitter: public Splitter {
-    public:
-        enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
-        
-    public:
-        CommonSplitter(uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize);
-        virtual ~CommonSplitter() {}
-        
-        virtual bool split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size);
-        
-    private:
-        uint _headSize;
-        uint _bodySizeOffset;
-        SIZE_TYPE _bodySizeType;
-        uint _maxSize;
-        int _bodySize;
-        
-        std::string _head;
-        uint8_t *_headBuf;
-        int _headNum;
-        
-        std::string _body;
-        uint8_t *_bodyBuf;
-        int _bodyNum;
-    };
+    // 上流流水线处理流程：
+    //   1.数据包分割：从buf中分隔出一个个的未decode的消息原始数据，输入是(uint8_t *)buf，输出是(uint8_t *)rawdata，该单元缓存数据状态
+    //   2.解码消息：将原始数据解码成消息对象，输入是(uint8_t *)rawdata，输出是(std::shared_ptr<void>)msg，该单元无状态
+    //   3.消息路由：根据消息类型将消息放到对应的消息队列中，该单元无状态
+    // 下流流水线处理流程：
+    //   1.编码器链：根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
     
     class Decoder {
     public:
         Decoder() {}
         virtual ~Decoder() = 0;
         
-        virtual bool decode(std::shared_ptr<Connection> &connection, uint8_t *head, uint8_t *body, int size) = 0;
+        virtual void * decode(std::shared_ptr<Connection> &connection, uint8_t *head, uint8_t *body, int size) = 0;
     };
     
     class Router {
@@ -86,7 +52,7 @@ namespace CoRpc {
         Router() {}
         virtual ~Router() = 0;
         
-        virtual bool route(std::shared_ptr<Connection> &connection, int type, void *msg) = 0;
+        virtual void route(std::shared_ptr<Connection> &connection, void *msg) = 0;
     };
     
     class Encoder {
@@ -99,14 +65,15 @@ namespace CoRpc {
     
     class Pipeline {
     public:
-        Pipeline(std::shared_ptr<Connection> &connection): _connection(connection) {}
+        enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
+        
+    public:
+        Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize);
         ~Pipeline() {}
         
         bool upflow(uint8_t *buf, int size);
         bool downflow(uint8_t *buf, int space, int &size);
         
-        void setSplitter(std::shared_ptr<Splitter>& splitter) { _splitter = splitter; }
-        std::shared_ptr<Splitter>& getSplitter() { return _splitter; }
         void setDecoder(std::shared_ptr<Decoder>& decoder) { _decoder = decoder; }
         std::shared_ptr<Decoder>& getDecoder() { return _decoder; }
         void setRouter(std::shared_ptr<Router>& router) { _router = router; }
@@ -115,7 +82,20 @@ namespace CoRpc {
         
         std::weak_ptr<Connection> &getConnection() { return _connection; }
     private:
-        std::shared_ptr<Splitter> _splitter;
+        uint _headSize;
+        uint _bodySizeOffset;
+        SIZE_TYPE _bodySizeType;
+        uint _maxBodySize;
+        int _bodySize;
+        
+        std::string _head;
+        uint8_t *_headBuf;
+        int _headNum;
+        
+        std::string _body;
+        uint8_t *_bodyBuf;
+        int _bodyNum;
+        
         std::shared_ptr<Decoder> _decoder;
         std::shared_ptr<Router> _router;
         std::vector<std::shared_ptr<Encoder>> _encoders;

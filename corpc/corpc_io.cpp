@@ -24,14 +24,21 @@
 
 namespace CoRpc {
     
-    Splitter::~Splitter() {}
+    Decoder::~Decoder() {}
     
-    CommonSplitter::CommonSplitter(uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxSize): _headSize(headSize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _maxSize(maxSize), _head(headSize,0), _bodySize(0), _headNum(0), _bodyNum(0) {
+    Router::~Router() {}
+    
+    Encoder::~Encoder() {}
+    
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize): _connection(connection), _headSize(headSize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _maxBodySize(maxBodySize), _head(headSize,0), _bodySize(0), _headNum(0), _bodyNum(0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
     
-    bool CommonSplitter::split(std::shared_ptr<Connection> &connection, uint8_t *buf, int size) {
+    bool Pipeline::upflow(uint8_t *buf, int size) {
+        std::shared_ptr<Connection> connection = _connection.lock();
+        assert(connection);
+        
         // 解析数据
         int offset = 0;
         while (size > offset) {
@@ -62,7 +69,7 @@ namespace CoRpc {
                     _bodySize = ntohl(x);
                 }
                 
-                if (_bodySize > _maxSize) { // 数据超长
+                if (_bodySize > _maxBodySize) { // 数据超长
                     printf("ERROR: CommonSplitter::split -- request too large in thread:%d\n", GetPid());
                     
                     return false;
@@ -85,9 +92,13 @@ namespace CoRpc {
                 }
             }
             
-            if (!connection->getPipeline()->getDecoder()->decode(connection, _headBuf, _bodyBuf, _bodySize)) {
+            void *msg = _decoder->decode(connection, _headBuf, _bodyBuf, _bodySize);
+            
+            if (!msg) {
                 return false;
             }
+            
+            _router->route(connection, msg);
             
             // 处理完一个请求消息，复位状态
             _headNum = 0;
@@ -96,19 +107,6 @@ namespace CoRpc {
         }
         
         return true;
-    }
-    
-    Decoder::~Decoder() {}
-    
-    Router::~Router() {}
-    
-    Encoder::~Encoder() {}
-    
-    bool Pipeline::upflow(uint8_t *buf, int size) {
-        std::shared_ptr<Connection> connection = _connection.lock();
-        assert(connection);
-        
-        return _splitter->split(connection, buf, size);
     }
     
     bool Pipeline::downflow(uint8_t *buf, int space, int &size) {
@@ -520,29 +518,8 @@ namespace CoRpc {
         _queueContext._queue.push(senderTask);
     }
     
-    //IO* IO::_io(nullptr);
-    
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
     }
-    
-    /*
-    bool IO::initialize(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
-        if (_io != nullptr) {
-            printf("ERROR: IO::initialize() -- already initialized.\n");
-            return false;
-        }
-        
-        if (receiveThreadNum == 0 && sendThreadNum == 0) {
-            printf("ERROR: IO::initialize() -- sender and receiver can't run at same thread.\n");
-            return false;
-        }
-        
-        _io = new IO(receiveThreadNum, sendThreadNum);
-        _io->start();
-        
-        return true;
-    }
-     */
     
     IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
         if (receiveThreadNum == 0 && sendThreadNum == 0) {

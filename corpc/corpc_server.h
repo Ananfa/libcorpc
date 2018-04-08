@@ -34,7 +34,7 @@ namespace CoRpc {
             Decoder() {}
             virtual ~Decoder();
             
-            virtual bool decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+            virtual void * decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
             
         };
         
@@ -43,7 +43,7 @@ namespace CoRpc {
             Router() {}
             virtual ~Router();
             
-            virtual bool route(std::shared_ptr<CoRpc::Connection> &connection, int type, void *msg);
+            virtual void route(std::shared_ptr<CoRpc::Connection> &connection, void *msg);
         };
         
         class Encoder: public CoRpc::Encoder {
