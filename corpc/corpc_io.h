@@ -180,11 +180,11 @@ namespace CoRpc {
     };
     
 #ifdef USE_NO_LOCK_QUEUE
-    typedef Co_MPSC_NoLockQueue<ReceiverTask*, static_cast<struct ReceiverTask *>(NULL)> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    typedef Co_MPSC_NoLockQueue<SenderTask*, static_cast<struct SenderTask *>(NULL)> SenderTaskQueue; // 用于向sender发送任务
+    typedef Co_MPSC_NoLockQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
+    typedef Co_MPSC_NoLockQueue<SenderTask*> SenderTaskQueue; // 用于向sender发送任务
 #else
-    typedef CoSyncQueue<ReceiverTask*, static_cast<struct ReceiverTask *>(NULL)> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    typedef CoSyncQueue<SenderTask*, static_cast<struct SenderTask *>(NULL)> SenderTaskQueue; // 用于向sender发送任务
+    typedef CoSyncQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
+    typedef CoSyncQueue<SenderTask*> SenderTaskQueue; // 用于向sender发送任务
 #endif
     
     // Receiver负责rpc连接的数据接受

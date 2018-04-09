@@ -160,11 +160,11 @@ namespace CoRpc {
         };
         
 #ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*, static_cast<struct stCoRoutine_t *>(NULL)> DownQueue;
-        typedef Co_MPSC_NoLockQueue<ConnectionTask*, static_cast<struct ConnectionTask *>(NULL)> ConnectionTaskQueue;
+        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> DownQueue;
+        typedef Co_MPSC_NoLockQueue<ConnectionTask*> ConnectionTaskQueue;
 #else
-        typedef CoSyncQueue<stCoRoutine_t*, static_cast<struct stCoRoutine_t *>(NULL)> DownQueue;
-        typedef CoSyncQueue<ConnectionTask*, static_cast<struct ConnectionTask *>(NULL)> ConnectionTaskQueue;
+        typedef CoSyncQueue<stCoRoutine_t*> DownQueue;
+        typedef CoSyncQueue<ConnectionTask*> ConnectionTaskQueue;
 #endif
        
     public:

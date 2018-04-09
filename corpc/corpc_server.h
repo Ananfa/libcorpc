@@ -118,11 +118,11 @@ namespace CoRpc {
         };
         
 #ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef MPSC_NoLockQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
+        typedef Co_MPSC_NoLockQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
+        //typedef MPSC_NoLockQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
 #else
-        typedef CoSyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef SyncQueue<WorkerTask*, static_cast<struct WorkerTask *>(NULL)> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
+        typedef CoSyncQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
+        //typedef SyncQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
 #endif
         
         class Acceptor {

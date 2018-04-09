@@ -69,7 +69,7 @@ namespace CoRpc {
     
     // 多生产者单消费者无锁队列实现
     // 注意：该实现只能在gcc 4.8.3之上版本使用，否则会出错，详见（https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60272）
-    template <typename T, T defaultValue>
+    template <typename T>
     class MPSC_NoLockQueue {
         struct Node {
             T value;
@@ -90,7 +90,7 @@ namespace CoRpc {
         }
         
         T pop() {
-            T ret = defaultValue;
+            T ret(nullptr);
         
             if (!_outqueue) {
                 if (_head != NULL) {
@@ -125,8 +125,8 @@ namespace CoRpc {
         Node *_outqueue;
     };
     
-    template <typename T, T defaultValue>
-    class Co_MPSC_NoLockQueue: public MPSC_NoLockQueue<T, defaultValue> {
+    template <typename T>
+    class Co_MPSC_NoLockQueue: public MPSC_NoLockQueue<T> {
     public:
         Co_MPSC_NoLockQueue() {
             pipe(_queuePipe.pipefd);
@@ -143,7 +143,7 @@ namespace CoRpc {
         int getWriteFd() { return _queuePipe.pipefd[1]; }
         
         void push(T & v) {
-            MPSC_NoLockQueue<T, defaultValue>::push(v);
+            MPSC_NoLockQueue<T>::push(v);
             
             char buf = 'X';
             write(getWriteFd(), &buf, 1);
@@ -154,7 +154,7 @@ namespace CoRpc {
     };
 
     // 注意：该Queue实现只支持多生产者和单消费者情形
-    template <typename T, T defaultValue>
+    template <typename T>
     class SyncQueue {
     public:
         SyncQueue() {}
@@ -166,7 +166,7 @@ namespace CoRpc {
         }
         
         T pop() {
-            T ret = defaultValue;
+            T ret(nullptr);
             
             if (!_outqueue.empty()) {
                 ret = _outqueue.front();
@@ -194,8 +194,8 @@ namespace CoRpc {
         std::list<T> _outqueue;
     };
     
-    template <typename T, T defaultValue>
-    class CoSyncQueue: public SyncQueue<T, defaultValue> {
+    template <typename T>
+    class CoSyncQueue: public SyncQueue<T> {
     public:
         CoSyncQueue() {
             pipe(_queuePipe.pipefd);
@@ -212,7 +212,7 @@ namespace CoRpc {
         int getWriteFd() { return _queuePipe.pipefd[1]; }
         
         void push(T & v) {
-            SyncQueue<T, defaultValue>::push(v);
+            SyncQueue<T>::push(v);
             
             char buf = 'K';
             write(getWriteFd(), &buf, 1);

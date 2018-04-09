@@ -42,11 +42,11 @@ namespace CoRpc {
         };
         
 #ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<Request*, static_cast<struct Request *>(NULL)> RequestQueue;
-        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*, static_cast<struct stCoRoutine_t *>(NULL)> ResponseQueue;
+        typedef Co_MPSC_NoLockQueue<Request*> RequestQueue;
+        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> ResponseQueue;
 #else
-        typedef CoSyncQueue<Request*, static_cast<struct Request *>(NULL)> RequestQueue;
-        typedef CoSyncQueue<stCoRoutine_t*, static_cast<struct stCoRoutine_t *>(NULL)> ResponseQueue;
+        typedef CoSyncQueue<Request*> RequestQueue;
+        typedef CoSyncQueue<stCoRoutine_t*> ResponseQueue;
 #endif
         
         class Client {
