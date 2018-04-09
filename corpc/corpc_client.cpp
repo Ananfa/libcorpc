@@ -32,8 +32,6 @@
 
 namespace CoRpc {
     
-    //__thread Client *Client::_instance(nullptr);
-    
     Client::Decoder::~Decoder() {}
     
     void * Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
@@ -124,7 +122,7 @@ namespace CoRpc {
     }
     
     std::shared_ptr<CoRpc::Pipeline> Client::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection, CORPC_RESPONSE_HEAD_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES, CORPC_MAX_RESPONSE_SIZE) );
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
         if (!_decoder) {
             _decoder.reset( new Decoder() );
@@ -161,7 +159,6 @@ namespace CoRpc {
             connectNum = 1;
         }
         
-        //_connections.resize(connectNum, nullptr);
         for (int i = 0; i < connectNum; i++) {
             _connections.push_back(nullptr);
         }
@@ -231,22 +228,6 @@ namespace CoRpc {
         }
     }
     
-    /*
-    Client* Client::instance() {
-        if (!_instance) {
-            IO *io = IO::instance();
-            if (io) {
-                _instance = new Client(io);
-                _instance->start();
-            } else {
-                printf("Error: Client::instance: IO hasn't initialized.\n");
-            }
-        }
-        
-        return _instance;
-    }
-     */
-    
     Client* Client::create(IO *io) {
         assert(io);
         Client *client = new Client(io);
@@ -282,7 +263,7 @@ namespace CoRpc {
         std::vector<char> buf(1024);
         while (true) {
             // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
+            ret = (int)read(readFd, &buf[0], 1024);
             assert(ret != 0);
             if (ret < 0) {
                 if (errno == EAGAIN) {
@@ -502,7 +483,7 @@ namespace CoRpc {
         std::vector<char> buf(1024);
         while (true) {
             // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
+            ret = (int)read(readFd, &buf[0], 1024);
             assert(ret != 0);
             if (ret < 0) {
                 if (errno == EAGAIN) {

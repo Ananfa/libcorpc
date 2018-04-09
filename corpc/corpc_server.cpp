@@ -123,7 +123,7 @@ namespace CoRpc {
     }
     
     std::shared_ptr<CoRpc::Pipeline> Server::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::Pipeline(connection, CORPC_REQUEST_HEAD_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES, CORPC_MAX_REQUEST_SIZE) );
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
         if (!_decoder) {
             _decoder.reset( new Decoder() );

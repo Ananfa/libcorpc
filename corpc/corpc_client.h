@@ -168,7 +168,6 @@ namespace CoRpc {
 #endif
        
     public:
-        //static Client* instance();
         static Client* create(IO *io);
         
         bool registerChannel(Channel *channel);
@@ -189,8 +188,6 @@ namespace CoRpc {
         void start();
         
     private:
-        //static __thread Client *_instance;
-        
         IO *_io;
         
         ConnectionTaskQueue _connectionTaskQueue;

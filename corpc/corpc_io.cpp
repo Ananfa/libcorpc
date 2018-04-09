@@ -30,12 +30,48 @@ namespace CoRpc {
     
     Encoder::~Encoder() {}
     
-    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize): _connection(connection), _headSize(headSize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _maxBodySize(maxBodySize), _head(headSize,0), _bodySize(0), _headNum(0), _bodyNum(0) {
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize): _connection(connection), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
     
-    bool Pipeline::upflow(uint8_t *buf, int size) {
+    Pipeline::~Pipeline() {}
+    
+    bool Pipeline::downflow(uint8_t *buf, int space, int &size) {
+        std::shared_ptr<Connection> connection = _connection.lock();
+        assert(connection);
+        
+        size = 0;
+        while (connection->_datas.size() > 0) {
+            bool encoded = false;
+            for (std::vector<std::shared_ptr<Encoder>>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
+                int tmp = 0;
+                if ((*it)->encode(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
+                    if (!tmp) { // 数据放不进buf中（等下次放入）
+                        return true;
+                    }
+                    
+                    size += tmp;
+                    encoded = true;
+                    break;
+                }
+            }
+            
+            if (!encoded) {
+                // 找不到可处理的编码器
+                return false;
+            }
+            
+            connection->_datas.pop_front();
+        }
+        
+        return true;
+    }
+    
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    }
+    
+    bool TcpPipeline::upflow(uint8_t *buf, int size) {
         std::shared_ptr<Connection> connection = _connection.lock();
         assert(connection);
         
@@ -70,7 +106,7 @@ namespace CoRpc {
                 }
                 
                 if (_bodySize > _maxBodySize) { // 数据超长
-                    printf("ERROR: CommonSplitter::split -- request too large in thread:%d\n", GetPid());
+                    printf("ERROR: TcpPipeline::upflow -- request too large in thread\n");
                     
                     return false;
                 }
@@ -109,33 +145,33 @@ namespace CoRpc {
         return true;
     }
     
-    bool Pipeline::downflow(uint8_t *buf, int space, int &size) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, headSize, maxBodySize) {
+        
+    }
+    
+    bool UdpPipeline::upflow(uint8_t *buf, int size) {
         std::shared_ptr<Connection> connection = _connection.lock();
         assert(connection);
         
-        size = 0;
-        while (connection->_datas.size() > 0) {
-            bool encoded = false;
-            for (std::vector<std::shared_ptr<Encoder>>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
-                int tmp = 0;
-                if ((*it)->encode(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
-                    if (!tmp) { // 数据放不进buf中（等下次放入）
-                        return true;
-                    }
-                    
-                    size += tmp;
-                    encoded = true;
-                    break;
-                }
-            }
+        if (size < _headSize) {
+            printf("ERROR: UdpPipeline::upflow -- package size too small\n");
             
-            if (!encoded) {
-                // 找不到可处理的编码器
-                return false;
-            }
-            
-            connection->_datas.pop_front();
+            return false;
         }
+        
+        memcpy(_headBuf, buf, _headSize);
+        
+        _bodySize = size - _headSize;
+        
+        memcpy(_bodyBuf, buf + _headSize, _bodySize);
+        
+        void *msg = _decoder->decode(connection, _headBuf, _bodyBuf, _bodySize);
+        
+        if (!msg) {
+            return false;
+        }
+        
+        _router->route(connection, msg);
         
         return true;
     }
@@ -174,7 +210,7 @@ namespace CoRpc {
         std::vector<char> buf(1024);
         while (true) {
             // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
+            ret = (int)read(readFd, &buf[0], 1024);
             assert(ret != 0);
             if (ret < 0) {
                 if (errno == EAGAIN) {
@@ -216,7 +252,7 @@ namespace CoRpc {
         
         while (true) {
             // 先将数据读到缓存中（尽可能多的读）
-            int ret = read(fd, buf, CORPC_MAX_BUFFER_SIZE);
+            int ret = (int)read(fd, buf, CORPC_MAX_BUFFER_SIZE);
             
             if (ret <= 0) {
                 // ret 0 mean disconnected
@@ -316,7 +352,7 @@ namespace CoRpc {
         std::vector<char> buf(1024);
         while (true) {
             // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
+            ret = (int)read(readFd, &buf[0], 1024);
             assert(ret != 0);
             if (ret < 0) {
                 if (errno == EAGAIN) {
@@ -415,7 +451,7 @@ namespace CoRpc {
             }
             
             // 发数据
-            int ret = write(connection->_fd, buf + startIndex, dataSize);
+            int ret = (int)write(connection->_fd, buf + startIndex, dataSize);
             if (ret < 0) {
                 printf("ERROR: IO::Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));

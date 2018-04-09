@@ -68,10 +68,10 @@ namespace CoRpc {
         enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
         
     public:
-        Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint bodySizeOffset, SIZE_TYPE bodySizeType, uint maxBodySize);
-        ~Pipeline() {}
+        Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize);
+        virtual ~Pipeline() = 0;
         
-        bool upflow(uint8_t *buf, int size);
+        virtual bool upflow(uint8_t *buf, int size) = 0;
         bool downflow(uint8_t *buf, int space, int &size);
         
         void setDecoder(std::shared_ptr<Decoder>& decoder) { _decoder = decoder; }
@@ -80,27 +80,45 @@ namespace CoRpc {
         std::shared_ptr<Router>& getRouter() { return _router; }
         void addEncoder(std::shared_ptr<Encoder>& encoder) { _encoders.push_back(encoder); }
         
-        std::weak_ptr<Connection> &getConnection() { return _connection; }
-    private:
+    protected:
         uint _headSize;
-        uint _bodySizeOffset;
-        SIZE_TYPE _bodySizeType;
         uint _maxBodySize;
-        int _bodySize;
         
         std::string _head;
         uint8_t *_headBuf;
-        int _headNum;
         
         std::string _body;
         uint8_t *_bodyBuf;
-        int _bodyNum;
+        uint _bodySize;
         
         std::shared_ptr<Decoder> _decoder;
         std::shared_ptr<Router> _router;
         std::vector<std::shared_ptr<Encoder>> _encoders;
         
         std::weak_ptr<Connection> _connection;
+    };
+    
+    class TcpPipeline: public Pipeline {
+    public:
+        TcpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
+        virtual ~TcpPipeline() {}
+        
+        virtual bool upflow(uint8_t *buf, int size);
+        
+    private:
+        uint _headNum;
+        uint _bodyNum;
+        
+        uint _bodySizeOffset;
+        SIZE_TYPE _bodySizeType;
+    };
+    
+    class UdpPipeline: public Pipeline {
+    public:
+        UdpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize);
+        virtual ~UdpPipeline() {}
+        
+        virtual bool upflow(uint8_t *buf, int size);
     };
     
     class PipelineFactory {
@@ -305,8 +323,6 @@ namespace CoRpc {
     
     class IO {
     public:
-        //static bool initialize(uint16_t receiveThreadNum, uint16_t sendThreadNum);
-        //static IO* instance() { return _io; }
         static IO* create(uint16_t receiveThreadNum, uint16_t sendThreadNum);
         
         bool start();
@@ -324,8 +340,6 @@ namespace CoRpc {
         ~IO() {}  // 不允许在栈上创建IO
         
     private:
-        //static IO* _io;
-        
         uint16_t _receiveThreadNum;
         uint16_t _sendThreadNum;
         
