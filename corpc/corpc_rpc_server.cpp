@@ -15,7 +15,7 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_server.h"
+#include "corpc_rpc_server.h"
 #include "corpc_controller.h"
 #include "corpc_utils.h"
 
@@ -36,26 +36,25 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    Server::Decoder::~Decoder() {}
+    RpcServer::Decoder::~Decoder() {}
     
-    void * Server::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * RpcServer::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
-        Server *server = conn->getServer();
+        RpcServer *server = conn->getServer();
         
-        RpcRequestHead reqhead;
-        reqhead.size = *(uint32_t *)head;
-        reqhead.size = ntohl(reqhead.size);
-        reqhead.serviceId = *(uint32_t *)(head + 4);
-        reqhead.serviceId = ntohl(reqhead.serviceId);
-        reqhead.methodId = *(uint32_t *)(head + 8);
-        reqhead.methodId = ntohl(reqhead.methodId);
-        reqhead.callId = *(uint64_t *)(head + 12);
-        reqhead.callId = ntohll(reqhead.callId);
+        uint32_t reqSize = *(uint32_t *)head;
+        reqSize = ntohl(reqSize);
+        uint32_t serviceId = *(uint32_t *)(head + 4);
+        serviceId = ntohl(serviceId);
+        uint32_t methodId = *(uint32_t *)(head + 8);
+        methodId = ntohl(methodId);
+        uint64_t callId = *(uint64_t *)(head + 12);
+        callId = ntohll(callId);
         
         // 生成ServerRpcTask
         // 根据serverId和methodId查表
-        const MethodData *methodData = server->getMethod(reqhead.serviceId, reqhead.methodId);
+        const MethodData *methodData = server->getMethod(serviceId, methodId);
         if (methodData != NULL) {
             const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
             
@@ -73,36 +72,36 @@ namespace CoRpc {
             WorkerTask *task = new WorkerTask;
             task->connection = conn;
             task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
-            task->rpcTask->service = server->getService(reqhead.serviceId);
+            task->rpcTask->service = server->getService(serviceId);
             task->rpcTask->method_descriptor = method_descriptor;
             task->rpcTask->request = request;
             task->rpcTask->response = response;
             task->rpcTask->controller = controller;
-            task->rpcTask->callId = reqhead.callId;
+            task->rpcTask->callId = callId;
             
             return task;
         } else {
             // 出错处理
-            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", reqhead.serviceId, reqhead.methodId);
+            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", serviceId, methodId);
             
             return nullptr;
         }
     }
     
-    Server::Router::~Router() {}
+    RpcServer::Router::~Router() {}
     
-    void Server::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
+    void RpcServer::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
-        Server *server = conn->getServer();
+        RpcServer *server = conn->getServer();
         
         WorkerTask *task = (WorkerTask *)msg;
         server->_worker->postRpcTask(task);
     }
     
-    Server::Encoder::~Encoder() {}
+    RpcServer::Encoder::~Encoder() {}
     
-    bool Server::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcServer::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
         uint32_t msgSize = rpcTask->response->GetCachedSize();
         if (msgSize == 0) {
@@ -122,49 +121,38 @@ namespace CoRpc {
         return true;
     }
     
-    std::shared_ptr<CoRpc::Pipeline> Server::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+    std::shared_ptr<CoRpc::Pipeline> RpcServer::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
         std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
-        if (!_decoder) {
-            _decoder.reset( new Decoder() );
-        }
         pipeline->setDecoder(_decoder);
-        
-        if (!_router) {
-            _router.reset( new Router() );
-        }
         pipeline->setRouter(_router);
-        
-        if (!_encoder) {
-            _encoder.reset( new Encoder() );
-        }
         pipeline->addEncoder(_encoder);
         
         return pipeline;
     }
     
-    Server::Connection::Connection(int fd, Server* server): CoRpc::Connection(fd, server->_io), _server(server) {
+    RpcServer::Connection::Connection(int fd, RpcServer* server): CoRpc::Connection(fd, server->_io), _server(server) {
     }
     
-    Server::Connection::~Connection() {
+    RpcServer::Connection::~Connection() {
         printf("INFO: Server::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
     }
     
-    Server::RpcTask::RpcTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {
+    RpcServer::RpcTask::RpcTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {
         
     }
     
-    Server::RpcTask::~RpcTask() {
+    RpcServer::RpcTask::~RpcTask() {
         delete request;
         delete response;
         delete controller;
     }
     
-    Server::Acceptor::~Acceptor() {
+    RpcServer::Acceptor::~Acceptor() {
         
     }
     
-    bool Server::Acceptor::init() {
+    bool RpcServer::Acceptor::init() {
         const std::string &ip = _server->getIP();
         uint16_t port = _server->getPort();
         
@@ -220,7 +208,7 @@ namespace CoRpc {
         return true;
     }
     
-    void *Server::Acceptor::acceptRoutine( void * arg ) {
+    void *RpcServer::Acceptor::acceptRoutine( void * arg ) {
         Acceptor *self = (Acceptor *)arg;
         co_enable_hook_sys();
         
@@ -263,7 +251,7 @@ namespace CoRpc {
         return NULL;
     }
     
-    void Server::ThreadAcceptor::threadEntry(ThreadAcceptor *self) {
+    void RpcServer::ThreadAcceptor::threadEntry(ThreadAcceptor *self) {
         if (!self->init()) {
             printf("ERROR: ThreadAcceptor::threadEntry() -- init fail\n");
             return;
@@ -275,12 +263,12 @@ namespace CoRpc {
         RoutineEnvironment::runEventLoop();
     }
     
-    bool Server::ThreadAcceptor::start() {
+    bool RpcServer::ThreadAcceptor::start() {
         _t = std::thread(threadEntry, this);
         return true;
     }
     
-    bool Server::CoroutineAcceptor::start() {
+    bool RpcServer::CoroutineAcceptor::start() {
         if (!init()) {
             return false;
         }
@@ -290,12 +278,12 @@ namespace CoRpc {
         return true;
     }
     
-    Server::Worker::~Worker() {
+    RpcServer::Worker::~Worker() {
         
     }
 
     // pipe通知版本
-    void *Server::Worker::taskHandleRoutine( void * arg ) {
+    void *RpcServer::Worker::taskHandleRoutine( void * arg ) {
         QueueContext *context = (QueueContext*)arg;
         
         WorkerTaskQueue& tqueue = context->_queue;
@@ -368,7 +356,7 @@ namespace CoRpc {
 
     /*
     // 轮询版本
-    void *Server::Worker::taskHandleRoutine( void * arg ) {
+    void *RpcServer::Worker::taskHandleRoutine( void * arg ) {
         QueueContext *context = (QueueContext*)arg;
      
         WorkerTaskQueue& tqueue = context->_queue;
@@ -407,7 +395,7 @@ namespace CoRpc {
     }
     */
     
-    void *Server::Worker::taskCallRoutine( void * arg ) {
+    void *RpcServer::Worker::taskCallRoutine( void * arg ) {
         WorkerTask *task = (WorkerTask *)arg;
         
         task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
@@ -422,14 +410,14 @@ namespace CoRpc {
         return NULL;
     }
     
-    void Server::MultiThreadWorker::threadEntry( ThreadData *tdata ) {
+    void RpcServer::MultiThreadWorker::threadEntry( ThreadData *tdata ) {
         // 启动rpc任务处理协程
         RoutineEnvironment::startCoroutine(taskHandleRoutine, &tdata->_queueContext);
         
         RoutineEnvironment::runEventLoop();
     }
     
-    bool Server::MultiThreadWorker::start() {
+    bool RpcServer::MultiThreadWorker::start() {
         // 启动线程
         for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
             it->_queueContext._worker = this;
@@ -439,36 +427,36 @@ namespace CoRpc {
         return true;
     }
     
-    void Server::MultiThreadWorker::postRpcTask(WorkerTask *task) {
+    void RpcServer::MultiThreadWorker::postRpcTask(WorkerTask *task) {
         uint16_t index = (_lastThreadIndex + 1) % _threadNum;
         // FIXME: 对_lastThreadIndex的处理是否需要加锁？
         _lastThreadIndex = index;
         _threadDatas[index]._queueContext._queue.push(task);
     }
     
-    bool Server::CoroutineWorker::start() {
+    bool RpcServer::CoroutineWorker::start() {
         // 启动rpc任务处理协程
         RoutineEnvironment::startCoroutine(taskHandleRoutine, &_queueContext);
         
         return true;
     }
     
-    void Server::CoroutineWorker::postRpcTask(WorkerTask *task) {
+    void RpcServer::CoroutineWorker::postRpcTask(WorkerTask *task) {
         _queueContext._queue.push(task);
     }
     
-    Server::Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): _io(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
+    RpcServer::RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): _io(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
     }
     
-    Server* Server::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
+    RpcServer* RpcServer::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
         assert(io);
-        Server *server = new Server(io, acceptInNewThread, workThreadNum, ip, port);
+        RpcServer *server = new RpcServer(io, acceptInNewThread, workThreadNum, ip, port);
         
         server->start();
         return server;
     }
     
-    bool Server::registerService(::google::protobuf::Service *rpcService) {
+    bool RpcServer::registerService(::google::protobuf::Service *rpcService) {
         const google::protobuf::ServiceDescriptor *serviceDescriptor = rpcService->GetDescriptor();
         
         uint32_t serviceId = (uint32_t)(serviceDescriptor->options().GetExtension(corpc::global_service_id));
@@ -493,7 +481,7 @@ namespace CoRpc {
         return true;
     }
     
-    google::protobuf::Service *Server::getService(uint32_t serviceId) const {
+    google::protobuf::Service *RpcServer::getService(uint32_t serviceId) const {
         std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
         if (it == _services.end()) {
             return NULL;
@@ -502,7 +490,7 @@ namespace CoRpc {
         return it->second.rpcService;
     }
     
-    const MethodData *Server::getMethod(uint32_t serviceId, uint32_t methodId) const {
+    const MethodData *RpcServer::getMethod(uint32_t serviceId, uint32_t methodId) const {
         std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
         if (it == _services.end()) {
             return NULL;
@@ -515,7 +503,7 @@ namespace CoRpc {
         return &(it->second.methods[methodId]);
     }
     
-    bool Server::start() {
+    bool RpcServer::start() {
         // 根据需要启动accept协程或线程
         if (_acceptInNewThread) {
             _acceptor = new ThreadAcceptor(this);

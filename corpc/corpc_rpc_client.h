@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef corpc_client_h
-#define corpc_client_h
+#ifndef corpc_rpc_client_h
+#define corpc_rpc_client_h
 
 #include "corpc_io.h"
 
@@ -32,7 +32,7 @@
 // rpc channel需要注册到client中才能被服务
 namespace CoRpc {
     
-    class Client {
+    class RpcClient {
         
         struct RpcTask {
             stCoRoutine_t *co;
@@ -86,7 +86,7 @@ namespace CoRpc {
             virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
             
         private:
-            PipelineFactory() {}
+            PipelineFactory(): _decoder(new Decoder), _router(new Router), _encoder(new Encoder) {}
             PipelineFactory(PipelineFactory const&);
             PipelineFactory& operator=(PipelineFactory const&);
             ~PipelineFactory() {}
@@ -119,7 +119,7 @@ namespace CoRpc {
             
         public:
             friend class Channel;
-            friend class Client;
+            friend class RpcClient;
             friend class Decoder;
             friend class Encoder;
         };
@@ -127,7 +127,7 @@ namespace CoRpc {
     public:
         class Channel : public google::protobuf::RpcChannel {
         public:
-            Channel(Client *client, const std::string& ip, uint32_t port, uint32_t connectNum = 1);
+            Channel(RpcClient *client, const std::string& ip, uint32_t port, uint32_t connectNum = 1);
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
             
         private:
@@ -139,7 +139,7 @@ namespace CoRpc {
             std::string _ip;
             uint32_t _port;
             
-            Client *_client;
+            RpcClient *_client;
             std::vector<std::shared_ptr<Connection>> _connections;
             uint32_t _conIndex;
             
@@ -147,7 +147,7 @@ namespace CoRpc {
             
         public:
             friend class ClientConnection;
-            friend class Client;
+            friend class RpcClient;
             friend class Encoder;
         };
         
@@ -168,16 +168,16 @@ namespace CoRpc {
 #endif
        
     public:
-        static Client* create(IO *io);
+        static RpcClient* create(IO *io);
         
         bool registerChannel(Channel *channel);
         
         void destroy() { delete this; } // 销毁Client
         
     private:
-        Client(IO *io): _io(io), _upRoutineHang(false), _upRoutine(NULL) {}
+        RpcClient(IO *io): _io(io), _upRoutineHang(false), _upRoutine(NULL) {}
         
-        ~Client() {}
+        ~RpcClient() {}
         
         static void *connectionRoutine( void * arg );  // 负责为connection连接建立和断线处理
         
@@ -204,4 +204,4 @@ namespace CoRpc {
     };
 }
 
-#endif /* corpc_client_h */
+#endif /* corpc_rpc_client_h */

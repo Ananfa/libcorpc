@@ -15,7 +15,7 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_server.h"
+#include "corpc_rpc_server.h"
 
 #include "helloworld.pb.h"
 #include "echo.pb.h"
@@ -70,7 +70,7 @@ int main(int argc, const char * argv[]) {
     
     IO *io = IO::create(1, 1);
     
-    Server *server = Server::create(io, false, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, false, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     EchoServiceImpl *echoService = new EchoServiceImpl();

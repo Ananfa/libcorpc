@@ -16,7 +16,7 @@
 
 #include "corpc_routine_env.h"
 #include "corpc_controller.h"
-#include "corpc_inner.h"
+#include "corpc_inner_rpc.h"
 
 #include "helloworld.pb.h"
 
@@ -44,7 +44,7 @@ static void *rpc_routine( void *arg )
 {
     co_enable_hook_sys();
     
-    Inner::Client::Channel *channel = (Inner::Client::Channel*)arg;
+    InnerRpcClient::Channel *channel = (InnerRpcClient::Channel*)arg;
     
     HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
     
@@ -72,10 +72,10 @@ static void *rpc_routine( void *arg )
     return NULL;
 }
 
-static void clientEntry( Inner::Server *server ) {
-    Inner::Client *client = Inner::Client::instance();
+static void clientEntry( InnerRpcServer *server ) {
+    InnerRpcClient *client = InnerRpcClient::instance();
     
-    Inner::Client::Channel *channel = new Inner::Client::Channel(client, server);
+    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
     
     RoutineEnvironment::startCoroutine(rpc_routine, channel);
     
@@ -85,7 +85,7 @@ static void clientEntry( Inner::Server *server ) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    Inner::Server *server = Inner::Server::create();
+    InnerRpcServer *server = InnerRpcServer::create();
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     server->registerService(helloWorldService);
     

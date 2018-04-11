@@ -15,8 +15,8 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_client.h"
-#include "corpc_server.h"
+#include "corpc_rpc_client.h"
+#include "corpc_rpc_server.h"
 
 #include "factorial.pb.h"
 
@@ -31,7 +31,7 @@ public:
     
     void setIO(IO *io) { _io = io; }
     
-    Client *get_client();
+    RpcClient *get_client();
     
 private:
     ThreadSpecialResource() {}
@@ -42,14 +42,14 @@ private:
 private:
     IO *_io;
     
-    static __thread Client *_client;
+    static __thread RpcClient *_client;
 };
 
-__thread Client *ThreadSpecialResource::_client(nullptr);
+__thread RpcClient *ThreadSpecialResource::_client(nullptr);
 
-Client *ThreadSpecialResource::get_client() {
+RpcClient *ThreadSpecialResource::get_client() {
     if (!_client) {
-        _client = Client::create(_io);
+        _client = RpcClient::create(_io);
     }
     
     return _client;
@@ -93,9 +93,9 @@ __thread FactorialService::Stub *FactorialServiceImpl::_factorial_clt(nullptr);
 
 FactorialService::Stub *FactorialServiceImpl::get_factorial_clt() {
     if (!_factorial_clt) {
-        Client *client = ThreadSpecialResource::Instance().get_client();
+        RpcClient *client = ThreadSpecialResource::Instance().get_client();
         if (client) {
-            Client::Channel *channel = new Client::Channel(client, _sip, _sport, 1);
+            RpcClient::Channel *channel = new RpcClient::Channel(client, _sip, _sport, 1);
             
             _factorial_clt= new FactorialService::Stub(channel, ::google::protobuf::Service::STUB_OWNS_CHANNEL);
         }
@@ -123,7 +123,7 @@ int main(int argc, const char * argv[]) {
     
     ThreadSpecialResource::Instance().setIO(io);
     
-    Server *server = Server::create(io, false, 1, ip, port);
+    RpcServer *server = RpcServer::create(io, false, 1, ip, port);
     
     FactorialServiceImpl *factorialService = new FactorialServiceImpl(sip, sport);
     server->registerService(factorialService);

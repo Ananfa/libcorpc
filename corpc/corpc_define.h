@@ -40,18 +40,6 @@
 
 namespace CoRpc {
     
-    struct RpcRequestHead {
-        uint32_t size;
-        uint32_t serviceId;
-        uint32_t methodId;
-        uint64_t callId;
-    };
-    
-    struct RpcResponseHead {
-        uint32_t size;
-        uint64_t callId;
-    };
-    
     struct PipeType {
         int pipefd[2];
     };

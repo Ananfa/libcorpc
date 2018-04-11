@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef corpc_server_h
-#define corpc_server_h
+#ifndef corpc_rpc_server_h
+#define corpc_rpc_server_h
 
 #include "corpc_io.h"
 
@@ -28,7 +28,7 @@
 
 namespace CoRpc {
 
-    class Server {
+    class RpcServer {
         class Decoder: public CoRpc::Decoder {
         public:
             Decoder() {}
@@ -65,7 +65,7 @@ namespace CoRpc {
             virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
             
         private:
-            PipelineFactory() {}
+            PipelineFactory(): _decoder(new Decoder), _router(new Router), _encoder(new Encoder) {}
             PipelineFactory(PipelineFactory const&);
             PipelineFactory& operator=(PipelineFactory const&);
             ~PipelineFactory() {}
@@ -78,24 +78,14 @@ namespace CoRpc {
         
         class Connection: public CoRpc::Connection {
         public:
-            Connection(int fd, Server* server);
+            Connection(int fd, RpcServer* server);
             virtual ~Connection();
             
             virtual void onClose() {}
             
-            Server *getServer() { return _server; }
+            RpcServer *getServer() { return _server; }
         private:
-            Server *_server;
-            
-            // 接收数据时的包头和包体
-            //RpcRequestHead _reqhead;
-            //char *_head_buf;
-            //int _headNum;
-            
-            //std::string _reqdata;
-            //uint8_t *_data_buf;
-            //int _dataNum;
-            
+            RpcServer *_server;
         };
         
         class RpcTask {
@@ -127,7 +117,7 @@ namespace CoRpc {
         
         class Acceptor {
         public:
-            Acceptor(Server *server): _server(server), _listen_fd(-1) {}
+            Acceptor(RpcServer *server): _server(server), _listen_fd(-1) {}
             virtual ~Acceptor() = 0;
             
             virtual bool start() = 0;
@@ -138,7 +128,7 @@ namespace CoRpc {
             static void *acceptRoutine( void * arg );
             
         protected:
-            Server *_server;
+            RpcServer *_server;
             
         private:
             int _listen_fd;
@@ -146,7 +136,7 @@ namespace CoRpc {
         
         class ThreadAcceptor: public Acceptor {
         public:
-            ThreadAcceptor(Server *server): Acceptor(server) {}
+            ThreadAcceptor(RpcServer *server): Acceptor(server) {}
             virtual ~ThreadAcceptor() {}
             
             virtual bool start();
@@ -161,7 +151,7 @@ namespace CoRpc {
         
         class CoroutineAcceptor: public Acceptor {
         public:
-            CoroutineAcceptor(Server *server): Acceptor(server) {}
+            CoroutineAcceptor(RpcServer *server): Acceptor(server) {}
             ~CoroutineAcceptor() {}
             
             virtual bool start();
@@ -177,7 +167,7 @@ namespace CoRpc {
             };
             
         public:
-            Worker(Server *server): _server(server) {}
+            Worker(RpcServer *server): _server(server) {}
             virtual ~Worker() = 0;
             
             virtual bool start() = 0;
@@ -190,7 +180,7 @@ namespace CoRpc {
             static void *taskCallRoutine( void * arg );
             
         protected:
-            Server *_server;
+            RpcServer *_server;
         };
         
         class MultiThreadWorker: public Worker {
@@ -204,7 +194,7 @@ namespace CoRpc {
             };
             
         public:
-            MultiThreadWorker(Server *server, uint16_t threadNum): Worker(server), _threadNum(threadNum), _threadDatas(threadNum) {}
+            MultiThreadWorker(RpcServer *server, uint16_t threadNum): Worker(server), _threadNum(threadNum), _threadDatas(threadNum) {}
             virtual ~MultiThreadWorker() {}
             
             bool start();
@@ -222,7 +212,7 @@ namespace CoRpc {
         
         class CoroutineWorker: public Worker {
         public:
-            CoroutineWorker(Server *server): Worker(server) { _queueContext._worker = this; }
+            CoroutineWorker(RpcServer *server): Worker(server) { _queueContext._worker = this; }
             virtual ~CoroutineWorker() {}
             
             bool start();
@@ -234,7 +224,7 @@ namespace CoRpc {
         };
         
     public:
-        static Server* create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        static RpcServer* create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -248,8 +238,8 @@ namespace CoRpc {
         uint16_t getPort() { return _port; }
         
     private:
-        Server(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
-        ~Server();  // 不允许在栈上创建server
+        RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        ~RpcServer();  // 不允许在栈上创建server
         
         bool start();
         
@@ -268,4 +258,4 @@ namespace CoRpc {
     
 }
 
-#endif /* corpc_server_h */
+#endif /* corpc_rpc_server_h */

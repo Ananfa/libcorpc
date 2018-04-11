@@ -16,7 +16,7 @@
 
 #include "corpc_routine_env.h"
 
-#include "corpc_client.h"
+#include "corpc_rpc_client.h"
 #include "corpc_utils.h"
 
 #include <errno.h>
@@ -32,26 +32,25 @@
 
 namespace CoRpc {
     
-    Client::Decoder::~Decoder() {}
+    RpcClient::Decoder::~Decoder() {}
     
-    void * Client::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * RpcClient::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
-        RpcResponseHead resphead;
-        resphead.size = *(uint32_t *)head;
-        resphead.size = ntohl(resphead.size);
-        resphead.callId = *(uint64_t *)(head + 4);
-        resphead.callId = ntohll(resphead.callId);
+        uint32_t respSize = *(uint32_t *)head;
+        respSize = ntohl(respSize);
+        uint64_t callId = *(uint64_t *)(head + 4);
+        callId = ntohll(callId);
         
         ClientTask *task = NULL;
         // 注意: _waitResultCoMap需进行线程同步
         {
             std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
-            Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(resphead.callId);
+            Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(callId);
             
             if (itor == conn->_waitResultCoMap.end()) {
                 // 打印出错信息
-                printf("Client::Decoder::decode can't find task : %llu\n", resphead.callId);
+                printf("Client::Decoder::decode can't find task : %llu\n", callId);
                 assert(false);
                 return nullptr;
             }
@@ -63,7 +62,7 @@ namespace CoRpc {
         }
         
         // 解析包体（RpcResponseData）
-        if (!task->rpcTask->response->ParseFromArray(body, resphead.size)) {
+        if (!task->rpcTask->response->ParseFromArray(body, respSize)) {
             printf("ERROR: Client::Decoder::decode -- parse response body fail\n");
             return nullptr;
         }
@@ -71,9 +70,9 @@ namespace CoRpc {
         return task;
     }
     
-    Client::Router::~Router() {}
+    RpcClient::Router::~Router() {}
     
-    void Client::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
+    void RpcClient::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         ClientTask *task = (ClientTask *)msg;
@@ -81,9 +80,9 @@ namespace CoRpc {
         conn->_channel->_client->_downQueue.push(task->rpcTask->co);
     }
     
-    Client::Encoder::~Encoder() {}
+    RpcClient::Encoder::~Encoder() {}
     
-    bool Client::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcClient::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
@@ -121,31 +120,20 @@ namespace CoRpc {
         return true;
     }
     
-    std::shared_ptr<CoRpc::Pipeline> Client::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+    std::shared_ptr<CoRpc::Pipeline> RpcClient::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
         std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
-        if (!_decoder) {
-            _decoder.reset( new Decoder() );
-        }
         pipeline->setDecoder(_decoder);
-        
-        if (!_router) {
-            _router.reset( new Router() );
-        }
         pipeline->setRouter(_router);
-        
-        if (!_encoder) {
-            _encoder.reset( new Encoder() );
-        }
         pipeline->addEncoder(_encoder);
         
         return pipeline;
     }
     
-    Client::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED) {
+    RpcClient::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED) {
     }
     
-    void Client::Connection::onClose() {
+    void RpcClient::Connection::onClose() {
         ConnectionTask *connectionTask = new ConnectionTask;
         connectionTask->type = ConnectionTask::CLOSE;
         connectionTask->connection = std::static_pointer_cast<Connection>(CoRpc::Connection::shared_from_this());
@@ -153,7 +141,7 @@ namespace CoRpc {
         _channel->_client->_connectionTaskQueue.push(connectionTask);
     }
     
-    Client::Channel::Channel(Client *client, const std::string& ip, uint32_t port, uint32_t connectNum)
+    RpcClient::Channel::Channel(RpcClient *client, const std::string& ip, uint32_t port, uint32_t connectNum)
     : _client(client), _ip(ip), _port(port), _conIndex(0), _connectDelay(false) {
         if (connectNum == 0) {
             connectNum = 1;
@@ -166,12 +154,12 @@ namespace CoRpc {
         _client->registerChannel(this);
     }
     
-    Client::Channel::~Channel() {
+    RpcClient::Channel::~Channel() {
         // TODO: 如何优雅的关闭channel？涉及其中connection关闭，而connection中有协程正在执行
         // 一般情况channel是不会被关闭的
     }
     
-    std::shared_ptr<Client::Connection>& Client::Channel::getNextConnection() {
+    std::shared_ptr<RpcClient::Connection>& RpcClient::Channel::getNextConnection() {
         _conIndex = (_conIndex + 1) % _connections.size();
         
         if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
@@ -196,7 +184,7 @@ namespace CoRpc {
         return _connections[_conIndex];
     }
     
-    void Client::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
+    void RpcClient::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
         ClientTask *clientTask = new ClientTask;
         clientTask->channel = this;
         clientTask->rpcTask = std::make_shared<RpcTask>();
@@ -228,15 +216,15 @@ namespace CoRpc {
         }
     }
     
-    Client* Client::create(IO *io) {
+    RpcClient* RpcClient::create(IO *io) {
         assert(io);
-        Client *client = new Client(io);
+        RpcClient *client = new RpcClient(io);
         
         client->start();
         return client;
     }
     
-    bool Client::registerChannel(Channel *channel) {
+    bool RpcClient::registerChannel(Channel *channel) {
         if (_channelSet.find(channel) != _channelSet.end()) {
             return false;
         }
@@ -245,14 +233,14 @@ namespace CoRpc {
         return true;
     }
     
-    void Client::start() {
+    void RpcClient::start() {
         RoutineEnvironment::startCoroutine(connectionRoutine, this);
         RoutineEnvironment::startCoroutine(downRoutine, this);
         RoutineEnvironment::startCoroutine(upRoutine, this);
     }
     
-    void *Client::connectionRoutine( void * arg ) {
-        Client *self = (Client *)arg;
+    void *RpcClient::connectionRoutine( void * arg ) {
+        RpcClient *self = (RpcClient *)arg;
         co_enable_hook_sys();
         
         int readFd = self->_connectionTaskQueue.getReadFd();
@@ -427,8 +415,8 @@ namespace CoRpc {
         }
     }
     
-    void *Client::upRoutine( void * arg ) {
-        Client *self = (Client *)arg;
+    void *RpcClient::upRoutine( void * arg ) {
+        RpcClient *self = (RpcClient *)arg;
         co_enable_hook_sys();
         
         self->_upRoutine = co_self();
@@ -472,8 +460,8 @@ namespace CoRpc {
         return NULL;
     }
     
-    void *Client::downRoutine( void * arg ) {
-        Client *self = (Client *)arg;
+    void *RpcClient::downRoutine( void * arg ) {
+        RpcClient *self = (RpcClient *)arg;
         co_enable_hook_sys();
         int readFd = self->_downQueue.getReadFd();
         co_register_fd(readFd);

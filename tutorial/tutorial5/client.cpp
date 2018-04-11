@@ -15,7 +15,7 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_client.h"
+#include "corpc_rpc_client.h"
 #include "corpc_controller.h"
 
 #include <stdio.h>
@@ -32,7 +32,7 @@ static void *rpc_routine( void *arg )
     
     printf("rpc_routine begin\n");
     
-    Client::Channel *channel = (Client::Channel*)arg;
+    RpcClient::Channel *channel = (RpcClient::Channel*)arg;
     
     FactorialService::Stub *factorial_clt = new FactorialService::Stub(channel);
     
@@ -77,8 +77,8 @@ int main(int argc, const char * argv[]) {
     
     IO* io = IO::create(1, 1);
     
-    Client *client = Client::create(io);
-    Client::Channel *channel = new Client::Channel(client, ip, port, 1);
+    RpcClient *client = RpcClient::create(io);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 1);
     
     RoutineEnvironment::startCoroutine(rpc_routine, channel);
     

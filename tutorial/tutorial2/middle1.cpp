@@ -15,8 +15,8 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_client.h"
-#include "corpc_server.h"
+#include "corpc_rpc_client.h"
+#include "corpc_rpc_server.h"
 
 #include "helloworld.pb.h"
 
@@ -55,10 +55,10 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     IO *io = IO::create(1, 1);
     
-    Client *client = Client::create(io);
-    Client::Channel *channel = new Client::Channel(client, sip, sport, 1);
+    RpcClient *client = RpcClient::create(io);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, sip, sport, 1);
     
-    Server *server = Server::create(io, false, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, false, 0, ip, port);
     //Server *server = Server::create(io, false, 1, ip, port); // this will error
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(new HelloWorldService::Stub(channel));

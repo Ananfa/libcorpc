@@ -16,7 +16,7 @@
 
 #include "corpc_routine_env.h"
 #include "corpc_controller.h"
-#include "corpc_inner.h"
+#include "corpc_inner_rpc.h"
 
 #include "foo.pb.h"
 #include "bar.pb.h"
@@ -243,10 +243,10 @@ static void *test_routine( void *arg )
     return NULL;
 }
 
-static void clientEntry( Inner::Server *server ) {
-    Inner::Client *client = Inner::Client::instance();
+static void clientEntry( InnerRpcServer *server ) {
+    InnerRpcClient *client = InnerRpcClient::instance();
     
-    Inner::Client::Channel *channel = new Inner::Client::Channel(client, server);
+    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
@@ -266,7 +266,7 @@ static void clientEntry( Inner::Server *server ) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    Inner::Server *server = Inner::Server::create();
+    InnerRpcServer *server = InnerRpcServer::create();
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);

@@ -15,8 +15,8 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_client.h"
-#include "corpc_server.h"
+#include "corpc_rpc_client.h"
+#include "corpc_rpc_server.h"
 
 #include "helloworld.pb.h"
 
@@ -31,7 +31,7 @@ public:
     
     void setIO(IO *io) { _io = io; }
     
-    Client *get_client();
+    RpcClient *get_client();
     
 private:
     ThreadSpecialResource() {}
@@ -42,14 +42,14 @@ private:
 private:
     IO *_io;
     
-    static __thread Client *_client;
+    static __thread RpcClient *_client;
 };
 
-__thread Client *ThreadSpecialResource::_client(nullptr);
+__thread RpcClient *ThreadSpecialResource::_client(nullptr);
 
-Client *ThreadSpecialResource::get_client() {
+RpcClient *ThreadSpecialResource::get_client() {
     if (!_client) {
-        _client = Client::create(_io);
+        _client = RpcClient::create(_io);
     }
     
     return _client;
@@ -80,9 +80,9 @@ __thread HelloWorldService::Stub *HelloWorldServiceImpl::_helloworld_clt(nullptr
 
 HelloWorldService::Stub *HelloWorldServiceImpl::get_helloworld_clt() {
     if (!_helloworld_clt) {
-        Client *client = ThreadSpecialResource::Instance().get_client();
+        RpcClient *client = ThreadSpecialResource::Instance().get_client();
         if (client) {
-            Client::Channel *channel = new Client::Channel(client, _sip, _sport, 1);
+            RpcClient::Channel *channel = new RpcClient::Channel(client, _sip, _sport, 1);
             
             _helloworld_clt= new HelloWorldService::Stub(channel, ::google::protobuf::Service::STUB_OWNS_CHANNEL);
         }
@@ -110,7 +110,7 @@ int main(int argc, const char * argv[]) {
     
     ThreadSpecialResource::Instance().setIO(io);
     
-    Server *server = Server::create(io, false, 1, ip, port);
+    RpcServer *server = RpcServer::create(io, false, 1, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(sip, sport);
     server->registerService(helloWorldService);

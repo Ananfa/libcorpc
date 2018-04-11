@@ -15,7 +15,7 @@
  */
 
 #include "corpc_routine_env.h"
-#include "corpc_server.h"
+#include "corpc_rpc_server.h"
 
 #include <signal.h>
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     // 注册服务
     IO *io = IO::create(1, 1);
     
-    Server *server = Server::create(io, true, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, true, 0, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
