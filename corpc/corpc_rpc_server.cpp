@@ -88,17 +88,6 @@ namespace CoRpc {
         }
     }
     
-    RpcServer::Router::~Router() {}
-    
-    void RpcServer::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
-        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
-        
-        RpcServer *server = conn->getServer();
-        
-        WorkerTask *task = (WorkerTask *)msg;
-        server->_worker->postRpcTask(task);
-    }
-    
     RpcServer::Encoder::~Encoder() {}
     
     bool RpcServer::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
@@ -122,11 +111,7 @@ namespace CoRpc {
     }
     
     std::shared_ptr<CoRpc::Pipeline> RpcServer::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
-        
-        pipeline->setDecoder(_decoder);
-        pipeline->setRouter(_router);
-        pipeline->addEncoder(_encoder);
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decoder, _worker, _encoders, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
         return pipeline;
     }
@@ -212,7 +197,8 @@ namespace CoRpc {
         Acceptor *self = (Acceptor *)arg;
         co_enable_hook_sys();
         
-        IO *io = self->_server->_io;
+        RpcServer *server = self->_server;
+        IO *io = server->_io;
         
         int listen_fd = self->_listen_fd;
         // 侦听连接，并把接受的连接传给连接处理对象
@@ -241,7 +227,7 @@ namespace CoRpc {
             co_set_timeout(fd, -1, 1000);
             
             std::shared_ptr<CoRpc::Connection> connection(new Connection(fd, self->_server));
-            std::shared_ptr<CoRpc::Pipeline> pipeline = PipelineFactory::Instance().buildPipeline(connection);
+            std::shared_ptr<CoRpc::Pipeline> pipeline = server->_pipelineFactory->buildPipeline(connection);
             connection->setPipeline(pipeline);
             
             // 将接受的连接分别发给Receiver和Sender
@@ -278,124 +264,7 @@ namespace CoRpc {
         return true;
     }
     
-    RpcServer::Worker::~Worker() {
-        
-    }
-
-    // pipe通知版本
-    void *RpcServer::Worker::taskHandleRoutine( void * arg ) {
-        QueueContext *context = (QueueContext*)arg;
-        
-        WorkerTaskQueue& tqueue = context->_queue;
-        Worker *self = context->_worker;
-        IO *io = self->_server->_io;
-        
-        // 初始化pipe readfd
-        co_enable_hook_sys();
-        int readFd = tqueue.getReadFd();
-        co_register_fd(readFd);
-        co_set_timeout(readFd, -1, 1000);
-        
-        int ret;
-        std::vector<char> buf(1024);
-        while (true) {
-            // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
-            assert(ret != 0);
-            if (ret < 0) {
-                if (errno == EAGAIN) {
-                    continue;
-                } else {
-                    // 管道出错
-                    printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
-                           readFd, ret, errno, strerror(errno));
-                    
-                    // TODO: 如何处理？退出协程？
-                    // sleep 10 milisecond
-                    msleep(10);
-                }
-            }
-            
-            struct timeval t1,t2;
-            gettimeofday(&t1, NULL);
-            
-            // 处理任务队列
-            WorkerTask *task = tqueue.pop();
-            while (task) {
-                bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
-                
-                if (needCoroutine) {
-                    // 启动协程进行rpc处理
-                    RoutineEnvironment::startCoroutine(taskCallRoutine, task);
-                } else {
-                    // rpc处理方法调用
-                    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
-                    
-                    if (task->rpcTask->response != NULL) {
-                        // 处理结果发给sender处理
-                        io->getSender()->send(task->connection, task->rpcTask);
-                    }
-                    
-                    delete task;
-                }
-                
-                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
-                gettimeofday(&t2, NULL);
-                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
-                    msleep(1);
-                    
-                    gettimeofday(&t1, NULL);
-                }
-                
-                task = tqueue.pop();
-            }
-        }
-        
-        return NULL;
-    }
-
-    /*
-    // 轮询版本
-    void *RpcServer::Worker::taskHandleRoutine( void * arg ) {
-        QueueContext *context = (QueueContext*)arg;
-     
-        WorkerTaskQueue& tqueue = context->_queue;
-        Worker *self = context->_worker;
-        IO *io = self->_server->getIO();
-     
-        // 初始化pipe readfd
-        co_enable_hook_sys();
-
-        while (true) {
-            usleep(4000);
-            
-            WorkerTask *task = tqueue->pop();
-            while (task) {
-     
-                bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
-     
-                if (needCoroutine) {
-                    // 启动协程进行rpc处理
-                    RoutineEnvironment::startCoroutine(taskCallRoutine, task);
-                } else {
-                    // rpc处理方法调用
-                    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
-     
-                    // 处理结果发回给receiver处理
-                    io->getSender()->send(task->connection, task->rpcTask);
-     
-                    delete task;
-                }
-     
-                task = tqueue.pop();
-            }
-        }
-        
-        return NULL;
-    }
-    */
-    
-    void *RpcServer::Worker::taskCallRoutine( void * arg ) {
+    void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
         WorkerTask *task = (WorkerTask *)arg;
         
         task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
@@ -410,42 +279,81 @@ namespace CoRpc {
         return NULL;
     }
     
-    void RpcServer::MultiThreadWorker::threadEntry( ThreadData *tdata ) {
-        // 启动rpc任务处理协程
-        RoutineEnvironment::startCoroutine(taskHandleRoutine, &tdata->_queueContext);
+    void RpcServer::MultiThreadWorker::handleMessage(void *msg) {
+        WorkerTask *task = (WorkerTask *)msg;
         
-        RoutineEnvironment::runEventLoop();
+        bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
+        
+        if (needCoroutine) {
+            // 启动协程进行rpc处理
+            RoutineEnvironment::startCoroutine(taskCallRoutine, task);
+        } else {
+            // rpc处理方法调用
+            task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+            
+            if (task->rpcTask->response != NULL) {
+                // 处理结果发给sender处理
+                task->connection->send(task->rpcTask);
+            }
+            
+            delete task;
+        }
     }
     
-    bool RpcServer::MultiThreadWorker::start() {
-        // 启动线程
-        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
-            it->_queueContext._worker = this;
-            it->_t = std::thread(threadEntry, &(*it));
+    void *RpcServer::CoroutineWorker::taskCallRoutine( void * arg ) {
+        WorkerTask *task = (WorkerTask *)arg;
+        
+        task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+        
+        if (task->rpcTask->response != NULL) {
+            // 处理结果发给sender处理
+            task->connection->send(task->rpcTask);
         }
         
-        return true;
-    }
-    
-    void RpcServer::MultiThreadWorker::postRpcTask(WorkerTask *task) {
-        uint16_t index = (_lastThreadIndex + 1) % _threadNum;
-        // FIXME: 对_lastThreadIndex的处理是否需要加锁？
-        _lastThreadIndex = index;
-        _threadDatas[index]._queueContext._queue.push(task);
-    }
-    
-    bool RpcServer::CoroutineWorker::start() {
-        // 启动rpc任务处理协程
-        RoutineEnvironment::startCoroutine(taskHandleRoutine, &_queueContext);
+        delete task;
         
-        return true;
+        return NULL;
     }
     
-    void RpcServer::CoroutineWorker::postRpcTask(WorkerTask *task) {
-        _queueContext._queue.push(task);
+    void RpcServer::CoroutineWorker::handleMessage(void *msg) {
+        WorkerTask *task = (WorkerTask *)msg;
+        
+        bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
+        
+        if (needCoroutine) {
+            // 启动协程进行rpc处理
+            RoutineEnvironment::startCoroutine(taskCallRoutine, task);
+        } else {
+            // rpc处理方法调用
+            task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+            
+            if (task->rpcTask->response != NULL) {
+                // 处理结果发给sender处理
+                task->connection->send(task->rpcTask);
+            }
+            
+            delete task;
+        }
     }
+    
     
     RpcServer::RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): _io(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
+        if (_acceptInNewThread) {
+            _acceptor = new ThreadAcceptor(this);
+        } else {
+            _acceptor = new CoroutineAcceptor(this);
+        }
+        
+        if (_workThreadNum > 0) {
+            _worker = new MultiThreadWorker(this, _workThreadNum);
+        } else {
+            _worker = new CoroutineWorker(this);
+        }
+        
+        std::vector<CoRpc::Encoder*> encoders;
+        encoders.push_back(new Encoder);
+        
+        _pipelineFactory = new PipelineFactory(new Decoder, _worker, std::move(encoders));
     }
     
     RpcServer* RpcServer::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
@@ -505,28 +413,13 @@ namespace CoRpc {
     
     bool RpcServer::start() {
         // 根据需要启动accept协程或线程
-        if (_acceptInNewThread) {
-            _acceptor = new ThreadAcceptor(this);
-        } else {
-            _acceptor = new CoroutineAcceptor(this);
-        }
-        
-        // 根据需要启动worker协程或线程
-        if (_workThreadNum > 0) {
-            _worker = new MultiThreadWorker(this, _workThreadNum);
-        } else {
-            _worker = new CoroutineWorker(this);
-        }
-        
         if (!_acceptor->start()) {
             printf("ERROR: Server::start() -- start acceptor failed.\n");
             return false;
         }
         
-        if (!_worker->start()) {
-            printf("ERROR: Server::start() -- start worker failed.\n");
-            return false;
-        }
+        // 根据需要启动worker协程或线程
+        _worker->start();
         
         return true;
     }

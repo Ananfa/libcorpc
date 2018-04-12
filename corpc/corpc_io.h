@@ -34,7 +34,7 @@ namespace CoRpc {
     // 上流流水线处理流程：
     //   1.数据包分割：从buf中分隔出一个个的未decode的消息原始数据，输入是(uint8_t *)buf，输出是(uint8_t *)rawdata，该单元缓存数据状态
     //   2.解码消息：将原始数据解码成消息对象，输入是(uint8_t *)rawdata，输出是(std::shared_ptr<void>)msg，该单元无状态
-    //   3.消息路由：根据消息类型将消息放到对应的消息队列中，该单元无状态
+    //   3.消息处理：将消息提交给worker处理
     // 下流流水线处理流程：
     //   1.编码器链：根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
     
@@ -46,14 +46,6 @@ namespace CoRpc {
         virtual void * decode(std::shared_ptr<Connection> &connection, uint8_t *head, uint8_t *body, int size) = 0;
     };
     
-    class Router {
-    public:
-        Router() {}
-        virtual ~Router() = 0;
-        
-        virtual void route(std::shared_ptr<Connection> &connection, void *msg) = 0;
-    };
-    
     class Encoder {
     public:
         Encoder() {}
@@ -62,22 +54,90 @@ namespace CoRpc {
         virtual bool encode(std::shared_ptr<Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size) = 0;
     };
     
+#ifdef USE_NO_LOCK_QUEUE
+    typedef Co_MPSC_NoLockQueue<void*> WorkerMessageQueue;
+#else
+    typedef CoSyncQueue<void*> WorkerMessageQueue;
+#endif
+    
+    class Worker {
+    protected:
+        struct QueueContext {
+            Worker *_worker;
+            
+            // 消息队列
+            WorkerMessageQueue _queue;
+        };
+        
+    public:
+        Worker() {}
+        virtual ~Worker() = 0;
+        
+        virtual void start() = 0;
+        
+        virtual void addMessage(void *msg) = 0;
+        
+    protected:
+        static void *msgHandleRoutine(void * arg);
+        
+        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+    };
+    
+    class MultiThreadWorker: public Worker {
+        // 线程相关数据
+        struct ThreadData {
+            // 消息队列
+            QueueContext _queueContext;
+            
+            // thread对象
+            std::thread _t;
+        };
+        
+    public:
+        MultiThreadWorker(uint16_t threadNum): _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
+        virtual ~MultiThreadWorker() = 0;
+        
+        virtual void start();
+        
+        virtual void addMessage(void *msg);
+        
+    protected:
+        static void threadEntry( ThreadData *tdata );
+        
+        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+        
+    private:
+        uint16_t _threadNum;
+        std::atomic<uint16_t> _lastThreadIndex;
+        std::vector<ThreadData> _threadDatas;
+    };
+    
+    class CoroutineWorker: public Worker {
+    public:
+        CoroutineWorker() { _queueContext._worker = this; }
+        virtual ~CoroutineWorker() = 0;
+        
+        virtual void start();
+        
+        virtual void addMessage(void *msg);
+        
+    protected:
+        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+        
+    private:
+        QueueContext _queueContext;
+    };
+    
     class Pipeline {
     public:
         enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
         
     public:
-        Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize);
+        Pipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize);
         virtual ~Pipeline() = 0;
         
         virtual bool upflow(uint8_t *buf, int size) = 0;
         bool downflow(uint8_t *buf, int space, int &size);
-        
-        void setDecoder(std::shared_ptr<Decoder>& decoder) { _decoder = decoder; }
-        std::shared_ptr<Decoder>& getDecoder() { return _decoder; }
-        void setRouter(std::shared_ptr<Router>& router) { _router = router; }
-        std::shared_ptr<Router>& getRouter() { return _router; }
-        void addEncoder(std::shared_ptr<Encoder>& encoder) { _encoders.push_back(encoder); }
         
     protected:
         uint _headSize;
@@ -90,16 +150,16 @@ namespace CoRpc {
         uint8_t *_bodyBuf;
         uint _bodySize;
         
-        std::shared_ptr<Decoder> _decoder;
-        std::shared_ptr<Router> _router;
-        std::vector<std::shared_ptr<Encoder>> _encoders;
+        Decoder *_decoder;
+        Worker *_worker;
+        std::vector<Encoder*> _encoders;
         
         std::weak_ptr<Connection> _connection;
     };
     
     class TcpPipeline: public Pipeline {
     public:
-        TcpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
+        TcpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~TcpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -114,7 +174,7 @@ namespace CoRpc {
     
     class UdpPipeline: public Pipeline {
     public:
-        UdpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize);
+        UdpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize);
         virtual ~UdpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -122,10 +182,15 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory() {}
+        PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): _decoder(decoder), _worker(worker), _encoders(std::move(encoders)) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
+        
+    protected:
+        Decoder *_decoder;
+        Worker *_worker;
+        std::vector<Encoder *> _encoders;
     };
     
     class Connection: public std::enable_shared_from_this<Connection> {

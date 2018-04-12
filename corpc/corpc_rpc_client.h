@@ -32,7 +32,8 @@
 // rpc channel需要注册到client中才能被服务
 namespace CoRpc {
     
-    class RpcClient {
+    // 注意：RpcClient的实现不考虑运行时的关闭销毁，只能通过关闭程序来关闭
+    class RpcClient: public CoroutineWorker {
         
         struct RpcTask {
             stCoRoutine_t *co;
@@ -59,14 +60,6 @@ namespace CoRpc {
             virtual void * decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         };
         
-        class Router: public CoRpc::Router {
-        public:
-            Router() {}
-            virtual ~Router();
-            
-            virtual void route(std::shared_ptr<CoRpc::Connection> &connection, void *msg);
-        };
-        
         class Encoder: public CoRpc::Encoder {
         public:
             Encoder() {}
@@ -75,26 +68,12 @@ namespace CoRpc {
             virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
         };
         
-        // singleton
         class PipelineFactory: public CoRpc::PipelineFactory {
         public:
-            static PipelineFactory& Instance() {
-                static PipelineFactory factory;
-                return factory;
-            }
-            
-            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
-            
-        private:
-            PipelineFactory(): _decoder(new Decoder), _router(new Router), _encoder(new Encoder) {}
-            PipelineFactory(PipelineFactory const&);
-            PipelineFactory& operator=(PipelineFactory const&);
+            PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): CoRpc::PipelineFactory(decoder, worker, std::move(encoders)) {}
             ~PipelineFactory() {}
             
-        private:
-            std::shared_ptr<CoRpc::Decoder> _decoder;
-            std::shared_ptr<CoRpc::Router> _router;
-            std::shared_ptr<CoRpc::Encoder> _encoder;
+            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
         };
         
         class Connection: public CoRpc::Connection {
@@ -160,10 +139,8 @@ namespace CoRpc {
         };
         
 #ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> DownQueue;
         typedef Co_MPSC_NoLockQueue<ConnectionTask*> ConnectionTaskQueue;
 #else
-        typedef CoSyncQueue<stCoRoutine_t*> DownQueue;
         typedef CoSyncQueue<ConnectionTask*> ConnectionTaskQueue;
 #endif
        
@@ -172,35 +149,32 @@ namespace CoRpc {
         
         bool registerChannel(Channel *channel);
         
-        void destroy() { delete this; } // 销毁Client
-        
     private:
-        RpcClient(IO *io): _io(io), _upRoutineHang(false), _upRoutine(NULL) {}
+        RpcClient(IO *io);
         
         ~RpcClient() {}
         
         static void *connectionRoutine( void * arg );  // 负责为connection连接建立和断线处理
         
-        static void *upRoutine( void * arg );   // 负责将rpc调用请求通过connection交由sender发出
-        
-        static void *downRoutine( void * arg ); // 负责接收rpc结果并唤醒rpc调用协程
+        static void *taskHandleRoutine( void * arg );   // 负责将rpc调用请求通过connection交由sender发出
         
         void start();
+        
+    protected:
+        virtual void handleMessage(void *msg);
         
     private:
         IO *_io;
         
         ConnectionTaskQueue _connectionTaskQueue;
         
-        // rpc task queue
-        // 由于upRoutine是在Client所在的线程中(即与rpc调用发起在同一线程中)，可以改造upRoutine实现，通过co_yield_ct和co_resume来控制routine执行，而不需要用pipe-fd来进行通知
-        std::list<ClientTask*> _upList;
-        bool _upRoutineHang; // 上行协程是否挂起
-        stCoRoutine_t* _upRoutine; // 上行协程
-        
-        DownQueue _downQueue; // 处理结果队列（rpc处理线程往rpc请求线程发rpc处理结果）
+        std::list<ClientTask*> _taskList;
+        bool _taskHandleRoutineHang; // 上行协程是否挂起
+        stCoRoutine_t* _taskHandleRoutine; // 上行协程
         
         ChannelSet _channelSet; // 注册的channel
+        
+        PipelineFactory *_pipelineFactory;
     };
 }
 

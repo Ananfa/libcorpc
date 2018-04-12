@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
-    IO *io = IO::create(1, 1);
+    IO *io = IO::create(0, 1);
     
     RpcClient *client = RpcClient::create(io);
     RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 10);

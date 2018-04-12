@@ -26,11 +26,103 @@ namespace CoRpc {
     
     Decoder::~Decoder() {}
     
-    Router::~Router() {}
+    
+    Worker::Worker::~Worker() {
+        
+    }
+    
+    // pipe通知版本
+    void *Worker::msgHandleRoutine( void * arg ) {
+        QueueContext *context = (QueueContext*)arg;
+        
+        WorkerMessageQueue& queue = context->_queue;
+        Worker *self = context->_worker;
+        
+        // 初始化pipe readfd
+        co_enable_hook_sys();
+        int readFd = queue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
+        
+        int ret;
+        std::vector<char> buf(1024);
+        while (true) {
+            // 等待处理信号
+            ret = (int)read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    // 管道出错
+                    printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    msleep(10);
+                }
+            }
+            
+            struct timeval t1,t2;
+            gettimeofday(&t1, NULL);
+            
+            // 处理任务队列
+            void *msg = queue.pop();
+            while (msg) {
+                self->handleMessage(msg);
+                
+                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                gettimeofday(&t2, NULL);
+                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
+                    msleep(1);
+                
+                    gettimeofday(&t1, NULL);
+                }
+                
+                msg = queue.pop();
+            }
+        }
+        
+        return NULL;
+    }
+    
+    MultiThreadWorker::~MultiThreadWorker() {}
+    
+    void MultiThreadWorker::threadEntry( ThreadData *tdata ) {
+        // 启动rpc任务处理协程
+        RoutineEnvironment::startCoroutine(msgHandleRoutine, &tdata->_queueContext);
+        
+        RoutineEnvironment::runEventLoop();
+    }
+    
+    void MultiThreadWorker::start() {
+        // 启动线程
+        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
+            it->_queueContext._worker = this;
+            it->_t = std::thread(threadEntry, &(*it));
+        }
+    }
+    
+    void MultiThreadWorker::addMessage(void *msg) {
+        uint16_t index = (_lastThreadIndex++) % _threadNum;
+        _threadDatas[index]._queueContext._queue.push(msg);
+    }
+    
+    CoroutineWorker::~CoroutineWorker() {}
+    
+    void CoroutineWorker::start() {
+        // 启动rpc任务处理协程
+        RoutineEnvironment::startCoroutine(msgHandleRoutine, &_queueContext);
+    }
+    
+    void CoroutineWorker::addMessage(void *msg) {
+        _queueContext._queue.push(msg);
+    }
     
     Encoder::~Encoder() {}
     
-    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize): _connection(connection), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize): _connection(connection), _decoder(decoder), _worker(worker), _encoders(std::move(encoders)), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
@@ -44,7 +136,7 @@ namespace CoRpc {
         size = 0;
         while (connection->_datas.size() > 0) {
             bool encoded = false;
-            for (std::vector<std::shared_ptr<Encoder>>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
+            for (std::vector<Encoder*>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
                 int tmp = 0;
                 if ((*it)->encode(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
                     if (!tmp) { // 数据放不进buf中（等下次放入）
@@ -68,7 +160,7 @@ namespace CoRpc {
         return true;
     }
     
-    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, decoder, worker, std::move(encoders), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
     }
     
     bool TcpPipeline::upflow(uint8_t *buf, int size) {
@@ -134,7 +226,7 @@ namespace CoRpc {
                 return false;
             }
             
-            _router->route(connection, msg);
+            _worker->addMessage(msg);
             
             // 处理完一个请求消息，复位状态
             _headNum = 0;
@@ -145,7 +237,7 @@ namespace CoRpc {
         return true;
     }
     
-    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, headSize, maxBodySize) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, decoder, worker, std::move(encoders), headSize, maxBodySize) {
         
     }
     
@@ -171,7 +263,7 @@ namespace CoRpc {
             return false;
         }
         
-        _router->route(connection, msg);
+        _worker->addMessage(msg);
         
         return true;
     }
@@ -198,7 +290,6 @@ namespace CoRpc {
         QueueContext *context = (QueueContext*)arg;
         
         ReceiverTaskQueue& queue = context->_queue;
-        Receiver *receiver = context->_receiver;
         
         // 初始化pipe readfd
         co_enable_hook_sys();
@@ -340,7 +431,6 @@ namespace CoRpc {
         QueueContext *context = (QueueContext*)arg;
         
         SenderTaskQueue& queue = context->_queue;
-        Sender *sender = context->_sender;
         
         // 初始化pipe readfd
         co_enable_hook_sys();

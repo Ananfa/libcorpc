@@ -38,12 +38,32 @@ namespace CoRpc {
             
         };
         
-        class Router: public CoRpc::Router {
+        class MultiThreadWorker: public CoRpc::MultiThreadWorker {
         public:
-            Router() {}
-            virtual ~Router();
+            MultiThreadWorker(RpcServer *server, uint16_t threadNum): CoRpc::MultiThreadWorker(threadNum), _server(server) {}
+            virtual ~MultiThreadWorker() {}
             
-            virtual void route(std::shared_ptr<CoRpc::Connection> &connection, void *msg);
+        protected:
+            static void *taskCallRoutine( void * arg );
+            
+            virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
+            
+        private:
+            RpcServer *_server;
+        };
+        
+        class CoroutineWorker: public CoRpc::CoroutineWorker {
+        public:
+            CoroutineWorker(RpcServer *server): _server(server) {}
+            virtual ~CoroutineWorker() {}
+            
+        protected:
+            static void *taskCallRoutine( void * arg );
+            
+            virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
+            
+        private:
+            RpcServer *_server;
         };
         
         class Encoder: public CoRpc::Encoder {
@@ -54,26 +74,12 @@ namespace CoRpc {
             virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
         };
         
-        // singleton
         class PipelineFactory: public CoRpc::PipelineFactory {
         public:
-            static PipelineFactory& Instance() {
-                static PipelineFactory factory;
-                return factory;
-            }
-            
-            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
-            
-        private:
-            PipelineFactory(): _decoder(new Decoder), _router(new Router), _encoder(new Encoder) {}
-            PipelineFactory(PipelineFactory const&);
-            PipelineFactory& operator=(PipelineFactory const&);
+            PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): CoRpc::PipelineFactory(decoder, worker, std::move(encoders)) {}
             ~PipelineFactory() {}
             
-        private:
-            std::shared_ptr<CoRpc::Decoder> _decoder;
-            std::shared_ptr<CoRpc::Router> _router;
-            std::shared_ptr<CoRpc::Encoder> _encoder;
+            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
         };
         
         class Connection: public CoRpc::Connection {
@@ -106,14 +112,6 @@ namespace CoRpc {
             std::shared_ptr<CoRpc::Connection> connection;
             std::shared_ptr<RpcTask> rpcTask;
         };
-        
-#ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef MPSC_NoLockQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#else
-        typedef CoSyncQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于pipe通知版本）
-        //typedef SyncQueue<WorkerTask*> WorkerTaskQueue; // 用于从rpc收发协程向worker发送rpc任务（注意：用于轮询版本）
-#endif
         
         class Acceptor {
         public:
@@ -157,72 +155,6 @@ namespace CoRpc {
             virtual bool start();
         };
         
-        class Worker {
-        protected:
-            struct QueueContext {
-                Worker *_worker;
-                
-                // 消息队列
-                WorkerTaskQueue _queue;
-            };
-            
-        public:
-            Worker(RpcServer *server): _server(server) {}
-            virtual ~Worker() = 0;
-            
-            virtual bool start() = 0;
-            
-            virtual void postRpcTask(WorkerTask *task) = 0;
-            
-        protected:
-            static void *taskHandleRoutine( void * arg );   // 处理WorkerTask，及其中的rpc任务，若rpc定义了need_coroutine，启动单独的taskCallRoutine协程来处理rpc任务
-            
-            static void *taskCallRoutine( void * arg );
-            
-        protected:
-            RpcServer *_server;
-        };
-        
-        class MultiThreadWorker: public Worker {
-            // 线程相关数据
-            struct ThreadData {
-                // 消息队列
-                QueueContext _queueContext;
-                
-                // thread对象
-                std::thread _t;
-            };
-            
-        public:
-            MultiThreadWorker(RpcServer *server, uint16_t threadNum): Worker(server), _threadNum(threadNum), _threadDatas(threadNum) {}
-            virtual ~MultiThreadWorker() {}
-            
-            bool start();
-            
-            void postRpcTask(WorkerTask *task);
-            
-        protected:
-            static void threadEntry( ThreadData *tdata );
-            
-        private:
-            uint16_t _threadNum;
-            uint16_t _lastThreadIndex;
-            std::vector<ThreadData> _threadDatas;
-        };
-        
-        class CoroutineWorker: public Worker {
-        public:
-            CoroutineWorker(RpcServer *server): Worker(server) { _queueContext._worker = this; }
-            virtual ~CoroutineWorker() {}
-            
-            bool start();
-            
-            void postRpcTask(WorkerTask *task);
-            
-        private:
-            QueueContext _queueContext;
-        };
-        
     public:
         static RpcServer* create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
@@ -231,8 +163,6 @@ namespace CoRpc {
         google::protobuf::Service *getService(uint32_t serviceId) const;
         
         const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
-        
-        void destroy() { delete this; } // 销毁Server
         
         const std::string &getIP() { return _ip; }
         uint16_t getPort() { return _port; }
@@ -254,6 +184,8 @@ namespace CoRpc {
         IO *_io;
         Acceptor *_acceptor;
         Worker *_worker;
+        
+        PipelineFactory *_pipelineFactory;
     };
     
 }

@@ -67,17 +67,7 @@ namespace CoRpc {
             return nullptr;
         }
         
-        return task;
-    }
-    
-    RpcClient::Router::~Router() {}
-    
-    void RpcClient::Router::route(std::shared_ptr<CoRpc::Connection> &connection, void *msg) {
-        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
-        
-        ClientTask *task = (ClientTask *)msg;
-        
-        conn->_channel->_client->_downQueue.push(task->rpcTask->co);
+        return task->rpcTask->co;
     }
     
     RpcClient::Encoder::~Encoder() {}
@@ -114,18 +104,14 @@ namespace CoRpc {
                 }
             }
             
-            conn->_channel->_client->_downQueue.push(rpcTask->co);
+            conn->_channel->_client->addMessage(rpcTask->co);
         }
         
         return true;
     }
     
     std::shared_ptr<CoRpc::Pipeline> RpcClient::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
-        
-        pipeline->setDecoder(_decoder);
-        pipeline->setRouter(_router);
-        pipeline->addEncoder(_encoder);
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decoder, _worker, _encoders, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
         return pipeline;
     }
@@ -167,7 +153,7 @@ namespace CoRpc {
             
             std::shared_ptr<CoRpc::Connection> connection = _connections[_conIndex];
             
-            std::shared_ptr<CoRpc::Pipeline> pipeline = PipelineFactory::Instance().buildPipeline(connection);
+            std::shared_ptr<CoRpc::Pipeline> pipeline = _client->_pipelineFactory->buildPipeline(connection);
             connection->setPipeline(pipeline);
         }
         
@@ -201,9 +187,9 @@ namespace CoRpc {
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
         
-        _client->_upList.push_back(clientTask);
-        if (_client->_upRoutineHang) {
-            co_resume(_client->_upRoutine);
+        _client->_taskList.push_back(clientTask);
+        if (_client->_taskHandleRoutineHang) {
+            co_resume(_client->_taskHandleRoutine);
         }
         
         co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
@@ -214,6 +200,13 @@ namespace CoRpc {
         if (done) {
             done->Run();
         }
+    }
+    
+    RpcClient::RpcClient(IO *io): _io(io), _taskHandleRoutineHang(false), _taskHandleRoutine(NULL) {
+        std::vector<CoRpc::Encoder*> encoders;
+        encoders.push_back(new Encoder);
+        
+        _pipelineFactory = new PipelineFactory(new Decoder, this, std::move(encoders));
     }
     
     RpcClient* RpcClient::create(IO *io) {
@@ -234,9 +227,11 @@ namespace CoRpc {
     }
     
     void RpcClient::start() {
+        CoroutineWorker::start();
+        
         RoutineEnvironment::startCoroutine(connectionRoutine, this);
-        RoutineEnvironment::startCoroutine(downRoutine, this);
-        RoutineEnvironment::startCoroutine(upRoutine, this);
+        
+        RoutineEnvironment::startCoroutine(taskHandleRoutine, this);
     }
     
     void *RpcClient::connectionRoutine( void * arg ) {
@@ -288,7 +283,7 @@ namespace CoRpc {
                                 
                                 task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
                                 
-                                self->_downQueue.push(task->rpcTask->co);
+                                self->addMessage(task->rpcTask->co);
                             }
                         }
                         
@@ -374,7 +369,7 @@ namespace CoRpc {
                                 
                                 task->rpcTask->controller->SetFailed("Connect fail");
                                 
-                                self->_downQueue.push(task->rpcTask->co);
+                                self->addMessage(task->rpcTask->co);
                             }
                             
                             assert(connection->_waitResultCoMap.empty());
@@ -415,26 +410,26 @@ namespace CoRpc {
         }
     }
     
-    void *RpcClient::upRoutine( void * arg ) {
+    void *RpcClient::taskHandleRoutine( void * arg ) {
         RpcClient *self = (RpcClient *)arg;
         co_enable_hook_sys();
         
-        self->_upRoutine = co_self();
-        self->_upRoutineHang = false;
+        self->_taskHandleRoutine = co_self();
+        self->_taskHandleRoutineHang = false;
         
         while (true) {
-            if (self->_upList.empty()) {
+            if (self->_taskList.empty()) {
                 // 挂起
-                self->_upRoutineHang = true;
+                self->_taskHandleRoutineHang = true;
                 co_yield_ct();
-                self->_upRoutineHang = false;
+                self->_taskHandleRoutineHang = false;
                 
                 continue;
             }
             
             // 处理任务队列
-            ClientTask *task = self->_upList.front();
-            self->_upList.pop_front();
+            ClientTask *task = self->_taskList.front();
+            self->_taskList.pop_front();
             assert(task);
             
             // 先从channel中获得一connection
@@ -460,42 +455,8 @@ namespace CoRpc {
         return NULL;
     }
     
-    void *RpcClient::downRoutine( void * arg ) {
-        RpcClient *self = (RpcClient *)arg;
-        co_enable_hook_sys();
-        int readFd = self->_downQueue.getReadFd();
-        co_register_fd(readFd);
-        co_set_timeout(readFd, -1, 1000);
-        
-        int ret;
-        std::vector<char> buf(1024);
-        while (true) {
-            // 等待处理信号
-            ret = (int)read(readFd, &buf[0], 1024);
-            assert(ret != 0);
-            if (ret < 0) {
-                if (errno == EAGAIN) {
-                    continue;
-                } else {
-                    // 管道出错
-                    printf("Error: Client::downQueueRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
-                           readFd, ret, errno, strerror(errno));
-                    
-                    // TODO: 如何处理？退出协程？
-                    // sleep 10 milisecond
-                    msleep(10);
-                }
-            }
-            
-            // 处理任务队列
-            stCoRoutine_t *co = self->_downQueue.pop();
-            while (co) {
-                co_resume(co);
-                
-                co = self->_downQueue.pop();
-            }
-        }
-        
-        return NULL;
+    void RpcClient::handleMessage(void *msg) {
+        stCoRoutine_t *co = (stCoRoutine_t *)msg;
+        co_resume(co);
     }
 }
