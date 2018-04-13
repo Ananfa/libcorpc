@@ -2,8 +2,6 @@ DerivedData
 libcorpc_mac.xcworkspace/xcuserdata
 co/co.xcodeproj/xcuserdata
 corpc/corpc.xcodeproj/xcuserdata
-test/rpccli/rpccli.xcodeproj/xcuserdata
-test/rpcsvr/rpcsvr.xcodeproj/xcuserdata
 test/interRpc/interRpc.xcodeproj/xcuserdata
 test/innerRpc/innerRpc.xcodeproj/xcuserdata
 test/test*

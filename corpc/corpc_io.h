@@ -397,6 +397,7 @@ namespace CoRpc {
         Sender *getSender() { return _sender; }
         
         void addConnection(std::shared_ptr<Connection>& connection);
+        void removeConnection(std::shared_ptr<Connection>& connection);
         
     private:
         // 注意：sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误

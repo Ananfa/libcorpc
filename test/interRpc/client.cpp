@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
     IO *io = IO::create(0, 1);
     
     RpcClient *client = RpcClient::create(io);
-    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 10);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 20);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);

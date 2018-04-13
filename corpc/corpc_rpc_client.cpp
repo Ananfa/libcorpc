@@ -242,6 +242,9 @@ namespace CoRpc {
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);
         
+        IO *io = self->_io;
+        Sender *sender = io->getSender();
+        
         int ret;
         std::vector<char> buf(1024);
         while (true) {
@@ -381,7 +384,7 @@ namespace CoRpc {
                         
                         // 加入到IO中
                         std::shared_ptr<CoRpc::Connection> ioConnection = std::static_pointer_cast<CoRpc::Connection>(connection);
-                        self->_io->addConnection(ioConnection);
+                        io->addConnection(ioConnection);
                         
                         // 发送等待发送队列中的任务
                         while (!connection->_waitSendTaskCoList.empty()) {
@@ -395,7 +398,7 @@ namespace CoRpc {
                                 connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
                             }
                             
-                            self->_io->getSender()->send(ioConn, task->rpcTask);
+                            sender->send(ioConn, task->rpcTask);
                         }
                         
                         break;
@@ -416,6 +419,8 @@ namespace CoRpc {
         
         self->_taskHandleRoutine = co_self();
         self->_taskHandleRoutineHang = false;
+        
+        Sender *sender = self->_io->getSender();
         
         while (true) {
             if (self->_taskList.empty()) {
@@ -448,13 +453,14 @@ namespace CoRpc {
                     conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
                 }
                 
-                self->_io->getSender()->send(ioConn, task->rpcTask);
+                sender->send(ioConn, task->rpcTask);
             }
         }
         
         return NULL;
     }
     
+    // 从Worker继承的方法实现
     void RpcClient::handleMessage(void *msg) {
         stCoRoutine_t *co = (stCoRoutine_t *)msg;
         co_resume(co);

@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		2D161D582064AC3E0062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5A2064AC3E0062BA35 /* libco.dylib */; };
-		2D161D592064AC3E0062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */; };
 		2D161D5C2064AC430062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5A2064AC3E0062BA35 /* libco.dylib */; };
 		2D161D5D2064AC430062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */; };
 		2D161D602064AC570062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D5E2064AC570062BA35 /* server.cpp */; };
@@ -19,6 +18,7 @@
 		2D161D6C2064AC6D0062BA35 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D652064AC650062BA35 /* baz.pb.cc */; };
 		2D161D6D2064AC6F0062BA35 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D622064AC650062BA35 /* foo.pb.cc */; };
 		2D161D6E2064AC730062BA35 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D5F2064AC570062BA35 /* client.cpp */; };
+		2DEA99772080645F0095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,7 +63,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2D161D582064AC3E0062BA35 /* libco.dylib in Frameworks */,
-				2D161D592064AC3E0062BA35 /* libcorpc.dylib in Frameworks */,
+				2DEA99772080645F0095C62F /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

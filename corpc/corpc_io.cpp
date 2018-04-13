@@ -696,4 +696,9 @@ namespace CoRpc {
         _receiver->addConnection(connection);
         _sender->addConnection(connection);
     }
+    
+    void IO::removeConnection(std::shared_ptr<Connection>& connection) {
+        _sender->removeConnection(connection);
+    }
+    
 }
