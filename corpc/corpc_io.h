@@ -232,6 +232,22 @@ namespace CoRpc {
         friend class Sender;
     };
     
+    // 服务器基类
+    class Server {
+    public:
+        Server(IO *io): _io(io) {}
+        virtual ~Server() = 0;
+        
+        void buildAndAddConnection(int fd);
+        
+    protected:
+        virtual PipelineFactory * getPipelineFactory() = 0;
+        virtual Connection * buildConnection(int fd) = 0;
+        
+    protected:
+        IO *_io;
+    };
+    
     struct SenderTask {
         enum TaskType {INIT, CLOSE, DATA};
         std::shared_ptr<Connection> connection;

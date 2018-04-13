@@ -282,9 +282,18 @@ namespace CoRpc {
         _io->_sender->send(self, data);
     }
     
-    Receiver::~Receiver() {
+    Server::~Server() {}
+    
+    void Server::buildAndAddConnection(int fd) {
+        std::shared_ptr<CoRpc::Connection> connection(buildConnection(fd));
+        std::shared_ptr<CoRpc::Pipeline> pipeline = getPipelineFactory()->buildPipeline(connection);
+        connection->setPipeline(pipeline);
         
+        // 将接受的连接分别发给Receiver和Sender
+        _io->addConnection(connection);
     }
+    
+    Receiver::~Receiver() {}
     
     void *Receiver::connectionDispatchRoutine( void * arg ) {
         QueueContext *context = (QueueContext*)arg;

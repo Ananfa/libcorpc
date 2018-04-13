@@ -28,7 +28,7 @@
 
 namespace CoRpc {
 
-    class RpcServer {
+    class RpcServer: public CoRpc::Server {
         class Decoder: public CoRpc::Decoder {
         public:
             Decoder() {}
@@ -167,9 +167,15 @@ namespace CoRpc {
         const std::string &getIP() { return _ip; }
         uint16_t getPort() { return _port; }
         
+        // override
+        virtual CoRpc::PipelineFactory * getPipelineFactory();
+        
+        // override
+        virtual CoRpc::Connection * buildConnection(int fd);
+        
     private:
         RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
-        ~RpcServer();  // 不允许在栈上创建server
+        virtual ~RpcServer();  // 不允许在栈上创建server
         
         bool start();
         
@@ -181,7 +187,6 @@ namespace CoRpc {
         std::string _ip;
         uint16_t _port;
         
-        IO *_io;
         Acceptor *_acceptor;
         Worker *_worker;
         

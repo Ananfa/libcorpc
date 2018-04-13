@@ -198,7 +198,6 @@ namespace CoRpc {
         co_enable_hook_sys();
         
         RpcServer *server = self->_server;
-        IO *io = server->_io;
         
         int listen_fd = self->_listen_fd;
         // 侦听连接，并把接受的连接传给连接处理对象
@@ -226,12 +225,7 @@ namespace CoRpc {
             // 设置读写超时时间，默认为1秒
             co_set_timeout(fd, -1, 1000);
             
-            std::shared_ptr<CoRpc::Connection> connection(new Connection(fd, self->_server));
-            std::shared_ptr<CoRpc::Pipeline> pipeline = server->_pipelineFactory->buildPipeline(connection);
-            connection->setPipeline(pipeline);
-            
-            // 将接受的连接分别发给Receiver和Sender
-            io->addConnection(connection);
+            server->buildAndAddConnection(fd);
         }
         
         return NULL;
@@ -337,7 +331,7 @@ namespace CoRpc {
     }
     
     
-    RpcServer::RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): _io(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
+    RpcServer::RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
         if (_acceptInNewThread) {
             _acceptor = new ThreadAcceptor(this);
         } else {
@@ -355,6 +349,8 @@ namespace CoRpc {
         
         _pipelineFactory = new PipelineFactory(new Decoder, _worker, std::move(encoders));
     }
+    
+    RpcServer::~RpcServer() {}
     
     RpcServer* RpcServer::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
         assert(io);
@@ -409,6 +405,14 @@ namespace CoRpc {
         }
         
         return &(it->second.methods[methodId]);
+    }
+    
+    CoRpc::PipelineFactory *RpcServer::getPipelineFactory() {
+        return _pipelineFactory;
+    }
+    
+    CoRpc::Connection *RpcServer::buildConnection(int fd) {
+        return new Connection(fd, this);
     }
     
     bool RpcServer::start() {
