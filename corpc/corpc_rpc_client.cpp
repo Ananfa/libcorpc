@@ -206,7 +206,7 @@ namespace CoRpc {
         std::vector<EncodeFunction> encodeFuns;
         encodeFuns.push_back(encode);
         
-        _pipelineFactory = new PipelineFactory(decode, this, std::move(encodeFuns));
+        _pipelineFactory = new PipelineFactory(this, decode, std::move(encodeFuns));
     }
     
     RpcClient* RpcClient::create(IO *io) {
