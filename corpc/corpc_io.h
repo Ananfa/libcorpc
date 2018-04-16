@@ -38,21 +38,8 @@ namespace CoRpc {
     // 下流流水线处理流程：
     //   1.编码器链：根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
     
-    class Decoder {
-    public:
-        Decoder() {}
-        virtual ~Decoder() = 0;
-        
-        virtual void * decode(std::shared_ptr<Connection> &connection, uint8_t *head, uint8_t *body, int size) = 0;
-    };
-    
-    class Encoder {
-    public:
-        Encoder() {}
-        virtual ~Encoder() = 0;
-        
-        virtual bool encode(std::shared_ptr<Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size) = 0;
-    };
+    typedef std::function<void* (std::shared_ptr<Connection>&, uint8_t*, uint8_t*, int)> DecodeFunction;
+    typedef std::function<bool (std::shared_ptr<Connection>&, std::shared_ptr<void>&, uint8_t*, int, int&)> EncodeFunction;
     
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<void*> WorkerMessageQueue;
@@ -133,7 +120,7 @@ namespace CoRpc {
         enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
         
     public:
-        Pipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize);
+        Pipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize);
         virtual ~Pipeline() = 0;
         
         virtual bool upflow(uint8_t *buf, int size) = 0;
@@ -150,16 +137,16 @@ namespace CoRpc {
         uint8_t *_bodyBuf;
         uint _bodySize;
         
-        Decoder *_decoder;
+        DecodeFunction _decodeFun;
         Worker *_worker;
-        std::vector<Encoder*> _encoders;
+        std::vector<EncodeFunction> _encodeFuns;
         
         std::weak_ptr<Connection> _connection;
     };
     
     class TcpPipeline: public Pipeline {
     public:
-        TcpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
+        TcpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~TcpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -174,7 +161,7 @@ namespace CoRpc {
     
     class UdpPipeline: public Pipeline {
     public:
-        UdpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize);
+        UdpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize);
         virtual ~UdpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -182,15 +169,15 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): _decoder(decoder), _worker(worker), _encoders(std::move(encoders)) {}
+        PipelineFactory(DecodeFunction decodeFun, CoRpc::Worker *worker, std::vector<EncodeFunction>&& encodeFuns): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
-        Decoder *_decoder;
+        DecodeFunction _decodeFun;
         Worker *_worker;
-        std::vector<Encoder *> _encoders;
+        std::vector<EncodeFunction> _encodeFuns;
     };
     
     class Connection: public std::enable_shared_from_this<Connection> {

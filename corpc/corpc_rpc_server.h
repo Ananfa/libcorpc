@@ -29,14 +29,6 @@
 namespace CoRpc {
 
     class RpcServer: public CoRpc::Server {
-        class Decoder: public CoRpc::Decoder {
-        public:
-            Decoder() {}
-            virtual ~Decoder();
-            
-            virtual void * decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
-            
-        };
         
         class MultiThreadWorker: public CoRpc::MultiThreadWorker {
         public:
@@ -66,17 +58,9 @@ namespace CoRpc {
             RpcServer *_server;
         };
         
-        class Encoder: public CoRpc::Encoder {
-        public:
-            Encoder() {}
-            virtual ~Encoder();
-            
-            virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
-        };
-        
         class PipelineFactory: public CoRpc::PipelineFactory {
         public:
-            PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): CoRpc::PipelineFactory(decoder, worker, std::move(encoders)) {}
+            PipelineFactory(DecodeFunction decodeFun, CoRpc::Worker *worker, std::vector<EncodeFunction>&& encodeFuns): CoRpc::PipelineFactory(decodeFun, worker, std::move(encodeFuns)) {}
             ~PipelineFactory() {}
             
             virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
@@ -131,6 +115,10 @@ namespace CoRpc {
     private:
         RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         virtual ~RpcServer();  // 不允许在栈上创建server
+        
+        static void* decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        
+        static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
         bool start();
         

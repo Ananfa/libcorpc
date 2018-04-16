@@ -27,7 +27,7 @@
 
 namespace CoRpc {
     
-    Decoder::~Decoder() {}
+    //Decoder::~Decoder() {}
     
     
     Worker::Worker::~Worker() {
@@ -123,9 +123,9 @@ namespace CoRpc {
         _queueContext._queue.push(msg);
     }
     
-    Encoder::~Encoder() {}
+    //Encoder::~Encoder() {}
     
-    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize): _connection(connection), _decoder(decoder), _worker(worker), _encoders(std::move(encoders)), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize): _connection(connection), _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
@@ -139,9 +139,9 @@ namespace CoRpc {
         size = 0;
         while (connection->_datas.size() > 0) {
             bool encoded = false;
-            for (std::vector<Encoder*>::iterator it = _encoders.begin(); it != _encoders.end(); it++) {
+            for (std::vector<EncodeFunction>::iterator it = _encodeFuns.begin(); it != _encodeFuns.end(); it++) {
                 int tmp = 0;
-                if ((*it)->encode(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
+                if ((*it)(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
                     if (!tmp) { // 数据放不进buf中（等下次放入）
                         return true;
                     }
@@ -163,7 +163,7 @@ namespace CoRpc {
         return true;
     }
     
-    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, decoder, worker, std::move(encoders), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, decodeFun, worker, std::move(encodeFuns), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
     }
     
     bool TcpPipeline::upflow(uint8_t *buf, int size) {
@@ -223,7 +223,7 @@ namespace CoRpc {
                 }
             }
             
-            void *msg = _decoder->decode(connection, _headBuf, _bodyBuf, _bodySize);
+            void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
             
             if (!msg) {
                 return false;
@@ -240,7 +240,7 @@ namespace CoRpc {
         return true;
     }
     
-    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Decoder *decoder, Worker *worker, std::vector<Encoder*> encoders, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, decoder, worker, std::move(encoders), headSize, maxBodySize) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, decodeFun, worker, std::move(encodeFuns), headSize, maxBodySize) {
         
     }
     
@@ -260,7 +260,7 @@ namespace CoRpc {
         
         memcpy(_bodyBuf, buf + _headSize, _bodySize);
         
-        void *msg = _decoder->decode(connection, _headBuf, _bodyBuf, _bodySize);
+        void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
         
         if (!msg) {
             return false;

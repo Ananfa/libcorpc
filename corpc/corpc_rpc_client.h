@@ -52,25 +52,9 @@ namespace CoRpc {
     public:
         class Channel;
     private:
-        class Decoder: public CoRpc::Decoder {
-        public:
-            Decoder() {}
-            virtual ~Decoder();
-            
-            virtual void * decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
-        };
-        
-        class Encoder: public CoRpc::Encoder {
-        public:
-            Encoder() {}
-            virtual ~Encoder();
-            
-            virtual bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void> &data, uint8_t *buf, int space, int &size);
-        };
-        
         class PipelineFactory: public CoRpc::PipelineFactory {
         public:
-            PipelineFactory(CoRpc::Decoder *decoder, CoRpc::Worker *worker, std::vector<CoRpc::Encoder*>&& encoders): CoRpc::PipelineFactory(decoder, worker, std::move(encoders)) {}
+            PipelineFactory(DecodeFunction decodeFun, CoRpc::Worker *worker, std::vector<EncodeFunction>&& encodeFuns): CoRpc::PipelineFactory(decodeFun, worker, std::move(encodeFuns)) {}
             ~PipelineFactory() {}
             
             virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
@@ -153,6 +137,10 @@ namespace CoRpc {
         RpcClient(IO *io);
         
         ~RpcClient() {}
+        
+        static void* decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        
+        static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
         static void *connectionRoutine( void * arg );  // 负责为connection连接建立和断线处理
         

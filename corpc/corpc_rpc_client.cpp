@@ -32,9 +32,9 @@
 
 namespace CoRpc {
     
-    RpcClient::Decoder::~Decoder() {}
+    //RpcClient::Decoder::~Decoder() {}
     
-    void * RpcClient::Decoder::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * RpcClient::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         uint32_t respSize = *(uint32_t *)head;
@@ -70,9 +70,9 @@ namespace CoRpc {
         return task->rpcTask->co;
     }
     
-    RpcClient::Encoder::~Encoder() {}
+    //RpcClient::Encoder::~Encoder() {}
     
-    bool RpcClient::Encoder::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcClient::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
@@ -111,7 +111,7 @@ namespace CoRpc {
     }
     
     std::shared_ptr<CoRpc::Pipeline> RpcClient::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decoder, _worker, _encoders, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
+        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
         
         return pipeline;
     }
@@ -203,10 +203,10 @@ namespace CoRpc {
     }
     
     RpcClient::RpcClient(IO *io): _io(io), _taskHandleRoutineHang(false), _taskHandleRoutine(NULL) {
-        std::vector<CoRpc::Encoder*> encoders;
-        encoders.push_back(new Encoder);
+        std::vector<EncodeFunction> encodeFuns;
+        encodeFuns.push_back(encode);
         
-        _pipelineFactory = new PipelineFactory(new Decoder, this, std::move(encoders));
+        _pipelineFactory = new PipelineFactory(decode, this, std::move(encodeFuns));
     }
     
     RpcClient* RpcClient::create(IO *io) {
