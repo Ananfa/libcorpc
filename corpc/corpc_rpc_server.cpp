@@ -133,131 +133,6 @@ namespace CoRpc {
         delete controller;
     }
     
-    RpcServer::Acceptor::~Acceptor() {
-        
-    }
-    
-    bool RpcServer::Acceptor::init() {
-        const std::string &ip = _server->getIP();
-        uint16_t port = _server->getPort();
-        
-        _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
-        if( _listen_fd >= 0 )
-        {
-            if(port != 0)
-            {
-                int nReuseAddr = 1;
-                setsockopt(_listen_fd,SOL_SOCKET,SO_REUSEADDR,&nReuseAddr,sizeof(nReuseAddr));
-                
-                struct sockaddr_in addr ;
-                bzero(&addr,sizeof(addr));
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(port);
-                int nIP = 0;
-                
-                if (ip.empty() ||
-                    ip.compare("0") == 0 ||
-                    ip.compare("0.0.0.0") == 0 ||
-                    ip.compare("*") == 0) {
-                    nIP = htonl(INADDR_ANY);
-                }
-                else
-                {
-                    nIP = inet_addr(ip.c_str());
-                }
-                addr.sin_addr.s_addr = nIP;
-                
-                int ret = bind(_listen_fd,(struct sockaddr*)&addr,sizeof(addr));
-                if( ret != 0)
-                {
-                    close(_listen_fd);
-                    _listen_fd = -1;
-                }
-            }
-        }
-        
-        if(_listen_fd==-1){
-            printf("ERROR: Acceptor::start() -- Port %d is in use\n", port);
-            return false;
-        }
-        
-        printf("INFO: Acceptor::start() -- listen %d %s:%d\n", _listen_fd, ip.c_str(), port);
-        listen( _listen_fd, 1024 );
-        
-        int iFlags;
-        iFlags = fcntl(_listen_fd, F_GETFL, 0);
-        iFlags |= O_NONBLOCK;
-        iFlags |= O_NDELAY;
-        fcntl(_listen_fd, F_SETFL, iFlags);
-        
-        return true;
-    }
-    
-    void *RpcServer::Acceptor::acceptRoutine( void * arg ) {
-        Acceptor *self = (Acceptor *)arg;
-        co_enable_hook_sys();
-        
-        RpcServer *server = self->_server;
-        
-        int listen_fd = self->_listen_fd;
-        // 侦听连接，并把接受的连接传给连接处理对象
-        printf("INFO: start accept from listen fd %d\n", listen_fd);
-        for(;;)
-        {
-            struct sockaddr_in addr; //maybe sockaddr_un;
-            memset( &addr,0,sizeof(addr) );
-            socklen_t len = sizeof(addr);
-            
-            int fd = co_accept(listen_fd, (struct sockaddr *)&addr, &len);
-            if( fd < 0 )
-            {
-                struct pollfd pf = { 0 };
-                pf.fd = listen_fd;
-                pf.events = (POLLIN|POLLERR|POLLHUP);
-                co_poll( co_get_epoll_ct(),&pf,1,1000 );
-                continue;
-            }
-            
-            printf("INFO: accept fd %d\n", fd);
-            // 保持连接
-            setKeepAlive(fd, 10);
-            
-            // 设置读写超时时间，默认为1秒
-            co_set_timeout(fd, -1, 1000);
-            
-            server->buildAndAddConnection(fd);
-        }
-        
-        return NULL;
-    }
-    
-    void RpcServer::ThreadAcceptor::threadEntry(ThreadAcceptor *self) {
-        if (!self->init()) {
-            printf("ERROR: ThreadAcceptor::threadEntry() -- init fail\n");
-            return;
-        }
-        
-        // 启动accept协程
-        RoutineEnvironment::startCoroutine(acceptRoutine, self);
-        
-        RoutineEnvironment::runEventLoop();
-    }
-    
-    bool RpcServer::ThreadAcceptor::start() {
-        _t = std::thread(threadEntry, this);
-        return true;
-    }
-    
-    bool RpcServer::CoroutineAcceptor::start() {
-        if (!init()) {
-            return false;
-        }
-        
-        RoutineEnvironment::startCoroutine(acceptRoutine, this);
-        
-        return true;
-    }
-    
     void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
         WorkerTask *task = (WorkerTask *)arg;
         
@@ -330,16 +205,11 @@ namespace CoRpc {
         }
     }
     
-    
-    RpcServer::RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io), _acceptInNewThread(acceptInNewThread), _workThreadNum(workThreadNum), _ip(ip), _port(port) {
-        if (_acceptInNewThread) {
-            _acceptor = new ThreadAcceptor(this);
-        } else {
-            _acceptor = new CoroutineAcceptor(this);
-        }
-        
-        if (_workThreadNum > 0) {
-            _worker = new MultiThreadWorker(this, _workThreadNum);
+    RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io) {
+        _acceptor = new Acceptor(this, ip, port);
+
+        if (workThreadNum > 0) {
+            _worker = new MultiThreadWorker(this, workThreadNum);
         } else {
             _worker = new CoroutineWorker(this);
         }
@@ -352,9 +222,9 @@ namespace CoRpc {
     
     RpcServer::~RpcServer() {}
     
-    RpcServer* RpcServer::create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
+    RpcServer* RpcServer::create(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
         assert(io);
-        RpcServer *server = new RpcServer(io, acceptInNewThread, workThreadNum, ip, port);
+        RpcServer *server = new RpcServer(io, workThreadNum, ip, port);
         
         server->start();
         return server;

@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     // 注册服务
     IO *io = IO::create(0, 1);
     
-    RpcServer *server = RpcServer::create(io, true, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, 0, ip, port);
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);

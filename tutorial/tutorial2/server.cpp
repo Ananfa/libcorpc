@@ -51,7 +51,7 @@ int main(int argc, const char * argv[]) {
     
     IO *io = IO::create(1, 1);
     
-    RpcServer *server = RpcServer::create(io, false, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, 0, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     server->registerService(helloWorldService);

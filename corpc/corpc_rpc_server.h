@@ -113,59 +113,14 @@ namespace CoRpc {
             std::shared_ptr<RpcTask> rpcTask;
         };
         
-        class Acceptor {
-        public:
-            Acceptor(RpcServer *server): _server(server), _listen_fd(-1) {}
-            virtual ~Acceptor() = 0;
-            
-            virtual bool start() = 0;
-            
-        protected:
-            bool init();
-            
-            static void *acceptRoutine( void * arg );
-            
-        protected:
-            RpcServer *_server;
-            
-        private:
-            int _listen_fd;
-        };
-        
-        class ThreadAcceptor: public Acceptor {
-        public:
-            ThreadAcceptor(RpcServer *server): Acceptor(server) {}
-            virtual ~ThreadAcceptor() {}
-            
-            virtual bool start();
-            
-        protected:
-            static void threadEntry( ThreadAcceptor *self );
-            
-        private:
-            
-            std::thread _t; // 保持的accept线程
-        };
-        
-        class CoroutineAcceptor: public Acceptor {
-        public:
-            CoroutineAcceptor(RpcServer *server): Acceptor(server) {}
-            ~CoroutineAcceptor() {}
-            
-            virtual bool start();
-        };
-        
     public:
-        static RpcServer* create(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        static RpcServer* create(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
         google::protobuf::Service *getService(uint32_t serviceId) const;
         
         const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
-        
-        const std::string &getIP() { return _ip; }
-        uint16_t getPort() { return _port; }
         
         // override
         virtual CoRpc::PipelineFactory * getPipelineFactory();
@@ -174,18 +129,13 @@ namespace CoRpc {
         virtual CoRpc::Connection * buildConnection(int fd);
         
     private:
-        RpcServer(IO *io, bool acceptInNewThread, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         virtual ~RpcServer();  // 不允许在栈上创建server
         
         bool start();
         
     private:
         std::map<uint32_t, ServiceData> _services;
-        
-        bool _acceptInNewThread;
-        uint16_t _workThreadNum;
-        std::string _ip;
-        uint16_t _port;
         
         Acceptor *_acceptor;
         Worker *_worker;

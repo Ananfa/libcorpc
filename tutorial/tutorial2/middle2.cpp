@@ -110,7 +110,7 @@ int main(int argc, const char * argv[]) {
     
     ThreadSpecialResource::Instance().setIO(io);
     
-    RpcServer *server = RpcServer::create(io, false, 1, ip, port);
+    RpcServer *server = RpcServer::create(io, 1, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(sip, sport);
     server->registerService(helloWorldService);

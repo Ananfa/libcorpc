@@ -248,6 +248,28 @@ namespace CoRpc {
         IO *_io;
     };
     
+    class Acceptor {
+    public:
+        Acceptor(Server *server, const std::string& ip, uint16_t port): _server(server), _ip(ip), _port(port), _listen_fd(-1) {}
+        ~Acceptor();
+        
+        bool start();
+        
+    protected:
+        bool init();
+        
+        static void *acceptRoutine( void * arg );
+        
+    protected:
+        Server *_server;
+        
+    private:
+        std::string _ip;
+        uint16_t _port;
+        
+        int _listen_fd;
+    };
+    
     struct SenderTask {
         enum TaskType {INIT, CLOSE, DATA};
         std::shared_ptr<Connection> connection;

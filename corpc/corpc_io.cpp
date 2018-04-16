@@ -18,7 +18,10 @@
 
 #include "corpc_io.h"
 #include "corpc_utils.h"
+
 #include <sys/time.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
 
 // TODO: 使用统一的Log接口记录Log
 
@@ -291,6 +294,115 @@ namespace CoRpc {
         
         // 将接受的连接分别发给Receiver和Sender
         _io->addConnection(connection);
+    }
+    
+    
+    Acceptor::~Acceptor() {
+        
+    }
+    
+    bool Acceptor::init() {
+        _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+        if( _listen_fd >= 0 )
+        {
+            if(_port != 0)
+            {
+                int nReuseAddr = 1;
+                setsockopt(_listen_fd,SOL_SOCKET,SO_REUSEADDR,&nReuseAddr,sizeof(nReuseAddr));
+                
+                struct sockaddr_in addr ;
+                bzero(&addr,sizeof(addr));
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(_port);
+                int nIP = 0;
+                
+                if (_ip.empty() ||
+                    _ip.compare("0") == 0 ||
+                    _ip.compare("0.0.0.0") == 0 ||
+                    _ip.compare("*") == 0) {
+                    nIP = htonl(INADDR_ANY);
+                }
+                else
+                {
+                    nIP = inet_addr(_ip.c_str());
+                }
+                addr.sin_addr.s_addr = nIP;
+                
+                int ret = bind(_listen_fd,(struct sockaddr*)&addr,sizeof(addr));
+                if( ret != 0)
+                {
+                    close(_listen_fd);
+                    _listen_fd = -1;
+                }
+            } else {
+                close(_listen_fd);
+                _listen_fd = -1;
+            }
+        }
+        
+        if(_listen_fd==-1){
+            printf("ERROR: Acceptor::start() -- Port %d is in use\n", _port);
+            return false;
+        }
+        
+        printf("INFO: Acceptor::start() -- listen %d %s:%d\n", _listen_fd, _ip.c_str(), _port);
+        listen( _listen_fd, 1024 );
+        
+        int iFlags;
+        iFlags = fcntl(_listen_fd, F_GETFL, 0);
+        iFlags |= O_NONBLOCK;
+        iFlags |= O_NDELAY;
+        fcntl(_listen_fd, F_SETFL, iFlags);
+        
+        return true;
+    }
+    
+    void *Acceptor::acceptRoutine( void * arg ) {
+        Acceptor *self = (Acceptor *)arg;
+        co_enable_hook_sys();
+        
+        Server *server = self->_server;
+        
+        int listen_fd = self->_listen_fd;
+        // 侦听连接，并把接受的连接传给连接处理对象
+        printf("INFO: start accept from listen fd %d\n", listen_fd);
+        for(;;)
+        {
+            struct sockaddr_in addr; //maybe sockaddr_un;
+            memset( &addr,0,sizeof(addr) );
+            socklen_t len = sizeof(addr);
+            
+            int fd = co_accept(listen_fd, (struct sockaddr *)&addr, &len);
+            if( fd < 0 )
+            {
+                struct pollfd pf = { 0 };
+                pf.fd = listen_fd;
+                pf.events = (POLLIN|POLLERR|POLLHUP);
+                co_poll( co_get_epoll_ct(),&pf,1,1000 );
+                continue;
+            }
+            
+            printf("INFO: accept fd %d\n", fd);
+            // 保持连接
+            setKeepAlive(fd, 10);
+            
+            // 设置读写超时时间，默认为1秒
+            co_set_timeout(fd, -1, 1000);
+            
+            server->buildAndAddConnection(fd);
+        }
+        
+        return NULL;
+    }
+    
+    bool Acceptor::start() {
+        if (!init()) {
+            return false;
+        }
+        
+        RoutineEnvironment::startCoroutine(acceptRoutine, this);
+        
+        return true;
     }
     
     Receiver::~Receiver() {}

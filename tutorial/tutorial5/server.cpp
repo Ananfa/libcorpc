@@ -123,7 +123,7 @@ int main(int argc, const char * argv[]) {
     
     ThreadSpecialResource::Instance().setIO(io);
     
-    RpcServer *server = RpcServer::create(io, false, 1, ip, port);
+    RpcServer *server = RpcServer::create(io, 1, ip, port);
     
     FactorialServiceImpl *factorialService = new FactorialServiceImpl(sip, sport);
     server->registerService(factorialService);
