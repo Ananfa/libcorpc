@@ -169,14 +169,14 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(DecodeFunction decodeFun, CoRpc::Worker *worker, std::vector<EncodeFunction>&& encodeFuns): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)) {}
+        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
-        DecodeFunction _decodeFun;
         Worker *_worker;
+        DecodeFunction _decodeFun;
         std::vector<EncodeFunction> _encodeFuns;
     };
     
