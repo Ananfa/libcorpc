@@ -112,6 +112,12 @@ namespace CoRpc {
         // override
         virtual CoRpc::Connection * buildConnection(int fd);
         
+        // override
+        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) {}
+        
+        // override
+        virtual void onClose(CoRpc::Connection * connection) {};
+        
     private:
         RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         virtual ~RpcServer();  // 不允许在栈上创建server

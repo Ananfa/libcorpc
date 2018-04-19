@@ -62,8 +62,8 @@ namespace CoRpc {
         
         class Connection: public CoRpc::Connection {
             enum Status {CLOSED, CONNECTING, CONNECTED};
-            typedef std::list<ClientTask*> WaitTaskList;
-            typedef std::map<uint64_t, ClientTask*> WaitTaskMap;
+            typedef std::list<std::shared_ptr<ClientTask> > WaitTaskList;
+            typedef std::map<uint64_t, std::shared_ptr<ClientTask> > WaitTaskMap;
             
         public:
             Connection(Channel *channel);
@@ -156,7 +156,7 @@ namespace CoRpc {
         
         ConnectionTaskQueue _connectionTaskQueue;
         
-        std::list<ClientTask*> _taskList;
+        std::list<std::shared_ptr<ClientTask> > _taskList;
         bool _taskHandleRoutineHang; // 上行协程是否挂起
         stCoRoutine_t* _taskHandleRoutine; // 上行协程
         

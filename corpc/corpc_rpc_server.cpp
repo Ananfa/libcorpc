@@ -36,79 +36,6 @@
 // TODO: 使用统一的Log接口记录Log
 
 namespace CoRpc {
-    //RpcServer::Decoder::~Decoder() {}
-    
-    void * RpcServer::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
-        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
-        
-        RpcServer *server = conn->getServer();
-        
-        uint32_t reqSize = *(uint32_t *)head;
-        reqSize = ntohl(reqSize);
-        uint32_t serviceId = *(uint32_t *)(head + 4);
-        serviceId = ntohl(serviceId);
-        uint32_t methodId = *(uint32_t *)(head + 8);
-        methodId = ntohl(methodId);
-        uint64_t callId = *(uint64_t *)(head + 12);
-        callId = ntohll(callId);
-        
-        // 生成ServerRpcTask
-        // 根据serverId和methodId查表
-        const MethodData *methodData = server->getMethod(serviceId, methodId);
-        if (methodData != NULL) {
-            const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
-            
-            google::protobuf::Message *request = methodData->request_proto->New();
-            google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
-            Controller *controller = new Controller();
-            if (!request->ParseFromArray(body, size)) {
-                // 出错处理
-                printf("ERROR: Server::Decoder::decode -- parse request body fail\n");
-                
-                return nullptr;
-            }
-            
-            // 将收到的请求传给worker
-            WorkerTask *task = new WorkerTask;
-            task->connection = conn;
-            task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
-            task->rpcTask->service = server->getService(serviceId);
-            task->rpcTask->method_descriptor = method_descriptor;
-            task->rpcTask->request = request;
-            task->rpcTask->response = response;
-            task->rpcTask->controller = controller;
-            task->rpcTask->callId = callId;
-            
-            return task;
-        } else {
-            // 出错处理
-            printf("ERROR: Server::Decoder::decode -- can't find method object of serviceId: %u methodId: %u\n", serviceId, methodId);
-            
-            return nullptr;
-        }
-    }
-    
-    //RpcServer::Encoder::~Encoder() {}
-    
-    bool RpcServer::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
-        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
-        uint32_t msgSize = rpcTask->response->GetCachedSize();
-        if (msgSize == 0) {
-            msgSize = rpcTask->response->ByteSize();
-        }
-        
-        if (msgSize + CORPC_RESPONSE_HEAD_SIZE >= space) {
-            return true;
-        }
-        
-        *(uint32_t *)buf = htonl(msgSize);
-        *(uint64_t *)(buf + 4) = htonll(rpcTask->callId);
-        
-        rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
-        size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
-        
-        return true;
-    }
     
     std::shared_ptr<CoRpc::Pipeline> RpcServer::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
         std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
@@ -208,6 +135,7 @@ namespace CoRpc {
     RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io) {
         _acceptor = new Acceptor(this, ip, port);
 
+        // 根据需要创建多线程worker或协程worker
         if (workThreadNum > 0) {
             _worker = new MultiThreadWorker(this, workThreadNum);
         } else {
@@ -228,6 +156,76 @@ namespace CoRpc {
         
         server->start();
         return server;
+    }
+    
+    void * RpcServer::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+        std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
+        
+        RpcServer *server = conn->getServer();
+        
+        uint32_t reqSize = *(uint32_t *)head;
+        reqSize = ntohl(reqSize);
+        uint32_t serviceId = *(uint32_t *)(head + 4);
+        serviceId = ntohl(serviceId);
+        uint32_t methodId = *(uint32_t *)(head + 8);
+        methodId = ntohl(methodId);
+        uint64_t callId = *(uint64_t *)(head + 12);
+        callId = ntohll(callId);
+        
+        // 生成ServerRpcTask
+        // 根据serverId和methodId查表
+        const MethodData *methodData = server->getMethod(serviceId, methodId);
+        if (methodData != NULL) {
+            const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
+            
+            google::protobuf::Message *request = methodData->request_proto->New();
+            google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
+            Controller *controller = new Controller();
+            if (!request->ParseFromArray(body, size)) {
+                // 出错处理
+                printf("ERROR: RpcServer::decode -- parse request body fail\n");
+                
+                return nullptr;
+            }
+            
+            // 将收到的请求传给worker
+            WorkerTask *task = new WorkerTask;
+            task->connection = conn;
+            task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
+            task->rpcTask->service = server->getService(serviceId);
+            task->rpcTask->method_descriptor = method_descriptor;
+            task->rpcTask->request = request;
+            task->rpcTask->response = response;
+            task->rpcTask->controller = controller;
+            task->rpcTask->callId = callId;
+            
+            return task;
+        } else {
+            // 出错处理
+            printf("ERROR: RpcServer::decode -- can't find method object of serviceId: %u methodId: %u\n", serviceId, methodId);
+            
+            return nullptr;
+        }
+    }
+    
+    bool RpcServer::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        uint32_t msgSize = rpcTask->response->GetCachedSize();
+        if (msgSize == 0) {
+            msgSize = rpcTask->response->ByteSize();
+        }
+        
+        if (msgSize + CORPC_RESPONSE_HEAD_SIZE >= space) {
+            return true;
+        }
+        
+        *(uint32_t *)buf = htonl(msgSize);
+        *(uint64_t *)(buf + 4) = htonll(rpcTask->callId);
+        
+        rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
+        size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
+        
+        return true;
     }
     
     bool RpcServer::registerService(::google::protobuf::Service *rpcService) {
@@ -286,13 +284,13 @@ namespace CoRpc {
     }
     
     bool RpcServer::start() {
-        // 根据需要启动accept协程或线程
+        // 启动acceptor
         if (!_acceptor->start()) {
             printf("ERROR: Server::start() -- start acceptor failed.\n");
             return false;
         }
         
-        // 根据需要启动worker协程或线程
+        // 启动worker
         _worker->start();
         
         return true;

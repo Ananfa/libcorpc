@@ -42,7 +42,7 @@ namespace CoRpc {
         uint64_t callId = *(uint64_t *)(head + 4);
         callId = ntohll(callId);
         
-        ClientTask *task = NULL;
+        std::shared_ptr<ClientTask> task;
         // 注意: _waitResultCoMap需进行线程同步
         {
             std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
@@ -55,7 +55,7 @@ namespace CoRpc {
                 return nullptr;
             }
             
-            task = itor->second;
+            task = std::move(itor->second);
             
             // 唤醒结果对应的等待结果协程进行处理
             conn->_waitResultCoMap.erase(itor);
@@ -171,7 +171,7 @@ namespace CoRpc {
     }
     
     void RpcClient::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
-        ClientTask *clientTask = new ClientTask;
+        std::shared_ptr<ClientTask> clientTask(new ClientTask);
         clientTask->channel = this;
         clientTask->rpcTask = std::make_shared<RpcTask>();
         clientTask->rpcTask->co = co_self();
@@ -187,14 +187,13 @@ namespace CoRpc {
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
         
-        _client->_taskList.push_back(clientTask);
+        _client->_taskList.push_back(std::move(clientTask));
         if (_client->_taskHandleRoutineHang) {
             co_resume(_client->_taskHandleRoutine);
         }
         
         co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
         
-        delete clientTask;
         
         // 正确返回
         if (done) {
@@ -281,7 +280,7 @@ namespace CoRpc {
                             std::unique_lock<std::mutex> lock( connection->_waitResultCoMapMutex );
                             while (!connection->_waitResultCoMap.empty()) {
                                 Connection::WaitTaskMap::iterator itor = connection->_waitResultCoMap.begin();
-                                ClientTask *task = itor->second;
+                                std::shared_ptr<ClientTask> task = std::move(itor->second);
                                 connection->_waitResultCoMap.erase(itor);
                                 
                                 task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
@@ -367,7 +366,7 @@ namespace CoRpc {
                         if (connection->_st == Connection::CLOSED) {
                             // 唤醒所有等待连接的协程进行错误处理
                             while (!connection->_waitSendTaskCoList.empty()) {
-                                ClientTask *task = connection->_waitSendTaskCoList.front();
+                                std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                                 connection->_waitSendTaskCoList.pop_front();
                                 
                                 task->rpcTask->controller->SetFailed("Connect fail");
@@ -388,7 +387,7 @@ namespace CoRpc {
                         
                         // 发送等待发送队列中的任务
                         while (!connection->_waitSendTaskCoList.empty()) {
-                            ClientTask *task = connection->_waitSendTaskCoList.front();
+                            std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                             connection->_waitSendTaskCoList.pop_front();
                             
                             std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(connection);
@@ -433,7 +432,7 @@ namespace CoRpc {
             }
             
             // 处理任务队列
-            ClientTask *task = self->_taskList.front();
+            std::shared_ptr<ClientTask> task = std::move(self->_taskList.front());
             self->_taskList.pop_front();
             assert(task);
             

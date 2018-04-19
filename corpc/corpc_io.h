@@ -230,7 +230,8 @@ namespace CoRpc {
     protected:
         virtual PipelineFactory * getPipelineFactory() = 0;
         virtual Connection * buildConnection(int fd) = 0;
-        
+        virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
+        virtual void onClose(Connection * connection) = 0;
     protected:
         IO *_io;
     };

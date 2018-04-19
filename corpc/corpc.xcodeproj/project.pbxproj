@@ -24,6 +24,8 @@
 		2DB2B3352049366C00114392 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DB2B2ED204929EE00114392 /* libco.dylib */; };
 		2DEA997C208480940095C62F /* corpc_rpc_client.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F8204931A300114392 /* corpc_rpc_client.h */; };
 		2DEA997D208480960095C62F /* corpc_rpc_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2F3204931A300114392 /* corpc_rpc_client.cpp */; };
+		2DEA9982208598550095C62F /* corpc_tcp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA996F207B675E0095C62F /* corpc_tcp.cpp */; };
+		2DEA9983208598580095C62F /* corpc_tcp.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9970207B675E0095C62F /* corpc_tcp.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,10 +47,10 @@
 		2DB2B2FD204931A400114392 /* corpc_option.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_option.pb.cc; sourceTree = "<group>"; };
 		2DB2B2FE204931A400114392 /* corpc_inner_rpc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_inner_rpc.h; sourceTree = "<group>"; };
 		2DB2B2FF204931A400114392 /* corpc_routine_env.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_routine_env.cpp; sourceTree = "<group>"; };
-		2DEA996F207B675E0095C62F /* corpc_tcp_server.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_tcp_server.cpp; sourceTree = "<group>"; };
-		2DEA9970207B675E0095C62F /* corpc_tcp_server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_tcp_server.h; sourceTree = "<group>"; };
-		2DEA9973207B679B0095C62F /* corpc_udp_server.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_udp_server.cpp; sourceTree = "<group>"; };
-		2DEA9974207B679B0095C62F /* corpc_udp_server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_udp_server.h; sourceTree = "<group>"; };
+		2DEA996F207B675E0095C62F /* corpc_tcp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_tcp.cpp; sourceTree = "<group>"; };
+		2DEA9970207B675E0095C62F /* corpc_tcp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_tcp.h; sourceTree = "<group>"; };
+		2DEA9973207B679B0095C62F /* corpc_udp.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_udp.cpp; sourceTree = "<group>"; };
+		2DEA9974207B679B0095C62F /* corpc_udp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_udp.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,10 +101,10 @@
 				2DB2B2F9204931A300114392 /* corpc_rpc_server.h */,
 				2D161BE92058CAF10062BA35 /* corpc_utils.cpp */,
 				2D161BEA2058CAF10062BA35 /* corpc_utils.h */,
-				2DEA996F207B675E0095C62F /* corpc_tcp_server.cpp */,
-				2DEA9970207B675E0095C62F /* corpc_tcp_server.h */,
-				2DEA9973207B679B0095C62F /* corpc_udp_server.cpp */,
-				2DEA9974207B679B0095C62F /* corpc_udp_server.h */,
+				2DEA996F207B675E0095C62F /* corpc_tcp.cpp */,
+				2DEA9970207B675E0095C62F /* corpc_tcp.h */,
+				2DEA9973207B679B0095C62F /* corpc_udp.cpp */,
+				2DEA9974207B679B0095C62F /* corpc_udp.h */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -131,6 +133,7 @@
 				2D161BEC2058CAF10062BA35 /* corpc_utils.h in Headers */,
 				2DB2B304204931A500114392 /* corpc_option.pb.h in Headers */,
 				2DEA997C208480940095C62F /* corpc_rpc_client.h in Headers */,
+				2DEA9983208598580095C62F /* corpc_tcp.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -191,6 +194,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DEA9982208598550095C62F /* corpc_tcp.cpp in Sources */,
 				2DEA997D208480960095C62F /* corpc_rpc_client.cpp in Sources */,
 				2DB2B30C204931A500114392 /* corpc_option.pb.cc in Sources */,
 				2D161BEB2058CAF10062BA35 /* corpc_utils.cpp in Sources */,
