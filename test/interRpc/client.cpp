@@ -151,27 +151,12 @@ static void *rpc_routine( void *arg )
             }
             case 2: {
                 BazRequest *request = new BazRequest();
-                Controller *controller = new Controller();
                 
                 request->set_text("Hello Baz");
                 
-                do {
-                    controller->Reset();
-                    testStubs->baz_clt->Baz(controller, request, NULL, NULL);
-                    
-                    if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                        iBazFailCnt++;
-                        
-                        usleep(100000);
-                    } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-                        iBazSuccCnt++;
-                    }
-                } while (controller->Failed());
+                testStubs->baz_clt->Baz(NULL, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&CoRpc::RpcClient::callDoneDeleteRequest, request));
                 
-                delete controller;
-                delete request;
+                iBazSuccCnt++;
                 
                 break;
             }

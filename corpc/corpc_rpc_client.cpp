@@ -94,17 +94,8 @@ namespace CoRpc {
         rpcTask->request->SerializeWithCachedSizesToArray(buf + CORPC_REQUEST_HEAD_SIZE);
         size = CORPC_REQUEST_HEAD_SIZE + msgSize;
         
-        if (rpcTask->response == NULL) {
-            // 注意: _waitResultCoMap需进行线程同步
-            {
-                std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
-                if (conn->_waitResultCoMap.erase(callId) == 0) {
-                    printf("ERROR: Client::Encoder::encode -- task not in waitResultCoMap\n");
-                    assert(false);
-                }
-            }
-            
-            conn->_channel->_client->addMessage(rpcTask->co);
+        if (!rpcTask->response) {
+            rpcTask->done->Run();
         }
         
         return true;
@@ -177,13 +168,11 @@ namespace CoRpc {
         clientTask->rpcTask->co = co_self();
         clientTask->rpcTask->request = request;
         
-        if (method->options().GetExtension(corpc::not_care_response)) {
-            clientTask->rpcTask->response = NULL;
-        } else {
-            clientTask->rpcTask->response = response;
-        }
+        bool care_response = !method->options().GetExtension(corpc::not_care_response);
+        clientTask->rpcTask->response = care_response ? response : NULL;
         
         clientTask->rpcTask->controller = controller;
+        clientTask->rpcTask->done = done;
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
         
@@ -192,13 +181,15 @@ namespace CoRpc {
             co_resume(_client->_taskHandleRoutine);
         }
         
-        co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
-        
-        
-        // 正确返回
-        if (done) {
-            done->Run();
+        if (care_response) {
+            co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
+            
+            // 正确返回
+            if (done) {
+                done->Run();
+            }
         }
+        
     }
     
     RpcClient::RpcClient(IO *io): _io(io), _taskHandleRoutineHang(false), _taskHandleRoutine(NULL) {
@@ -392,7 +383,7 @@ namespace CoRpc {
                             
                             std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(connection);
                             
-                            {
+                            if (task->rpcTask->response) {
                                 std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
                                 connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
                             }
@@ -447,7 +438,7 @@ namespace CoRpc {
             } else {
                 std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(conn);
                 
-                {
+                if (task->rpcTask->response) {
                     std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
                     conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
                 }

@@ -40,6 +40,7 @@ namespace CoRpc {
             const google::protobuf::Message* request;
             google::protobuf::Message* response;
             google::protobuf::RpcController *controller;
+            google::protobuf::Closure *done;
             uint32_t serviceId;
             uint32_t methodId;
         };
@@ -130,6 +131,8 @@ namespace CoRpc {
        
     public:
         static RpcClient* create(IO *io);
+        
+        static void callDoneDeleteRequest(::google::protobuf::Message *request) { delete request; }
         
         bool registerChannel(Channel *channel);
         
