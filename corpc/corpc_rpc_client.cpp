@@ -296,12 +296,12 @@ namespace CoRpc {
                             }
                         }
                         
-                        // 注意：对于not_care_response的rpc调用来说，连接断开时，需要调用回调清理request
+                        // 注意：连接断开时，需要调用回调
                         std::list<std::shared_ptr<void>>& datas = connection->_datas;
                         for (auto iter = datas.begin(); iter != datas.end(); iter++) {
                             std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(*iter);
                             
-                            if (!rpcTask->response) {
+                            if (rpcTask->done) {
                                 rpcTask->done->Run();
                             }
                         }
