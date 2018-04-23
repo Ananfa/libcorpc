@@ -18,6 +18,8 @@
 #include "corpc_rpc_client.h"
 #include "corpc_controller.h"
 
+#include "corpc_utils.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -32,8 +34,7 @@ static int iFooSuccCnt = 0;
 static int iFooFailCnt = 0;
 static int iBarSuccCnt = 0;
 static int iBarFailCnt = 0;
-static int iBazSuccCnt = 0;
-static int iBazFailCnt = 0;
+static int iBazCnt = 0;
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
@@ -56,8 +57,8 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt;
-        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt;
+        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazCnt;
+        totalFail += iFooFailCnt + iBarFailCnt;
         
         time_t now = time(NULL);
         
@@ -68,14 +69,13 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d, average:Succ %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, averageSucc);
+        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz: %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazCnt, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
         iBarSuccCnt = 0;
         iBarFailCnt = 0;
-        iBazSuccCnt = 0;
-        iBazFailCnt = 0;
+        iBazCnt = 0;
     }
     
     return NULL;
@@ -87,10 +87,11 @@ static void *rpc_routine( void *arg )
     
     Test_Stubs *testStubs = (Test_Stubs*)arg;
     
+    int total = 100000;
     // 注意：用于rpc调用参数的request,response和controller对象不能在栈中分配，必须在堆中分配，
     //      这是由于共享栈协程模式下，协程切换时栈会被当前协程栈覆盖，导致指向栈中地址的指针已经不是原来的对象
-    while (true) {
-        int type = rand() % 3;
+    while (total > 0) {
+        int type = 2;//rand() % 3;
         switch (type) {
             case 0: {
                 FooRequest *request = new FooRequest();
@@ -108,7 +109,7 @@ static void *rpc_routine( void *arg )
                         //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iFooFailCnt++;
                         
-                        usleep(100000);
+                        msleep(100);
                     } else {
                         //printf("++++++ Rpc Response is %s\n", response->text().c_str());
                         iFooSuccCnt++;
@@ -136,7 +137,7 @@ static void *rpc_routine( void *arg )
                         //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iBarFailCnt++;
                         
-                        usleep(100000);
+                        msleep(100);
                     } else {
                         //printf("++++++ Rpc Response is %s\n", response->text().c_str());
                         iBarSuccCnt++;
@@ -154,15 +155,20 @@ static void *rpc_routine( void *arg )
                 
                 request->set_text("Hello Baz");
                 
+                // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递
                 testStubs->baz_clt->Baz(NULL, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&CoRpc::RpcClient::callDoneDeleteRequest, request));
                 
-                iBazSuccCnt++;
+                iBazCnt++;
+                
+                msleep(1);
                 
                 break;
             }
             default:
                 break;
         }
+        
+        total--;
     }
     
     return NULL;

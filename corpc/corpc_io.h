@@ -186,6 +186,7 @@ namespace CoRpc {
         virtual ~Connection() = 0;
         
         virtual void onClose() = 0;
+        virtual void cleanDataOnClosing(std::shared_ptr<void>& data) {}
     public:
         void setPipeline(std::shared_ptr<Pipeline> &pipeline) { _pipeline = pipeline; }
         std::shared_ptr<Pipeline> &getPipeline() { return _pipeline; }

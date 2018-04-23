@@ -20,6 +20,7 @@
 #include "corpc_utils.h"
 
 #include <errno.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -31,8 +32,6 @@
 #include "corpc_option.pb.h"
 
 namespace CoRpc {
-    
-    //RpcClient::Decoder::~Decoder() {}
     
     void * RpcClient::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
@@ -52,6 +51,8 @@ namespace CoRpc {
                 // 打印出错信息
                 printf("Client::Decoder::decode can't find task : %llu\n", callId);
                 assert(false);
+                
+                // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
                 return nullptr;
             }
             
@@ -64,13 +65,14 @@ namespace CoRpc {
         // 解析包体（RpcResponseData）
         if (!task->rpcTask->response->ParseFromArray(body, respSize)) {
             printf("ERROR: Client::Decoder::decode -- parse response body fail\n");
+            assert(false);
+            
+            // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
             return nullptr;
         }
         
         return task->rpcTask->co;
     }
-    
-    //RpcClient::Encoder::~Encoder() {}
     
     bool RpcClient::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
@@ -95,6 +97,8 @@ namespace CoRpc {
         size = CORPC_REQUEST_HEAD_SIZE + msgSize;
         
         if (!rpcTask->response) {
+            // 对于not_care_response类型的rpc调用，这里需要触发回调来清理request对象
+            assert(rpcTask->done);
             rpcTask->done->Run();
         }
         
@@ -116,6 +120,15 @@ namespace CoRpc {
         connectionTask->connection = std::static_pointer_cast<Connection>(CoRpc::Connection::shared_from_this());
         
         _channel->_client->_connectionTaskQueue.push(connectionTask);
+    }
+    
+    void RpcClient::Connection::cleanDataOnClosing(std::shared_ptr<void>& data) {
+        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        
+        // not_care_response类型rpc调用需要通过回调清理request
+        if (!rpcTask->response) {
+            rpcTask->done->Run();
+        }
     }
     
     RpcClient::Channel::Channel(RpcClient *client, const std::string& ip, uint32_t port, uint32_t connectNum)
@@ -176,10 +189,7 @@ namespace CoRpc {
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
         
-        _client->_taskList.push_back(std::move(clientTask));
-        if (_client->_taskHandleRoutineHang) {
-            co_resume(_client->_taskHandleRoutine);
-        }
+        _client->_taskQueue.push(std::move(clientTask));
         
         if (care_response) {
             co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
@@ -192,7 +202,7 @@ namespace CoRpc {
         
     }
     
-    RpcClient::RpcClient(IO *io): _io(io), _taskHandleRoutineHang(false), _taskHandleRoutine(NULL) {
+    RpcClient::RpcClient(IO *io): _io(io) {
         std::vector<EncodeFunction> encodeFuns;
         encodeFuns.push_back(encode);
         
@@ -219,9 +229,15 @@ namespace CoRpc {
     void RpcClient::start() {
         CoroutineWorker::start();
         
-        RoutineEnvironment::startCoroutine(connectionRoutine, this);
+        _t = std::thread(threadEntry, this);
+    }
+    
+    void RpcClient::threadEntry(RpcClient *self) {
+        RoutineEnvironment::startCoroutine(connectionRoutine, self);
         
-        RoutineEnvironment::startCoroutine(taskHandleRoutine, this);
+        RoutineEnvironment::startCoroutine(taskHandleRoutine, self);
+
+        RoutineEnvironment::runEventLoop();
     }
     
     void *RpcClient::connectionRoutine( void * arg ) {
@@ -277,6 +293,16 @@ namespace CoRpc {
                                 task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
                                 
                                 self->addMessage(task->rpcTask->co);
+                            }
+                        }
+                        
+                        // 注意：对于not_care_response的rpc调用来说，连接断开时，需要调用回调清理request
+                        std::list<std::shared_ptr<void>>& datas = connection->_datas;
+                        for (auto iter = datas.begin(); iter != datas.end(); iter++) {
+                            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(*iter);
+                            
+                            if (!rpcTask->response) {
+                                rpcTask->done->Run();
                             }
                         }
                         
@@ -355,14 +381,19 @@ namespace CoRpc {
                         }
                         
                         if (connection->_st == Connection::CLOSED) {
-                            // 唤醒所有等待连接的协程进行错误处理
+                            // 连接失败，唤醒所有等待连接建立的rpc调用协程进行错误处理
                             while (!connection->_waitSendTaskCoList.empty()) {
                                 std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                                 connection->_waitSendTaskCoList.pop_front();
                                 
-                                task->rpcTask->controller->SetFailed("Connect fail");
-                                
-                                self->addMessage(task->rpcTask->co);
+                                if (task->rpcTask->response) {
+                                    task->rpcTask->controller->SetFailed("Connect fail");
+                                    self->addMessage(task->rpcTask->co);
+                                } else {
+                                    // not_care_response类型的rpc需要在这里触发回调清理request
+                                    assert(task->rpcTask->done);
+                                    task->rpcTask->done->Run();
+                                }
                             }
                             
                             assert(connection->_waitResultCoMap.empty());
@@ -403,47 +434,73 @@ namespace CoRpc {
         }
     }
     
-    void *RpcClient::taskHandleRoutine( void * arg ) {
+    void *RpcClient::taskHandleRoutine(void *arg) {
         RpcClient *self = (RpcClient *)arg;
         co_enable_hook_sys();
         
-        self->_taskHandleRoutine = co_self();
-        self->_taskHandleRoutineHang = false;
-        
+        ClientTaskQueue& queue = self->_taskQueue;
         Sender *sender = self->_io->getSender();
         
+        // 初始化pipe readfd
+        co_enable_hook_sys();
+        int readFd = queue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
+        
+        int ret;
+        std::vector<char> buf(1024);
         while (true) {
-            if (self->_taskList.empty()) {
-                // 挂起
-                self->_taskHandleRoutineHang = true;
-                co_yield_ct();
-                self->_taskHandleRoutineHang = false;
-                
-                continue;
+            // 等待处理信号
+            ret = (int)read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    // 管道出错
+                    printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    msleep(10);
+                }
             }
             
-            // 处理任务队列
-            std::shared_ptr<ClientTask> task = std::move(self->_taskList.front());
-            self->_taskList.pop_front();
-            assert(task);
+            struct timeval t1,t2;
+            gettimeofday(&t1, NULL);
             
-            // 先从channel中获得一connection
-            std::shared_ptr<Connection> conn = ((Channel*)(task->channel))->getNextConnection();
-            assert(conn->_st != Connection::CLOSED);
-
-            // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
-            // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
-            if (conn->_st == Connection::CONNECTING) {
-                conn->_waitSendTaskCoList.push_back(task);
-            } else {
-                std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(conn);
+            // 处理任务队列
+            std::shared_ptr<ClientTask> task = queue.pop();
+            while (task) {
+                // 先从channel中获得一connection
+                std::shared_ptr<Connection> conn = ((Channel*)(task->channel))->getNextConnection();
+                assert(conn->_st != Connection::CLOSED);
                 
-                if (task->rpcTask->response) {
-                    std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
-                    conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
+                // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
+                if (conn->_st == Connection::CONNECTING) {
+                    conn->_waitSendTaskCoList.push_back(task);
+                } else {
+                    std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(conn);
+                    
+                    if (task->rpcTask->response) {
+                        std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
+                        conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                    }
+                    
+                    sender->send(ioConn, task->rpcTask);
                 }
                 
-                sender->send(ioConn, task->rpcTask);
+                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                gettimeofday(&t2, NULL);
+                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
+                    msleep(1);
+                    
+                    gettimeofday(&t1, NULL);
+                }
+                
+                task = queue.pop();
             }
         }
         

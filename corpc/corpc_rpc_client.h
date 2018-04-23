@@ -28,7 +28,6 @@
 #include <google/protobuf/service.h>
 #include <google/protobuf/descriptor.h>
 
-// TODO: 启动1条线程协程化处理rpc请求收发
 // rpc channel需要注册到client中才能被服务
 namespace CoRpc {
     
@@ -71,6 +70,7 @@ namespace CoRpc {
             ~Connection() {}
             
             virtual void onClose();
+            virtual void cleanDataOnClosing(std::shared_ptr<void>& data);
             
         private:
             Channel *_channel;
@@ -125,13 +125,16 @@ namespace CoRpc {
         
 #ifdef USE_NO_LOCK_QUEUE
         typedef Co_MPSC_NoLockQueue<ConnectionTask*> ConnectionTaskQueue;
+        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ClientTask>> ClientTaskQueue;
 #else
         typedef CoSyncQueue<ConnectionTask*> ConnectionTaskQueue;
+        typedef CoSyncQueue<std::shared_ptr<ClientTask>> ClientTaskQueue;
 #endif
        
     public:
         static RpcClient* create(IO *io);
         
+        // callDoneDeleteRequest静态方法用于rpc调用中的callback参数，为了清理request。主要用于not_care_response类型的rpc调用
         static void callDoneDeleteRequest(::google::protobuf::Message *request) { delete request; }
         
         bool registerChannel(Channel *channel);
@@ -145,9 +148,13 @@ namespace CoRpc {
         
         static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
-        static void *connectionRoutine( void * arg );  // 负责为connection连接建立和断线处理
+        // 注意：需要开启线程来执行connectionRoutine和taskHandleRoutine协程，原因是not_care_response类型的rpc调用不会触发调用处协程切换，
+        // 此时如果在同一线程中开启connectionRoutine和taskHandleRoutine协程，它们将等到调用处协程将来让出执行后才能得到调度，导致数据不能及时发送。
+        static void threadEntry(RpcClient *self);
         
-        static void *taskHandleRoutine( void * arg );   // 负责将rpc调用请求通过connection交由sender发出
+        static void *connectionRoutine(void * arg);  // 负责为connection连接建立和断线处理
+        
+        static void *taskHandleRoutine(void * arg);   // 负责将rpc调用请求通过connection交由sender发出
         
         void start();
         
@@ -157,11 +164,11 @@ namespace CoRpc {
     private:
         IO *_io;
         
-        ConnectionTaskQueue _connectionTaskQueue;
+        std::thread _t; // 任务处理线程
         
-        std::list<std::shared_ptr<ClientTask> > _taskList;
-        bool _taskHandleRoutineHang; // 上行协程是否挂起
-        stCoRoutine_t* _taskHandleRoutine; // 上行协程
+        ConnectionTaskQueue _connectionTaskQueue; // connectionRoutine处理的连接任务队列
+        
+        ClientTaskQueue _taskQueue; // taskHandleRoutine
         
         ChannelSet _channelSet; // 注册的channel
         

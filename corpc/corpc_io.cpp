@@ -611,6 +611,8 @@ namespace CoRpc {
                             if (task->connection->_routineHang) {
                                 co_resume(task->connection->_routine);
                             }
+                        } else {
+                            task->connection->cleanDataOnClosing(task->data);
                         }
                         
                         delete task;

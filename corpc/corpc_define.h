@@ -68,9 +68,18 @@ namespace CoRpc {
         MPSC_NoLockQueue():_head(NULL), _outqueue(NULL) {}
         ~MPSC_NoLockQueue() {}
         
-        void push(T & v) {
+        void push(T& v) {
             Node *newNode = new Node;
             newNode->value = v;
+            
+            newNode->next = _head;
+            do {
+            } while (!_head.compare_exchange_weak(newNode->next, newNode));
+        }
+        
+        void push(T&& v) {
+            Node *newNode = new Node;
+            newNode->value = std::move(v);
             
             newNode->next = _head;
             do {
@@ -99,7 +108,7 @@ namespace CoRpc {
             }
             
             if (_outqueue) {
-                ret = _outqueue->value;
+                ret = std::move(_outqueue->value);
                 Node *tnode = _outqueue;
                 _outqueue = _outqueue->next;
                 delete tnode;
@@ -137,6 +146,13 @@ namespace CoRpc {
             write(getWriteFd(), &buf, 1);
         }
         
+        void push(T && v) {
+            MPSC_NoLockQueue<T>::push(std::move(v));
+            
+            char buf = 'X';
+            write(getWriteFd(), &buf, 1);
+        }
+        
     private:
         PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
     };
@@ -153,11 +169,16 @@ namespace CoRpc {
             _inqueue.push_back(v);
         }
         
+        void push(T && v) {
+            std::unique_lock<std::mutex> lock( _queueMutex );
+            _inqueue.push_back(std::move(v));
+        }
+        
         T pop() {
             T ret(nullptr);
             
             if (!_outqueue.empty()) {
-                ret = _outqueue.front();
+                ret = std::move(_outqueue.front());
                 
                 _outqueue.pop_front();
             } else {
@@ -167,7 +188,7 @@ namespace CoRpc {
                         _inqueue.swap(_outqueue);
                     }
                     
-                    ret = _outqueue.front();
+                    ret = std::move(_outqueue.front());
                     
                     _outqueue.pop_front();
                 }
@@ -201,6 +222,13 @@ namespace CoRpc {
         
         void push(T & v) {
             SyncQueue<T>::push(v);
+            
+            char buf = 'K';
+            write(getWriteFd(), &buf, 1);
+        }
+        
+        void push(T && v) {
+            SyncQueue<T>::push(std::move(v));
             
             char buf = 'K';
             write(getWriteFd(), &buf, 1);

@@ -25,6 +25,48 @@
 
 using namespace CoRpc;
 
+static int iFooCnt = 0;
+static int iBarCnt = 0;
+static int iBazCnt = 0;
+
+static void *log_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    int total = 0;
+    int average = 0;
+    
+    time_t startAt = time(NULL);
+    
+    while (true) {
+        sleep(1);
+        
+        total += iFooCnt + iBarCnt + iBazCnt;
+        
+        if (total == 0) {
+            startAt = time(NULL);
+            continue;
+        }
+        
+        time_t now = time(NULL);
+        
+        time_t difTime = now - startAt;
+        if (difTime > 0) {
+            average = total / difTime;
+        } else {
+            average = total;
+        }
+        
+        printf("time %ld seconds, foo: %d, bar: %d, baz: %d, average: %d, total: %d\n", difTime, iFooCnt, iBarCnt, iBazCnt, average, total);
+        
+        iFooCnt = 0;
+        iBarCnt = 0;
+        iBazCnt = 0;
+    }
+    
+    return NULL;
+}
+
 class FooServiceImpl : public FooService {
 public:
     FooServiceImpl() {}
@@ -38,6 +80,8 @@ public:
             str += (" " + tmp);
         response->set_text(str);
         response->set_result(true);
+        
+        iFooCnt++;
     }
 };
 
@@ -54,6 +98,8 @@ public:
             str += (" " + tmp);
         response->set_text(str);
         response->set_result(true);
+        
+        iBarCnt++;
     }
 };
 
@@ -66,6 +112,7 @@ public:
                      ::google::protobuf::Closure* done) {
         std::string str = request->text();
         
+        iBazCnt++;
         //printf("BazServiceImpl::Baz: %s\n", str.c_str());
     }
 };
@@ -97,6 +144,8 @@ int main(int argc, char *argv[]) {
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
+    
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
     
     RoutineEnvironment::runEventLoop();
 }
