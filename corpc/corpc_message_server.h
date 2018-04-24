@@ -106,9 +106,6 @@ namespace CoRpc {
     
     class TcpMessageServer: public MessageServer {
     public:
-        static TcpMessageServer* create( CoRpc::IO *io, const std::string& ip, uint16_t port);
-        
-    public:
         TcpMessageServer( CoRpc::IO *io, const std::string& ip, uint16_t port);
         virtual ~TcpMessageServer() = 0;
         

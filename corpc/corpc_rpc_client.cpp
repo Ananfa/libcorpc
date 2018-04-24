@@ -121,6 +121,7 @@ namespace CoRpc {
         
         // not_care_response类型rpc调用需要通过回调清理request
         if (!rpcTask->response) {
+            rpcTask->controller->SetFailed(strerror(ENETDOWN));
             rpcTask->done->Run();
         }
     }
@@ -176,8 +177,8 @@ namespace CoRpc {
         clientTask->rpcTask->request = request;
         
         bool care_response = !method->options().GetExtension(corpc::not_care_response);
+        assert(care_response || done); // not_care_response need done
         clientTask->rpcTask->response = care_response ? response : NULL;
-        
         clientTask->rpcTask->controller = controller;
         clientTask->rpcTask->done = done;
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
@@ -295,7 +296,9 @@ namespace CoRpc {
                         for (auto iter = datas.begin(); iter != datas.end(); iter++) {
                             std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(*iter);
                             
-                            if (rpcTask->done) {
+                            // 对于not_care_response类型的rpc需要在这里调用回调处理
+                            if (!rpcTask->response) {
+                                rpcTask->controller->SetFailed(strerror(ENETDOWN));
                                 rpcTask->done->Run();
                             }
                         }
@@ -380,8 +383,8 @@ namespace CoRpc {
                                 std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                                 connection->_waitSendTaskCoList.pop_front();
                                 
+                                task->rpcTask->controller->SetFailed("Connect fail");
                                 if (task->rpcTask->response) {
-                                    task->rpcTask->controller->SetFailed("Connect fail");
                                     self->addMessage(task->rpcTask->co);
                                 } else {
                                     // not_care_response类型的rpc需要在这里触发回调清理request

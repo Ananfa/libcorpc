@@ -34,7 +34,11 @@ static int iFooSuccCnt = 0;
 static int iFooFailCnt = 0;
 static int iBarSuccCnt = 0;
 static int iBarFailCnt = 0;
-static int iBazCnt = 0;
+static int iBazSuccCnt = 0;
+static int iBazFailCnt = 0;
+
+static int iTotalBazSend = 0;
+static int iTotalBazDone = 0;
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
@@ -57,8 +61,8 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazCnt;
-        totalFail += iFooFailCnt + iBarFailCnt;
+        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt;
+        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt;
         
         time_t now = time(NULL);
         
@@ -69,16 +73,30 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz: %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazCnt, averageSucc, totalSucc + totalFail);
+        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
         iBarSuccCnt = 0;
         iBarFailCnt = 0;
-        iBazCnt = 0;
+        iBazSuccCnt = 0;
+        iBazFailCnt = 0;
     }
     
     return NULL;
+}
+
+static void callDoneHandle(::google::protobuf::Message *request, CoRpc::Controller *controller) {
+    if (controller->Failed()) {
+        iBazFailCnt++;
+    } else {
+        iBazSuccCnt++;
+    }
+    
+    iTotalBazDone++;
+    
+    delete controller;
+    delete request;
 }
 
 static void *rpc_routine( void *arg )
@@ -152,13 +170,16 @@ static void *rpc_routine( void *arg )
             }
             case 2: {
                 BazRequest *request = new BazRequest();
+                Controller *controller = new Controller();
                 
                 request->set_text("Hello Baz");
                 
-                // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递
-                testStubs->baz_clt->Baz(NULL, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&CoRpc::RpcClient::callDoneDeleteRequest, request));
+                // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递。
+                // 注意：not_care_response类型的rpc调用是异步的，request和controller对象在回调处理中才能删除，不能在调用语句后面马上删除。
+                // 因此not_care_response类型的rpc调用必须提供回调对象
+                testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
                 
-                iBazCnt++;
+                iTotalBazSend++;
                 
                 msleep(1);
                 

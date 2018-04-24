@@ -4,6 +4,7 @@ co/co.xcodeproj/xcuserdata
 corpc/corpc.xcodeproj/xcuserdata
 test/interRpc/interRpc.xcodeproj/xcuserdata
 test/innerRpc/innerRpc.xcodeproj/xcuserdata
+test/echotcp/echotcp.xcodeproj/xcuserdata
 test/test*
 tutorial/tutorial1/tutorial1.xcodeproj/xcuserdata
 tutorial/tutorial2/tutorial2.xcodeproj/xcuserdata

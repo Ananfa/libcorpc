@@ -303,10 +303,9 @@ namespace CoRpc {
         // 将接受的连接分别发给Receiver和Sender
         _io->addConnection(connection);
         
-        // TODO: 产生连接消息
-        
+        // 通知连接建立
+        onConnect(connection);
     }
-    
     
     Acceptor::~Acceptor() {
         

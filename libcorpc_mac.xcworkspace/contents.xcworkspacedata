@@ -2,7 +2,7 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:test/testtcp/testtcp.xcodeproj">
+      location = "group:/Users/xianke.liu/refer_prjs/libcorpc/test/echotcp/echotcp.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:co/co.xcodeproj">

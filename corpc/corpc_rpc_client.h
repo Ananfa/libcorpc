@@ -126,9 +126,6 @@ namespace CoRpc {
     public:
         static RpcClient* create(IO *io);
         
-        // callDoneDeleteRequest静态方法用于rpc调用中的callback参数，为了清理request。主要用于not_care_response类型的rpc调用
-        static void callDoneDeleteRequest(::google::protobuf::Message *request) { delete request; }
-        
         bool registerChannel(Channel *channel);
         
     private:
