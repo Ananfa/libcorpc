@@ -49,7 +49,7 @@ namespace CoRpc {
             
             if (itor == conn->_waitResultCoMap.end()) {
                 // 打印出错信息
-                printf("Client::Decoder::decode can't find task : %llu\n", callId);
+                printf("ERROR: RpcClient::decode can't find task : %llu\n", callId);
                 assert(false);
                 
                 // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
@@ -64,7 +64,7 @@ namespace CoRpc {
         
         // 解析包体（RpcResponseData）
         if (!task->rpcTask->response->ParseFromArray(body, respSize)) {
-            printf("ERROR: Client::Decoder::decode -- parse response body fail\n");
+            printf("ERROR: RpcClient::decode -- parse response body fail\n");
             assert(false);
             
             // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
@@ -103,12 +103,6 @@ namespace CoRpc {
         }
         
         return true;
-    }
-    
-    std::shared_ptr<CoRpc::Pipeline> RpcClient::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
-        
-        return pipeline;
     }
     
     RpcClient::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED) {
@@ -206,7 +200,7 @@ namespace CoRpc {
         std::vector<EncodeFunction> encodeFuns;
         encodeFuns.push_back(encode);
         
-        _pipelineFactory = new PipelineFactory(this, decode, std::move(encodeFuns));
+        _pipelineFactory = new TcpPipelineFactory(this, decode, std::move(encodeFuns), CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
     }
     
     RpcClient* RpcClient::create(IO *io) {
@@ -262,7 +256,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("Error: Client::connectionRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                    printf("Error: RpcClient::connectionRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -352,7 +346,7 @@ namespace CoRpc {
                                 ret = getsockopt(connection->_fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
                                 if ( ret == -1 ) {
                                     // 出错处理
-                                    printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                    printf("Error: RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
                                            co_self(), connection->_fd, ret, errno, strerror(errno));
                                     
                                     close(connection->_fd);
@@ -360,7 +354,7 @@ namespace CoRpc {
                                     connection->_st = Connection::CLOSED;
                                 } else if ( error ) {
                                     // 出错处理
-                                    printf("Client::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                    printf("Error: RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
                                            co_self(), connection->_fd, ret, error, strerror(error));
                                     
                                     close(connection->_fd);
@@ -371,7 +365,7 @@ namespace CoRpc {
                                 assert(connection->_waitResultCoMap.empty());
                             } else {
                                 // 出错处理
-                                printf("Client::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
+                                printf("Error: RpcClient::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
                                        co_self(), connection->_fd, ret, errno, strerror(errno));
                                 
                                 close(connection->_fd);
@@ -458,7 +452,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: RpcClient::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？

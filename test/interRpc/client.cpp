@@ -91,7 +91,7 @@ static void *rpc_routine( void *arg )
     // 注意：用于rpc调用参数的request,response和controller对象不能在栈中分配，必须在堆中分配，
     //      这是由于共享栈协程模式下，协程切换时栈会被当前协程栈覆盖，导致指向栈中地址的指针已经不是原来的对象
     while (total > 0) {
-        int type = 2;//rand() % 3;
+        int type = rand() % 3;
         switch (type) {
             case 0: {
                 FooRequest *request = new FooRequest();

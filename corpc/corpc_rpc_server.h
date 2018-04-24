@@ -58,20 +58,12 @@ namespace CoRpc {
             RpcServer *_server;
         };
         
-        class PipelineFactory: public CoRpc::PipelineFactory {
-        public:
-            PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns): CoRpc::PipelineFactory(worker, decodeFun, std::move(encodeFuns)) {}
-            ~PipelineFactory() {}
-            
-            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
-        };
-        
         class Connection: public CoRpc::Connection {
         public:
             Connection(int fd, RpcServer* server);
             virtual ~Connection();
             
-            virtual void onClose() {}
+            virtual void onClose();
             
             RpcServer *getServer() { return _server; }
         private:
@@ -116,7 +108,7 @@ namespace CoRpc {
         virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) {}
         
         // override
-        virtual void onClose(CoRpc::Connection * connection) {};
+        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection);
         
     private:
         RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);

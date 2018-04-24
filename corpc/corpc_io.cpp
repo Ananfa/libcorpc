@@ -58,7 +58,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: MultiThreadReceiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: Worker::msgHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -273,6 +273,14 @@ namespace CoRpc {
     
     PipelineFactory::~PipelineFactory() {}
     
+    std::shared_ptr<CoRpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
+    }
+    
+    std::shared_ptr<CoRpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
+        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::UdpPipeline(connection, _decodeFun, _worker, _encodeFuns, _headSize, _maxBodySize) );
+    }
+    
     Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _isClosing(false), _canClose(false) {
     }
     
@@ -344,11 +352,11 @@ namespace CoRpc {
         }
         
         if(_listen_fd==-1){
-            printf("ERROR: Acceptor::start() -- Port %d is in use\n", _port);
+            printf("ERROR: Acceptor::init() -- Port %d is in use\n", _port);
             return false;
         }
         
-        printf("INFO: Acceptor::start() -- listen %d %s:%d\n", _listen_fd, _ip.c_str(), _port);
+        printf("INFO: Acceptor::init() -- listen %d %s:%d\n", _listen_fd, _ip.c_str(), _port);
         listen( _listen_fd, 1024 );
         
         int iFlags;
@@ -432,7 +440,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: IO::Receiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: Receiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -476,7 +484,7 @@ namespace CoRpc {
                 }
                 
                 // 出错处理
-                printf("ERROR: IO::Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+                printf("ERROR: Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
                        fd, ret, errno, strerror(errno));
                 
                 break;
@@ -497,7 +505,6 @@ namespace CoRpc {
         }
         
         close(fd);
-        printf("INFO: IO::Receiver::connectionRoutine -- end for fd:%d in thread:%d\n", fd, GetPid());
         
         connection->onClose();
         
@@ -573,7 +580,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: IO::Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -669,7 +676,7 @@ namespace CoRpc {
             // 发数据
             int ret = (int)write(connection->_fd, buf + startIndex, dataSize);
             if (ret < 0) {
-                printf("ERROR: IO::Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
+                printf("ERROR: Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));
                 
                 break;
@@ -686,7 +693,7 @@ namespace CoRpc {
         shutdown(connection->_fd, SHUT_RD);
         connection->_canClose = true;
         
-        printf("ERROR: Server::Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
+        printf("ERROR: Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
         
         return NULL;
     }
@@ -806,12 +813,12 @@ namespace CoRpc {
         }
         
         if (!_receiver->start()) {
-            printf("ERROR: Server::start() -- start receiver failed.\n");
+            printf("ERROR: IO::start() -- start receiver failed.\n");
             return false;
         }
         
         if (!_sender->start()) {
-            printf("ERROR: Server::start() -- start sender failed.\n");
+            printf("ERROR: IO::start() -- start sender failed.\n");
             return false;
         }
         

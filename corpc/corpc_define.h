@@ -38,6 +38,9 @@
 #define CORPC_REQUEST_HEAD_SIZE 20
 #define CORPC_RESPONSE_HEAD_SIZE 12
 
+#define CORPC_MESSAGE_HEAD_SIZE 8
+#define CORPC_MAX_MESSAGE_SIZE 0x10000
+
 namespace CoRpc {
     
     struct PipeType {

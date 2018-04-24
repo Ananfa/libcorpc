@@ -37,17 +37,16 @@
 
 namespace CoRpc {
     
-    std::shared_ptr<CoRpc::Pipeline> RpcServer::PipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        std::shared_ptr<CoRpc::Pipeline> pipeline( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES) );
-        
-        return pipeline;
-    }
-    
     RpcServer::Connection::Connection(int fd, RpcServer* server): CoRpc::Connection(fd, server->_io), _server(server) {
     }
     
     RpcServer::Connection::~Connection() {
         printf("INFO: Server::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
+    }
+    
+    void RpcServer::Connection::onClose() {
+        std::shared_ptr<CoRpc::Connection> self = CoRpc::Connection::shared_from_this();
+        _server->onClose(self);
     }
     
     RpcServer::RpcTask::RpcTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {
@@ -145,7 +144,7 @@ namespace CoRpc {
         std::vector<EncodeFunction> encodeFuns;
         encodeFuns.push_back(encode);
         
-        _pipelineFactory = new PipelineFactory(_worker, decode, std::move(encodeFuns));
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, std::move(encodeFuns), CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
     }
     
     RpcServer::~RpcServer() {}
@@ -283,10 +282,14 @@ namespace CoRpc {
         return new Connection(fd, this);
     }
     
+    void RpcServer::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
+        printf("INFO: RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
+    }
+    
     bool RpcServer::start() {
         // 启动acceptor
         if (!_acceptor->start()) {
-            printf("ERROR: Server::start() -- start acceptor failed.\n");
+            printf("ERROR: RpcServer::start() -- start acceptor failed.\n");
             return false;
         }
         

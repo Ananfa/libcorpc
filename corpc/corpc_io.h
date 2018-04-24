@@ -169,7 +169,7 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)) {}
+        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)), _headSize(headSize), _maxBodySize(maxBodySize) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
@@ -178,6 +178,29 @@ namespace CoRpc {
         Worker *_worker;
         DecodeFunction _decodeFun;
         std::vector<EncodeFunction> _encodeFuns;
+        
+        uint _headSize;
+        uint _maxBodySize;
+    };
+    
+    class TcpPipelineFactory: public PipelineFactory {
+    public:
+        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, Pipeline::SIZE_TYPE bodySizeType): PipelineFactory(worker, decodeFun, std::move(encodeFuns), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
+        ~TcpPipelineFactory() {}
+        
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
+        
+    public:
+        uint _bodySizeOffset;
+        Pipeline::SIZE_TYPE _bodySizeType;
+    };
+    
+    class UdpPipelineFactory: public PipelineFactory {
+    public:
+        UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize): PipelineFactory(worker, decodeFun, std::move(encodeFuns), headSize, maxBodySize) {}
+        ~UdpPipelineFactory() {}
+        
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
     };
     
     class Connection: public std::enable_shared_from_this<Connection> {
@@ -232,7 +255,7 @@ namespace CoRpc {
         virtual PipelineFactory * getPipelineFactory() = 0;
         virtual Connection * buildConnection(int fd) = 0;
         virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
-        virtual void onClose(Connection * connection) = 0;
+        virtual void onClose(std::shared_ptr<Connection>& connection) = 0;
     protected:
         IO *_io;
     };

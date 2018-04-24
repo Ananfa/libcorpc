@@ -52,14 +52,6 @@ namespace CoRpc {
     public:
         class Channel;
     private:
-        class PipelineFactory: public CoRpc::PipelineFactory {
-        public:
-            PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns): CoRpc::PipelineFactory(worker, decodeFun, std::move(encodeFuns)) {}
-            ~PipelineFactory() {}
-            
-            virtual std::shared_ptr<CoRpc::Pipeline> buildPipeline(std::shared_ptr<CoRpc::Connection> &connection);
-        };
-        
         class Connection: public CoRpc::Connection {
             enum Status {CLOSED, CONNECTING, CONNECTED};
             typedef std::list<std::shared_ptr<ClientTask> > WaitTaskList;
