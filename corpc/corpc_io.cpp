@@ -42,7 +42,6 @@ namespace CoRpc {
         Worker *self = context->_worker;
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);
@@ -293,11 +292,16 @@ namespace CoRpc {
         _io->_sender->send(self, data);
     }
     
+    void Connection::close() {
+        std::shared_ptr<Connection> self = shared_from_this();
+        _io->removeConnection(self);
+    }
+    
     Server::~Server() {}
     
     void Server::buildAndAddConnection(int fd) {
         std::shared_ptr<CoRpc::Connection> connection(buildConnection(fd));
-        std::shared_ptr<CoRpc::Pipeline> pipeline = getPipelineFactory()->buildPipeline(connection);
+        std::shared_ptr<CoRpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);
         
         // 将接受的连接分别发给Receiver和Sender
@@ -307,11 +311,34 @@ namespace CoRpc {
         onConnect(connection);
     }
     
+    bool Server::start() {
+        if (!_acceptor) {
+            printf("ERROR: Server::start() -- acceptor is NULL.\n");
+            return false;
+        }
+        
+        if (!_worker) {
+            printf("ERROR: Server::start() -- worker is NULL.\n");
+            return false;
+        }
+        
+        // 启动acceptor
+        if (!_acceptor->start()) {
+            printf("ERROR: Server::start() -- start acceptor failed.\n");
+            return false;
+        }
+        
+        _worker->start();
+        
+        return true;
+    }
+    
+    
     Acceptor::~Acceptor() {
         
     }
     
-    bool Acceptor::init() {
+    bool TcpAcceptor::init() {
         _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
         if( _listen_fd >= 0 )
         {
@@ -367,17 +394,14 @@ namespace CoRpc {
         return true;
     }
     
-    void *Acceptor::acceptRoutine( void * arg ) {
-        Acceptor *self = (Acceptor *)arg;
-        co_enable_hook_sys();
-        
+    void *TcpAcceptor::acceptRoutine( void * arg ) {
+        TcpAcceptor *self = (TcpAcceptor *)arg;
         Server *server = self->_server;
-        
         int listen_fd = self->_listen_fd;
+        
         // 侦听连接，并把接受的连接传给连接处理对象
         printf("INFO: start accept from listen fd %d\n", listen_fd);
-        for(;;)
-        {
+        while (true) {
             struct sockaddr_in addr; //maybe sockaddr_un;
             memset( &addr,0,sizeof(addr) );
             socklen_t len = sizeof(addr);
@@ -405,7 +429,7 @@ namespace CoRpc {
         return NULL;
     }
     
-    bool Acceptor::start() {
+    bool TcpAcceptor::start() {
         if (!init()) {
             return false;
         }
@@ -423,7 +447,6 @@ namespace CoRpc {
         ReceiverTaskQueue& queue = context->_queue;
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);
@@ -459,7 +482,6 @@ namespace CoRpc {
     }
     
     void *Receiver::connectionRoutine( void * arg ) {
-        co_enable_hook_sys();
         ReceiverTask *recvTask = (ReceiverTask *)arg;
         std::shared_ptr<Connection> connection = recvTask->connection;
         delete recvTask;
@@ -563,7 +585,6 @@ namespace CoRpc {
         SenderTaskQueue& queue = context->_queue;
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);

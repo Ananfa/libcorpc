@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:test/testUdp/testUdp.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:/Users/xianke.liu/refer_prjs/libcorpc/test/echotcp/echotcp.xcodeproj">
    </FileRef>
    <FileRef

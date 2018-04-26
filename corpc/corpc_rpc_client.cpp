@@ -237,7 +237,6 @@ namespace CoRpc {
     
     void *RpcClient::connectionRoutine( void * arg ) {
         RpcClient *self = (RpcClient *)arg;
-        co_enable_hook_sys();
         
         int readFd = self->_connectionTaskQueue.getReadFd();
         co_register_fd(readFd);
@@ -433,13 +432,11 @@ namespace CoRpc {
     
     void *RpcClient::taskHandleRoutine(void *arg) {
         RpcClient *self = (RpcClient *)arg;
-        co_enable_hook_sys();
         
         ClientTaskQueue& queue = self->_taskQueue;
         Sender *sender = self->_io->getSender();
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);

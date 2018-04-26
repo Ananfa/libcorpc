@@ -94,12 +94,6 @@ namespace CoRpc {
         return false;
     }
     
-    bool MessageServer::start() {
-        _worker->start();
-        
-        return true;
-    }
-    
     CoRpc::Connection *MessageServer::buildConnection(int fd) {
         return new Connection(fd, this);
     }
@@ -173,7 +167,7 @@ namespace CoRpc {
     }
     
     TcpMessageServer::TcpMessageServer( CoRpc::IO *io, const std::string& ip, uint16_t port): MessageServer(io) {
-        _acceptor = new Acceptor(this, ip, port);
+        _acceptor = new TcpAcceptor(this, ip, port);
         
         std::vector<CoRpc::EncodeFunction> encodeFuns;
         encodeFuns.push_back(encode);
@@ -183,18 +177,4 @@ namespace CoRpc {
     
     TcpMessageServer::~TcpMessageServer() {}
 
-    bool TcpMessageServer::start() {
-        if (!MessageServer::start()) {
-            return false;
-        }
-        
-        // 启动acceptor
-        if (!_acceptor->start()) {
-            printf("ERROR: TcpMessageServer::start() -- start acceptor failed.\n");
-            return false;
-        }
-        
-        return true;
-    }
-    
 }

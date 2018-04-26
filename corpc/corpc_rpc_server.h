@@ -99,9 +99,6 @@ namespace CoRpc {
         const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
         
         // override
-        virtual CoRpc::PipelineFactory * getPipelineFactory();
-        
-        // override
         virtual CoRpc::Connection * buildConnection(int fd);
         
         // override
@@ -118,15 +115,8 @@ namespace CoRpc {
         
         static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
-        bool start();
-        
     private:
         std::map<uint32_t, ServiceData> _services;
-        
-        Acceptor *_acceptor;
-        Worker *_worker;
-        
-        PipelineFactory *_pipelineFactory;
     };
     
 }

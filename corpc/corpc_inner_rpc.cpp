@@ -75,7 +75,6 @@ namespace CoRpc {
         InnerRpcResponseQueue& queue = client->_queue;
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);
@@ -179,7 +178,6 @@ namespace CoRpc {
         InnerRpcRequestQueue& queue = server->_queue;
         
         // 初始化pipe readfd
-        co_enable_hook_sys();
         int readFd = queue.getReadFd();
         co_register_fd(readFd);
         co_set_timeout(readFd, -1, 1000);

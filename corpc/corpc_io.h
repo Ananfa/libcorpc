@@ -222,6 +222,8 @@ namespace CoRpc {
         void setRecvThreadIndex(int threadIndex) { _recvThreadIndex = threadIndex; }
         
         void send(std::shared_ptr<void> data);
+        
+        void close();
     protected:
         IO *_io;
         int _fd; // connect fd
@@ -243,43 +245,70 @@ namespace CoRpc {
         friend class Sender;
     };
     
+    class Acceptor;
+    
     // 服务器基类
     class Server {
     public:
-        Server(IO *io): _io(io) {}
+        Server(IO *io): _io(io), _acceptor(nullptr), _worker(nullptr), _pipelineFactory(nullptr) {}
         virtual ~Server() = 0;
         
         void buildAndAddConnection(int fd);
         
     protected:
-        virtual PipelineFactory * getPipelineFactory() = 0;
+        virtual bool start();
+        
         virtual Connection * buildConnection(int fd) = 0;
         virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
         virtual void onClose(std::shared_ptr<Connection>& connection) = 0;
     protected:
         IO *_io;
+        
+        Acceptor *_acceptor;
+        Worker *_worker;
+        
+        PipelineFactory *_pipelineFactory;
     };
     
     class Acceptor {
     public:
         Acceptor(Server *server, const std::string& ip, uint16_t port): _server(server), _ip(ip), _port(port), _listen_fd(-1) {}
-        ~Acceptor();
+        virtual ~Acceptor() = 0;
         
-        bool start();
-        
-    protected:
-        bool init();
-        
-        static void *acceptRoutine( void * arg );
+        virtual bool start() = 0;
         
     protected:
         Server *_server;
         
-    private:
         std::string _ip;
         uint16_t _port;
         
         int _listen_fd;
+    };
+    
+    class TcpAcceptor: public Acceptor {
+    public:
+        TcpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port) {}
+        virtual ~TcpAcceptor() {}
+        
+        virtual bool start();
+        
+    private:
+        bool init();
+        
+        static void *acceptRoutine( void * arg );
+        
+    };
+    
+    class UdpAcceptor: public Acceptor {
+    public:
+        UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port) {}
+        virtual ~UdpAcceptor() {}
+        
+        virtual bool start();
+        
+    private:
+        // TODO:
     };
     
     struct SenderTask {

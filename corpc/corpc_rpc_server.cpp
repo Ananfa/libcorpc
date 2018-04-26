@@ -132,7 +132,7 @@ namespace CoRpc {
     }
     
     RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io) {
-        _acceptor = new Acceptor(this, ip, port);
+        _acceptor = new TcpAcceptor(this, ip, port);
 
         // 根据需要创建多线程worker或协程worker
         if (workThreadNum > 0) {
@@ -274,10 +274,6 @@ namespace CoRpc {
         return &(it->second.methods[methodId]);
     }
     
-    CoRpc::PipelineFactory *RpcServer::getPipelineFactory() {
-        return _pipelineFactory;
-    }
-    
     CoRpc::Connection *RpcServer::buildConnection(int fd) {
         return new Connection(fd, this);
     }
@@ -286,17 +282,4 @@ namespace CoRpc {
         printf("INFO: RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
     }
     
-    bool RpcServer::start() {
-        // 启动acceptor
-        if (!_acceptor->start()) {
-            printf("ERROR: RpcServer::start() -- start acceptor failed.\n");
-            return false;
-        }
-        
-        // 启动worker
-        _worker->start();
-        
-        return true;
-    }
-
 }

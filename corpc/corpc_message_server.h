@@ -88,19 +88,13 @@ namespace CoRpc {
         static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
     protected:
-        virtual bool start();
-        
         virtual CoRpc::Connection * buildConnection(int fd);
-        
-        virtual CoRpc::PipelineFactory * getPipelineFactory() = 0;
         
         virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) = 0;
         
         virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection) = 0;
         
     protected:
-        Worker *_worker;
-        
         std::map<int, RegisterMessageInfo> _registerMessageMap;
     };
     
@@ -110,27 +104,15 @@ namespace CoRpc {
         virtual ~TcpMessageServer() = 0;
         
     protected:
-        virtual bool start();
-        
-        virtual CoRpc::PipelineFactory * getPipelineFactory() {
-            return _pipelineFactory;
-        }
-        
         virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) = 0;
         
         virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection) = 0;
         
-    private:
-        Acceptor *_acceptor;
-        
-        TcpPipelineFactory *_pipelineFactory;
     };
     
     // TODO: UDP服务器实现
     class UdpMessageServer: public MessageServer {
         
-    private:
-        UdpPipelineFactory *_pipelineFactory;
     };
 }
 
