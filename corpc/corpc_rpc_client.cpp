@@ -105,7 +105,7 @@ namespace CoRpc {
         return true;
     }
     
-    RpcClient::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io), _channel(channel), _st(CLOSED) {
+    RpcClient::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
     }
     
     void RpcClient::Connection::onClose() {
@@ -198,10 +198,7 @@ namespace CoRpc {
     }
     
     RpcClient::RpcClient(IO *io): _io(io) {
-        std::vector<EncodeFunction> encodeFuns;
-        encodeFuns.push_back(encode);
-        
-        _pipelineFactory = new TcpPipelineFactory(this, decode, std::move(encodeFuns), CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(this, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
     }
     
     RpcClient* RpcClient::create(IO *io) {

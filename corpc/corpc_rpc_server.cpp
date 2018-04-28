@@ -37,7 +37,7 @@
 
 namespace CoRpc {
     
-    RpcServer::Connection::Connection(int fd, RpcServer* server): CoRpc::Connection(fd, server->_io), _server(server) {
+    RpcServer::Connection::Connection(int fd, RpcServer* server): CoRpc::Connection(fd, server->_io, false), _server(server) {
     }
     
     RpcServer::Connection::~Connection() {
@@ -141,10 +141,7 @@ namespace CoRpc {
             _worker = new CoroutineWorker(this);
         }
         
-        std::vector<EncodeFunction> encodeFuns;
-        encodeFuns.push_back(encode);
-        
-        _pipelineFactory = new TcpPipelineFactory(_worker, decode, std::move(encodeFuns), CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
     }
     
     RpcServer::~RpcServer() {}

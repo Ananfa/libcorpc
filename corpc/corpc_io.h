@@ -29,6 +29,7 @@ namespace CoRpc {
     class Sender;
     class Connection;
     class Pipeline;
+    class Heartbeater;
     
     // 接收数据和发送数据的pipeline流水线处理，流水线中的处理单元是有状态的，难点：1.流水线中的处理单元的处理数据类型 2.会增加内存分配和数据拷贝影响效率
     // 上流流水线处理流程：
@@ -120,7 +121,7 @@ namespace CoRpc {
         enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
         
     public:
-        Pipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize);
+        Pipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
         virtual ~Pipeline() = 0;
         
         virtual bool upflow(uint8_t *buf, int size) = 0;
@@ -139,14 +140,14 @@ namespace CoRpc {
         
         DecodeFunction _decodeFun;
         Worker *_worker;
-        std::vector<EncodeFunction> _encodeFuns;
+        EncodeFunction _encodeFun;
         
         std::weak_ptr<Connection> _connection;
     };
     
     class TcpPipeline: public Pipeline {
     public:
-        TcpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
+        TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~TcpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -161,7 +162,7 @@ namespace CoRpc {
     
     class UdpPipeline: public Pipeline {
     public:
-        UdpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize);
+        UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
         virtual ~UdpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size);
@@ -169,7 +170,7 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize): _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)), _headSize(headSize), _maxBodySize(maxBodySize) {}
+        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
@@ -177,7 +178,7 @@ namespace CoRpc {
     protected:
         Worker *_worker;
         DecodeFunction _decodeFun;
-        std::vector<EncodeFunction> _encodeFuns;
+        EncodeFunction _encodeFun;
         
         uint _headSize;
         uint _maxBodySize;
@@ -185,7 +186,7 @@ namespace CoRpc {
     
     class TcpPipelineFactory: public PipelineFactory {
     public:
-        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, Pipeline::SIZE_TYPE bodySizeType): PipelineFactory(worker, decodeFun, std::move(encodeFuns), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
+        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, Pipeline::SIZE_TYPE bodySizeType): PipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
         ~TcpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
@@ -197,7 +198,7 @@ namespace CoRpc {
     
     class UdpPipelineFactory: public PipelineFactory {
     public:
-        UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, std::vector<EncodeFunction>&& encodeFuns, uint headSize, uint maxBodySize): PipelineFactory(worker, decodeFun, std::move(encodeFuns), headSize, maxBodySize) {}
+        UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize) {}
         ~UdpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
@@ -205,7 +206,7 @@ namespace CoRpc {
     
     class Connection: public std::enable_shared_from_this<Connection> {
     public:
-        Connection(int fd, IO* io);
+        Connection(int fd, IO* io, bool needHB);
         virtual ~Connection() = 0;
         
         virtual void onClose() = 0;
@@ -221,6 +222,13 @@ namespace CoRpc {
         int getRecvThreadIndex() { return _recvThreadIndex; }
         void setRecvThreadIndex(int threadIndex) { _recvThreadIndex = threadIndex; }
         
+        bool needHB() { return _needHB; }
+        uint64_t getLastRecvHBTime() { return _lastRecvHBTime; }
+        void setLastRecvHBTime(uint64_t time) { _lastRecvHBTime = time; }
+        
+        bool isDecodeError() { return _decodeError; }
+        void setDecodeError() { _decodeError = true; }
+        
         void send(std::shared_ptr<void> data);
         
         void close();
@@ -233,9 +241,14 @@ namespace CoRpc {
         int _sendThreadIndex; // 分配到sender的线程下标
         int _recvThreadIndex; // 分配到receiver的线程下标
         
+        bool _needHB; // 是否进行心跳
+        std::atomic<uint64_t> _lastRecvHBTime; // 最后一次收到数据的时间（只在UDP连接中使用）
+        
         std::shared_ptr<Pipeline> _pipeline;
         std::list<std::shared_ptr<void>> _datas; // 等待发送的数据
         
+        bool _decodeError; // 是否数据解码出错
+        std::atomic<bool> _closed; // 是否已关闭
         std::atomic<bool> _isClosing; // 是否正在关闭
         std::atomic<bool> _canClose; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
         
@@ -243,6 +256,7 @@ namespace CoRpc {
         friend class Pipeline;
         friend class Receiver;
         friend class Sender;
+        friend class Heartbeater;
     };
     
     class Acceptor;
@@ -253,7 +267,7 @@ namespace CoRpc {
         Server(IO *io): _io(io), _acceptor(nullptr), _worker(nullptr), _pipelineFactory(nullptr) {}
         virtual ~Server() = 0;
         
-        void buildAndAddConnection(int fd);
+        std::shared_ptr<Connection> buildAndAddConnection(int fd);
         
     protected:
         virtual bool start();
@@ -272,7 +286,7 @@ namespace CoRpc {
     
     class Acceptor {
     public:
-        Acceptor(Server *server, const std::string& ip, uint16_t port): _server(server), _ip(ip), _port(port), _listen_fd(-1) {}
+        Acceptor(Server *server, const std::string& ip, uint16_t port);
         virtual ~Acceptor() = 0;
         
         virtual bool start() = 0;
@@ -282,6 +296,8 @@ namespace CoRpc {
         
         std::string _ip;
         uint16_t _port;
+        
+        sockaddr_in _local_addr;
         
         int _listen_fd;
     };
@@ -294,21 +310,30 @@ namespace CoRpc {
         virtual bool start();
         
     private:
-        bool init();
-        
         static void *acceptRoutine( void * arg );
         
     };
     
     class UdpAcceptor: public Acceptor {
     public:
-        UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port) {}
+        UdpAcceptor(Server *server, const std::string& ip, uint16_t port);
         virtual ~UdpAcceptor() {}
         
         virtual bool start();
         
     private:
-        // TODO:
+        // 启动新线程来负责连接握手
+        static void threadEntry( UdpAcceptor *self );
+        
+        static void *acceptRoutine( void * arg ); // 负责监听新连接
+        static void *handshakeRoutine( void * arg ); // 负责新连接握手
+        
+    private:
+        int _shake_fd;
+        std::thread _t;
+        
+        std::string _shakemsg2;
+        uint8_t *_shakemsg2buf;
     };
     
     struct SenderTask {
@@ -324,10 +349,12 @@ namespace CoRpc {
     
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    typedef Co_MPSC_NoLockQueue<SenderTask*> SenderTaskQueue; // 用于向sender发送任务
+    typedef Co_MPSC_NoLockQueue<SenderTask*> SenderTaskQueue; // 用于向Sender发送任务
+    typedef Co_MPSC_NoLockQueue<std::shared_ptr<Connection>> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接
 #else
     typedef CoSyncQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
-    typedef CoSyncQueue<SenderTask*> SenderTaskQueue; // 用于向sender发送任务
+    typedef CoSyncQueue<SenderTask*> SenderTaskQueue; // 用于向Sender发送任务
+    typedef CoSyncQueue<std::shared_ptr<Connection>> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接
 #endif
     
     // Receiver负责rpc连接的数据接受
@@ -462,6 +489,46 @@ namespace CoRpc {
         virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
     private:
         QueueContext _queueContext;
+    };
+    
+    // singleton
+    class Heartbeater {
+        struct HeartbeatItem {
+            std::shared_ptr<Connection> connection;
+            uint64_t nexttime;
+        };
+        
+    public:
+        static Heartbeater& Instance() {
+            static Heartbeater heartbeater;
+            
+            return heartbeater;
+        }
+        
+        void addConnection(std::shared_ptr<Connection>& connection);
+        
+    private:
+        Heartbeater();
+        Heartbeater(Heartbeater const&);
+        Heartbeater& operator=(Heartbeater const&);
+        ~Heartbeater() {}
+        
+        static void threadEntry( Heartbeater *self );
+        
+        static void *dispatchRoutine( void * arg ); // 负责接收新连接
+        static void *heartbeatRoutine( void * arg ); // 负责对握过手的连接进行心跳
+        
+    private:
+        std::shared_ptr<SendMessageInfo> _heartbeatmsg;
+        
+        HeartbeatQueue _queue;
+        std::thread _t;
+        
+        std::list<HeartbeatItem> _heartbeatList;
+        
+        bool _heartbeatRoutineHang; // deamon协程是否挂起
+        stCoRoutine_t* _heartbeatRoutine; // deamon协程
+        
     };
     
     class IO {

@@ -17,37 +17,24 @@
 
 class TestTcpServer : public CoRpc::TcpMessageServer {
 public:
-    static TestTcpServer* create( CoRpc::IO *io, const std::string& ip, uint16_t port);
+    static TestTcpServer* create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     
     static void fooHandle(std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn);
     
 private:
-    TestTcpServer( CoRpc::IO *io, const std::string& ip, uint16_t port);
+    TestTcpServer( CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     virtual ~TestTcpServer() {}
-    
-protected:
-    virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection);
-    
-    virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection);
 };
 
-TestTcpServer::TestTcpServer( CoRpc::IO *io, const std::string& ip, uint16_t port): CoRpc::TcpMessageServer(io, ip, port) {
+TestTcpServer::TestTcpServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): CoRpc::TcpMessageServer(io, needHB, ip, port) {
 }
 
-TestTcpServer* TestTcpServer::create( CoRpc::IO *io, const std::string& ip, uint16_t port) {
+TestTcpServer* TestTcpServer::create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port) {
     assert(io);
-    TestTcpServer *server = new TestTcpServer(io, ip, port);
+    TestTcpServer *server = new TestTcpServer(io, needHB, ip, port);
     
     server->start();
     return server;
-}
-
-void TestTcpServer::onConnect(std::shared_ptr<CoRpc::Connection>& connection) {
-    printf("TestTcpServer::onConnect -- connection %d.\n", connection->getfd());
-}
-
-void TestTcpServer::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
-    printf("ERROR: TestTcpServer::onClose -- connection %d closed.\n", connection->getfd());
 }
 
 void TestTcpServer::fooHandle(std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn) {
@@ -61,7 +48,7 @@ void TestTcpServer::fooHandle(std::shared_ptr<google::protobuf::Message> msg, st
         str += (" " + tmp);
     response->set_text(str);
     
-    std::shared_ptr<SendMessageInfo> sendInfo(new SendMessageInfo);
+    std::shared_ptr<CoRpc::SendMessageInfo> sendInfo(new CoRpc::SendMessageInfo);
     sendInfo->type = 1;
     sendInfo->isRaw = false;
     sendInfo->msg = response;
@@ -88,7 +75,7 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     CoRpc::IO *io = CoRpc::IO::create(1, 1);
     
-    TestTcpServer *server = TestTcpServer::create(io, ip, port);
+    TestTcpServer *server = TestTcpServer::create(io, false, ip, port);
     
     server->registerMessage(1, new FooRequest, false, TestTcpServer::fooHandle);
     

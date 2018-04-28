@@ -24,30 +24,8 @@
 
 namespace CoRpc {
     
-    typedef std::function<void(std::shared_ptr<google::protobuf::Message>, std::shared_ptr<CoRpc::Connection>)> MessageHandle;
-    
     class MessageServer: public CoRpc::Server {
-    public:
-        struct SendMessageInfo {
-            int32_t type;
-            bool isRaw;
-            std::shared_ptr<void> msg;  // 当isRaw为true时，msg中存的是std::string指针，当isRaw为false时，msg中存的是google::protobuf::Message指针。这是为了广播或转发消息给玩家时不需要对数据进行protobuf编解码
-        };
-
     private:
-        struct RegisterMessageInfo {
-            int32_t type;
-            google::protobuf::Message *proto;
-            bool needCoroutine;
-            MessageHandle handle;
-        };
-        
-        struct WorkerTask {
-            int32_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
-            std::shared_ptr<CoRpc::Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
-            std::shared_ptr<google::protobuf::Message> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据
-        };
-        
         class Connection: public CoRpc::Connection {
         public:
             Connection(int fd, MessageServer* server);
@@ -59,6 +37,22 @@ namespace CoRpc {
         private:
             MessageServer *_server;
         };
+        
+        typedef std::function<void(std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
+        
+        struct RegisterMessageInfo {
+            int32_t type;
+            google::protobuf::Message *proto;
+            bool needCoroutine;
+            MessageHandle handle;
+        };
+        
+        struct WorkerTask {
+            int32_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
+            std::shared_ptr<Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
+            std::shared_ptr<google::protobuf::Message> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据
+        };
+        
         
         class Worker: public CoRpc::CoroutineWorker {
         public:
@@ -75,7 +69,7 @@ namespace CoRpc {
         };
         
     public:
-        MessageServer(IO *io);
+        MessageServer(IO *io, bool needHB);
         virtual ~MessageServer() = 0;
         
         bool registerMessage(int type,
@@ -90,29 +84,26 @@ namespace CoRpc {
     protected:
         virtual CoRpc::Connection * buildConnection(int fd);
         
-        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) = 0;
+        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection);
         
-        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection) = 0;
+        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection);
         
     protected:
+        bool _needHB; // 是否进行心跳
+        
         std::map<int, RegisterMessageInfo> _registerMessageMap;
     };
     
     class TcpMessageServer: public MessageServer {
     public:
-        TcpMessageServer( CoRpc::IO *io, const std::string& ip, uint16_t port);
+        TcpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
         virtual ~TcpMessageServer() = 0;
-        
-    protected:
-        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) = 0;
-        
-        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection) = 0;
-        
     };
     
-    // TODO: UDP服务器实现
     class UdpMessageServer: public MessageServer {
-        
+    public:
+        UdpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
+        virtual ~UdpMessageServer() = 0;
     };
 }
 

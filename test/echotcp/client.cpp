@@ -11,6 +11,7 @@
 
 #include <signal.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 
 #include <google/protobuf/message.h>
 #include "foo.pb.h"
@@ -107,7 +108,7 @@ private:
     };
     
 public:
-    static TestTcpClient* create( CoRpc::IO *io, const std::string& ip, uint16_t port);
+    static TestTcpClient* create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     
     bool registerMessage(int type,
                          google::protobuf::Message *proto,
@@ -117,7 +118,7 @@ public:
     static void fooHandle(std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn);
     
 private:
-    TestTcpClient( CoRpc::IO *io, const std::string& ip, uint16_t port);
+    TestTcpClient(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     virtual ~TestTcpClient() {}
     
     static void *connectRoutine( void * arg ); // 建立与服务器的连接
@@ -145,6 +146,8 @@ private:
     std::string _ip;
     uint16_t _port;
     
+    bool _needHB;
+    
     Worker *_worker;
     
     CoRpc::TcpPipelineFactory *_pipelineFactory;
@@ -154,7 +157,7 @@ private:
     std::shared_ptr<CoRpc::Connection> _connection;
 };
 
-TestTcpClient::Connection::Connection(int fd, TestTcpClient* client): CoRpc::Connection(fd, client->_io), _client(client) {
+TestTcpClient::Connection::Connection(int fd, TestTcpClient* client): CoRpc::Connection(fd, client->_io, client->_needHB), _client(client) {
     
 }
 
@@ -215,17 +218,14 @@ void TestTcpClient::Worker::handleMessage(void *msg) {
     }
 }
 
-TestTcpClient::TestTcpClient( CoRpc::IO *io, const std::string& ip, uint16_t port): _io(io), _ip(ip), _port(port) {
+TestTcpClient::TestTcpClient(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): _io(io), _needHB(needHB), _ip(ip), _port(port) {
     _worker = new Worker(this);
     
-    std::vector<CoRpc::EncodeFunction> encodeFuns;
-    encodeFuns.push_back(encode);
-    
-    _pipelineFactory = new CoRpc::TcpPipelineFactory(_worker, decode, std::move(encodeFuns), CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+    _pipelineFactory = new CoRpc::TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
 }
 
-TestTcpClient* TestTcpClient::create( CoRpc::IO *io, const std::string& ip, uint16_t port) {
-    TestTcpClient *client = new TestTcpClient(io, ip, port);
+TestTcpClient* TestTcpClient::create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port) {
+    TestTcpClient *client = new TestTcpClient(io, needHB, ip, port);
     
     client->start();
     return client;
@@ -324,9 +324,27 @@ void* TestTcpClient::decode(std::shared_ptr<CoRpc::Connection> &connection, uint
     int32_t msgType = *(int32_t *)(head + 4);
     msgType = ntohl(msgType);
     
+    // 处理系统类型消息，如：心跳
+    // 注意：如果是UDP握手消息怎么办？
+    if (msgType < 0) {
+        if (msgType == CORPC_MSG_TYPE_UDP_HEARTBEAT) {
+            struct timeval now = { 0 };
+            gettimeofday( &now,NULL );
+            uint64_t nowms = now.tv_sec;
+            nowms *= 1000;
+            nowms += now.tv_usec / 1000;
+            
+            connection->setLastRecvHBTime(nowms);
+        } else {
+            printf("Warning: MessageServer::decode -- recv system message: %d\n", msgType);
+        }
+        
+        return nullptr;
+    }
+    
     auto iter = client->_registerMessageMap.find(msgType);
     if (iter == client->_registerMessageMap.end()) {
-        printf("ERROR: TestTcpClient::decode -- unknown msg type\n");
+        printf("ERROR: TestTcpClient::decode -- unknown msg type %d for connection %d\n", msgType, connection->getfd());
         
         return nullptr;
     }
@@ -353,13 +371,15 @@ bool TestTcpClient::encode(std::shared_ptr<CoRpc::Connection> &connection, std::
     if (msgInfo->isRaw) {
         std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(msgInfo->msg);
         
-        msgSize = msg->size();
+        msgSize = msg?msg->size():0;
         if (msgSize + CORPC_MESSAGE_HEAD_SIZE >= space) {
             return true;
         }
         
-        uint8_t * msgBuf = (uint8_t *)msg->data();
-        memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+        if (msgSize) {
+            uint8_t * msgBuf = (uint8_t *)msg->data();
+            memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+        }
     } else {
         std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(msgInfo->msg);
         
@@ -386,6 +406,11 @@ void TestTcpClient::setConnection(std::shared_ptr<CoRpc::Connection>& connection
     _connection = connection;
     
     _io->addConnection(connection);
+    
+    // 判断是否需要心跳
+    if (connection->needHB()) {
+        CoRpc::Heartbeater::Instance().addConnection(connection);
+    }
 }
 
 bool TestTcpClient::start() {
@@ -427,8 +452,8 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     CoRpc::IO *io = CoRpc::IO::create(1, 1);
     
-    for (int i=0; i<50; i++) {
-        TestTcpClient *client = TestTcpClient::create(io, ip, port);
+    for (int i=0; i<10; i++) {
+        TestTcpClient *client = TestTcpClient::create(io, false, ip, port);
     
         client->registerMessage(1, new FooResponse, false, TestTcpClient::fooHandle);
     }

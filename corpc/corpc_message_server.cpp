@@ -9,9 +9,11 @@
 #include "corpc_routine_env.h"
 #include "corpc_message_server.h"
 
+#include <sys/time.h>
+
 namespace CoRpc {
     
-    MessageServer::Connection::Connection(int fd, MessageServer* server): CoRpc::Connection(fd, server->_io), _server(server) {
+    MessageServer::Connection::Connection(int fd, MessageServer* server): CoRpc::Connection(fd, server->_io, server->_needHB), _server(server) {
     }
     
     MessageServer::Connection::~Connection() {
@@ -26,9 +28,7 @@ namespace CoRpc {
     void * MessageServer::Worker::taskCallRoutine( void * arg ) {
         WorkerTask *task = (WorkerTask *)arg;
         
-        std::shared_ptr<MessageServer::Connection> conn = std::static_pointer_cast<MessageServer::Connection>(task->connection);
-        
-        MessageServer *server = static_cast<MessageServer *>(conn->getServer());
+        MessageServer *server = static_cast<MessageServer *>(task->connection->getServer());
         
         auto iter = server->_registerMessageMap.find(task->type);
         
@@ -45,9 +45,11 @@ namespace CoRpc {
         
         switch (task->type) {
             case -1: // 新连接建立
+                printf("INFO: MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
                 // TODO:
                 break;
             case -2: // 连接断开
+                printf("INFO: MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
                 // TODO:
                 break;
             default: {
@@ -55,7 +57,7 @@ namespace CoRpc {
                 // 其他消息处理
                 auto iter = _server->_registerMessageMap.find(task->type);
                 if (iter == _server->_registerMessageMap.end()) {
-                    printf("ERROR: TestTcpServer::Worker::handleMessage -- unknown msg type\n");
+                    printf("ERROR: MessageServer::Worker::handleMessage -- unknown msg type\n");
                     
                     return;
                 }
@@ -73,7 +75,7 @@ namespace CoRpc {
         }
     }
     
-    MessageServer::MessageServer( IO *io): CoRpc::Server(io) {
+    MessageServer::MessageServer(IO *io, bool needHB): CoRpc::Server(io), _needHB(needHB) {
         _worker = new Worker(this);
     }
 
@@ -98,6 +100,22 @@ namespace CoRpc {
         return new Connection(fd, this);
     }
     
+    void MessageServer::onConnect(std::shared_ptr<CoRpc::Connection>& connection) {
+        WorkerTask *task = new WorkerTask;
+        task->type = CORPC_MSG_TYPE_CONNECT;
+        task->connection = std::static_pointer_cast<Connection>(connection);
+        
+        _worker->addMessage(task);
+    }
+    
+    void MessageServer::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
+        WorkerTask *task = new WorkerTask;
+        task->type = CORPC_MSG_TYPE_CLOSE;
+        task->connection = std::static_pointer_cast<Connection>(connection);
+        
+        _worker->addMessage(task);
+    }
+    
     void* MessageServer::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
@@ -108,24 +126,42 @@ namespace CoRpc {
         int32_t msgType = *(int32_t *)(head + 4);
         msgType = ntohl(msgType);
         
+        // 处理系统类型消息，如：心跳
+        // 注意：如果是UDP握手消息怎么办？
+        if (msgType < 0) {
+            if (msgType == CORPC_MSG_TYPE_UDP_HEARTBEAT) {
+                struct timeval now = { 0 };
+                gettimeofday( &now,NULL );
+                uint64_t nowms = now.tv_sec;
+                nowms *= 1000;
+                nowms += now.tv_usec / 1000;
+                
+                connection->setLastRecvHBTime(nowms);
+            } else {
+                printf("Warning: MessageServer::decode -- recv system message: %d\n", msgType);
+            }
+            
+            return nullptr;
+        }
+        
         auto iter = server->_registerMessageMap.find(msgType);
         if (iter == server->_registerMessageMap.end()) {
-            printf("ERROR: TestTcpServer::decode -- unknown msg type\n");
-            
+            printf("ERROR: MessageServer::decode -- unknown message: %d\n", msgType);
+            connection->setDecodeError();
             return nullptr;
         }
         
         google::protobuf::Message *msg = iter->second.proto->New();
         if (!msg->ParseFromArray(body, size)) {
             // 出错处理
-            printf("ERROR: TestTcpServer::decode -- parse msg body fail\n");
-            
+            printf("ERROR: MessageServer::decode -- parse body fail for message: %d\n", msgType);
+            connection->setDecodeError();
             return nullptr;
         }
         
         WorkerTask *task = new WorkerTask;
         task->type = msgType;
-        task->connection = connection;
+        task->connection = conn;
         task->msg = std::shared_ptr<google::protobuf::Message>(msg);
         
         return task;
@@ -137,13 +173,15 @@ namespace CoRpc {
         if (msgInfo->isRaw) {
             std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(msgInfo->msg);
             
-            msgSize = msg->size();
+            msgSize = msg?msg->size():0;
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE >= space) {
                 return true;
             }
             
-            uint8_t * msgBuf = (uint8_t *)msg->data();
-            memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+            if (msgSize) {
+                uint8_t * msgBuf = (uint8_t *)msg->data();
+                memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+            }
         } else {
             std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(msgInfo->msg);
             
@@ -166,15 +204,20 @@ namespace CoRpc {
         return true;
     }
     
-    TcpMessageServer::TcpMessageServer( CoRpc::IO *io, const std::string& ip, uint16_t port): MessageServer(io) {
+    TcpMessageServer::TcpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
         _acceptor = new TcpAcceptor(this, ip, port);
         
-        std::vector<CoRpc::EncodeFunction> encodeFuns;
-        encodeFuns.push_back(encode);
-        
-        _pipelineFactory = new TcpPipelineFactory(_worker, decode, std::move(encodeFuns), CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
     }
     
     TcpMessageServer::~TcpMessageServer() {}
+
+    UdpMessageServer::UdpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
+        _acceptor = new UdpAcceptor(this, ip, port);
+        
+        _pipelineFactory = new UdpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE);
+    }
+    
+    UdpMessageServer::~UdpMessageServer() {}
 
 }

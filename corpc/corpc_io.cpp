@@ -124,7 +124,7 @@ namespace CoRpc {
     
     //Encoder::~Encoder() {}
     
-    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize): _connection(connection), _decodeFun(decodeFun), _worker(worker), _encodeFuns(std::move(encodeFuns)), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _connection(connection), _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
@@ -137,24 +137,17 @@ namespace CoRpc {
         
         size = 0;
         while (connection->_datas.size() > 0) {
-            bool encoded = false;
-            for (std::vector<EncodeFunction>::iterator it = _encodeFuns.begin(); it != _encodeFuns.end(); it++) {
-                int tmp = 0;
-                if ((*it)(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
-                    if (!tmp) { // 数据放不进buf中（等下次放入）
-                        return true;
-                    }
-                    
-                    size += tmp;
-                    encoded = true;
-                    break;
-                }
-            }
-            
-            if (!encoded) {
-                // 找不到可处理的编码器
+            int tmp = 0;
+            if (!_encodeFun(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
+                // 编码失败
                 return false;
             }
+            
+            if (!tmp) { // buf已满，数据放不进buf中（等buf发送出去之后，再放入）
+                return true;
+            }
+            
+            size += tmp;
             
             connection->_datas.pop_front();
         }
@@ -162,7 +155,7 @@ namespace CoRpc {
         return true;
     }
     
-    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, decodeFun, worker, std::move(encodeFuns), headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
     }
     
     bool TcpPipeline::upflow(uint8_t *buf, int size) {
@@ -224,11 +217,13 @@ namespace CoRpc {
             
             void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
             
-            if (!msg) {
+            if (connection->isDecodeError()) {
                 return false;
             }
             
-            _worker->addMessage(msg);
+            if (msg) {
+                _worker->addMessage(msg);
+            }
             
             // 处理完一个请求消息，复位状态
             _headNum = 0;
@@ -239,7 +234,7 @@ namespace CoRpc {
         return true;
     }
     
-    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, DecodeFunction decodeFun, Worker *worker, std::vector<EncodeFunction> encodeFuns, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, decodeFun, worker, std::move(encodeFuns), headSize, maxBodySize) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize) {
         
     }
     
@@ -257,15 +252,19 @@ namespace CoRpc {
         
         _bodySize = size - _headSize;
         
-        memcpy(_bodyBuf, buf + _headSize, _bodySize);
+        if (_bodySize) {
+            memcpy(_bodyBuf, buf + _headSize, _bodySize);
+        }
         
         void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
         
-        if (!msg) {
+        if (connection->isDecodeError()) {
             return false;
         }
         
-        _worker->addMessage(msg);
+        if (msg) {
+            _worker->addMessage(msg);
+        }
         
         return true;
     }
@@ -273,14 +272,14 @@ namespace CoRpc {
     PipelineFactory::~PipelineFactory() {}
     
     std::shared_ptr<CoRpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::TcpPipeline(connection, _decodeFun, _worker, _encodeFuns, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
+        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::TcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
     }
     
     std::shared_ptr<CoRpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::UdpPipeline(connection, _decodeFun, _worker, _encodeFuns, _headSize, _maxBodySize) );
+        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::UdpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize) );
     }
     
-    Connection::Connection(int fd, IO* io): _fd(fd), _io(io), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _isClosing(false), _canClose(false) {
+    Connection::Connection(int fd, IO* io, bool needHB): _fd(fd), _io(io), _needHB(needHB), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _decodeError(false), _closed(false), _isClosing(false), _canClose(false), _lastRecvHBTime(0) {
     }
     
     Connection::~Connection() {
@@ -299,7 +298,7 @@ namespace CoRpc {
     
     Server::~Server() {}
     
-    void Server::buildAndAddConnection(int fd) {
+    std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
         std::shared_ptr<CoRpc::Connection> connection(buildConnection(fd));
         std::shared_ptr<CoRpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);
@@ -307,8 +306,15 @@ namespace CoRpc {
         // 将接受的连接分别发给Receiver和Sender
         _io->addConnection(connection);
         
+        // 判断是否需要心跳
+        if (connection->needHB()) {
+            Heartbeater::Instance().addConnection(connection);
+        }
+        
         // 通知连接建立
         onConnect(connection);
+        
+        return connection;
     }
     
     bool Server::start() {
@@ -333,65 +339,28 @@ namespace CoRpc {
         return true;
     }
     
+    Acceptor::Acceptor(Server *server, const std::string& ip, uint16_t port): _server(server), _ip(ip), _port(port), _listen_fd(-1) {
+        socklen_t addrlen = sizeof(_local_addr);
+        bzero(&_local_addr, addrlen);
+        _local_addr.sin_family = AF_INET;
+        _local_addr.sin_port = htons(_port);
+        int nIP = 0;
+        
+        if (_ip.empty() ||
+            _ip.compare("0") == 0 ||
+            _ip.compare("0.0.0.0") == 0 ||
+            _ip.compare("*") == 0) {
+            nIP = htonl(INADDR_ANY);
+        }
+        else
+        {
+            nIP = inet_addr(_ip.c_str());
+        }
+        _local_addr.sin_addr.s_addr = nIP;
+    }
     
     Acceptor::~Acceptor() {
         
-    }
-    
-    bool TcpAcceptor::init() {
-        _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
-        if( _listen_fd >= 0 )
-        {
-            if(_port != 0)
-            {
-                int nReuseAddr = 1;
-                setsockopt(_listen_fd,SOL_SOCKET,SO_REUSEADDR,&nReuseAddr,sizeof(nReuseAddr));
-                
-                struct sockaddr_in addr ;
-                bzero(&addr,sizeof(addr));
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(_port);
-                int nIP = 0;
-                
-                if (_ip.empty() ||
-                    _ip.compare("0") == 0 ||
-                    _ip.compare("0.0.0.0") == 0 ||
-                    _ip.compare("*") == 0) {
-                    nIP = htonl(INADDR_ANY);
-                }
-                else
-                {
-                    nIP = inet_addr(_ip.c_str());
-                }
-                addr.sin_addr.s_addr = nIP;
-                
-                int ret = bind(_listen_fd,(struct sockaddr*)&addr,sizeof(addr));
-                if( ret != 0)
-                {
-                    close(_listen_fd);
-                    _listen_fd = -1;
-                }
-            } else {
-                close(_listen_fd);
-                _listen_fd = -1;
-            }
-        }
-        
-        if(_listen_fd==-1){
-            printf("ERROR: Acceptor::init() -- Port %d is in use\n", _port);
-            return false;
-        }
-        
-        printf("INFO: Acceptor::init() -- listen %d %s:%d\n", _listen_fd, _ip.c_str(), _port);
-        listen( _listen_fd, 1024 );
-        
-        int iFlags;
-        iFlags = fcntl(_listen_fd, F_GETFL, 0);
-        iFlags |= O_NONBLOCK;
-        iFlags |= O_NDELAY;
-        fcntl(_listen_fd, F_SETFL, iFlags);
-        
-        return true;
     }
     
     void *TcpAcceptor::acceptRoutine( void * arg ) {
@@ -399,8 +368,16 @@ namespace CoRpc {
         Server *server = self->_server;
         int listen_fd = self->_listen_fd;
         
+        printf("INFO: start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+        listen( listen_fd, 1024 );
+        
+        // 注意：由于accept方法没有进行hook，只好将它设置为NONBLOCK并且自己对它进行poll
+        int iFlags = fcntl(listen_fd, F_GETFL, 0);
+        iFlags |= O_NONBLOCK;
+        iFlags |= O_NDELAY;
+        fcntl(listen_fd, F_SETFL, iFlags);
+        
         // 侦听连接，并把接受的连接传给连接处理对象
-        printf("INFO: start accept from listen fd %d\n", listen_fd);
         while (true) {
             struct sockaddr_in addr; //maybe sockaddr_un;
             memset( &addr,0,sizeof(addr) );
@@ -412,7 +389,7 @@ namespace CoRpc {
                 struct pollfd pf = { 0 };
                 pf.fd = listen_fd;
                 pf.events = (POLLIN|POLLERR|POLLHUP);
-                co_poll( co_get_epoll_ct(),&pf,1,1000 );
+                co_poll( co_get_epoll_ct(),&pf,1,10000 );
                 continue;
             }
             
@@ -430,11 +407,190 @@ namespace CoRpc {
     }
     
     bool TcpAcceptor::start() {
-        if (!init()) {
+        if (_port == 0) {
+            printf("ERROR: TcpAcceptor::start() -- port can't be 0\n");
             return false;
         }
         
+        _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+        if( _listen_fd >= 0 )
+        {
+            int nReuseAddr = 1;
+            setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
+            
+            if( bind(_listen_fd, (struct sockaddr*)&_local_addr, sizeof(_local_addr)) == -1 )
+            {
+                close(_listen_fd);
+                _listen_fd = -1;
+            }
+        }
+        
+        if(_listen_fd==-1){
+            printf("ERROR: TcpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+            return false;
+        }
+        
+        // 启动accept协程
         RoutineEnvironment::startCoroutine(acceptRoutine, this);
+        
+        return true;
+    }
+    
+    UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0) {
+        _shakemsg2buf = (uint8_t *)_shakemsg2.data();
+        *(uint32_t *)_shakemsg2buf = htonl(0);
+        *(uint32_t *)(_shakemsg2buf + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+    }
+    
+    void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
+        // 启动accept协程
+        RoutineEnvironment::startCoroutine(acceptRoutine, self);
+    }
+    
+    void *UdpAcceptor::acceptRoutine( void * arg ) {
+        UdpAcceptor *self = (UdpAcceptor *)arg;
+        Server *server = self->_server;
+        int listen_fd = self->_listen_fd;
+        char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
+        
+        // TODO: 设置listen_fd
+                
+        struct sockaddr_in client_addr;
+        socklen_t slen = sizeof(client_addr);
+        
+        printf("INFO: start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+        
+        while (true) {
+            bzero(&client_addr, slen);
+            
+            ssize_t ret = recvfrom(listen_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE, 0, (struct sockaddr *)&client_addr, &slen);
+            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                printf("ERROR: UdpAcceptor::acceptRoutine() -- wrong msg.\n");
+                continue;
+            }
+            
+            uint32_t bodySize = *(uint32_t *)buf;
+            bodySize = ntohl(bodySize);
+            int32_t msgType = *(int32_t *)(buf + 4);
+            msgType = ntohl(msgType);
+            
+            // 判断是否“连接请求”消息
+            if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
+                printf("ERROR: UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
+                continue;
+            }
+            
+            int new_fd = self->_shake_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+            
+            int nReuseAddr = 1;
+            setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
+            setsockopt(new_fd, SOL_SOCKET, SO_REUSEPORT, &nReuseAddr, sizeof(nReuseAddr));
+            
+            if (bind(new_fd , (struct sockaddr *)&self->_local_addr, sizeof(struct sockaddr)) == -1 ||
+                connect(new_fd , (struct sockaddr * )&client_addr, sizeof(struct sockaddr)) == -1) {
+                printf("ERROR: UdpAcceptor::acceptRoutine() -- bind and connect new fd\n");
+                close(new_fd);
+                continue;
+            }
+            
+            // 为new_fd启动握手协程
+            RoutineEnvironment::startCoroutine(handshakeRoutine, self);
+        }
+        
+        return NULL;
+    }
+    
+    void *UdpAcceptor::handshakeRoutine( void * arg ) {
+        UdpAcceptor *self = (UdpAcceptor *)arg;
+        Server *server = self->_server;
+        int shake_fd = self->_shake_fd; // 注意：这里必须立即记录shake_fd，UdpAcceptor::_shake_fd会被后续新连接修改
+        
+        std::string bufstring(CORPC_MAX_UDP_MESSAGE_SIZE, 0);
+        uint8_t *buf = (uint8_t *)bufstring.data();
+        
+        // TODO: 设置shake_fd
+        
+        int waittime = 1000;
+        bool shakeOK = false;
+        int trytimes = 4;
+        
+        while (trytimes > 0 && !shakeOK) {
+            co_set_timeout(shake_fd, waittime, 1000);
+            
+            // 发送“连接确认”给客户的
+            int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
+            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                printf("ERROR: UdpAcceptor::handshakeRoutine() -- write shake msg fail for fd %d ret %d errno %d (%s)\n",
+                       shake_fd, ret, errno, strerror(errno));
+                close(shake_fd);
+                break;
+            }
+            
+            // 接收“最终确认”
+            ret = (int)read(shake_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
+            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                // ret 0 mean disconnected
+                if (ret < 0 && errno == EAGAIN) {
+                    waittime <<= 1;
+                    trytimes--;
+                    
+                    continue;
+                }
+                
+                // 读取的数据长度不对
+                printf("ERROR: UdpAcceptor::handshakeRoutine() -- read shake msg fail for fd %d ret %d errno %d (%s)\n",
+                       shake_fd, ret, errno, strerror(errno));
+                close(shake_fd);
+                break;
+            } else {
+                // 判断是否“最终确认消息”
+                uint32_t msgtype = *(uint32_t *)(buf + 4);
+                msgtype = ntohl(msgtype);
+                
+                if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
+                    // 消息类型不对
+                    printf("ERROR: UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d\n", shake_fd);
+                    close(shake_fd);
+                    break;
+                }
+                
+                // 握手成功，创建connection对象
+                co_set_timeout(shake_fd, -1, 1000);
+                
+                std::shared_ptr<Connection> connection = server->buildAndAddConnection(shake_fd);
+            }
+        }
+        
+        return NULL;
+    }
+    
+    bool UdpAcceptor::start() {
+        if (_port == 0) {
+            printf("ERROR: UdpAcceptor::start() -- port can't be 0\n");
+            return false;
+        }
+        
+        _listen_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if( _listen_fd >= 0 )
+        {
+            int nReuseAddr = 1;
+            setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
+            setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEPORT, &nReuseAddr, sizeof(nReuseAddr));
+            
+            //bind socket to port
+            if( bind(_listen_fd , (struct sockaddr*)&_local_addr, sizeof(_local_addr) ) == -1 )
+            {
+                close(_listen_fd);
+                _listen_fd = -1;
+            }
+        }
+        
+        if(_listen_fd==-1){
+            printf("ERROR: UdpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+            return false;
+        }
+        
+        _t = std::thread(threadEntry, this);
         
         return true;
     }
@@ -526,6 +682,8 @@ namespace CoRpc {
         }
         
         close(fd);
+        
+        connection->_closed = true;
         
         connection->onClose();
         
@@ -795,6 +953,134 @@ namespace CoRpc {
         senderTask->data = data;
         
         _queueContext._queue.push(senderTask);
+    }
+    
+    Heartbeater::Heartbeater(): _heartbeatmsg(new SendMessageInfo) {
+        _heartbeatmsg->type = CORPC_MSG_TYPE_UDP_HEARTBEAT;
+        _heartbeatmsg->isRaw = true;
+        
+        _t = std::thread(threadEntry, this);
+    }
+    
+    void Heartbeater::threadEntry( Heartbeater *self ) {
+        RoutineEnvironment::startCoroutine(heartbeatRoutine, self);
+        RoutineEnvironment::startCoroutine(dispatchRoutine, self);
+        
+        RoutineEnvironment::runEventLoop();
+    }
+    
+    void *Heartbeater::dispatchRoutine( void * arg ) {
+        Heartbeater *self = (Heartbeater *)arg;
+        
+        HeartbeatQueue& queue = self->_queue;
+        
+        // 初始化pipe readfd
+        int readFd = queue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
+        
+        int ret;
+        std::vector<char> buf(1024);
+        while (true) {
+            // 等待处理信号
+            ret = (int)read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    // 管道出错
+                    printf("ERROR: Receiver::dispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    msleep(10);
+                }
+            }
+            
+            // 处理任务队列
+            std::shared_ptr<Connection> connection = queue.pop();
+            while (connection) {
+                struct timeval now = { 0 };
+                gettimeofday( &now,NULL );
+                uint64_t nowms = now.tv_sec;
+                nowms *= 1000;
+                nowms += now.tv_usec / 1000;
+                self->_heartbeatList.push_back({connection, nowms + CORPC_UDP_HEARTBEAT_PERIOD});
+                
+                if (self->_heartbeatRoutineHang) {
+                    co_resume(self->_heartbeatRoutine);
+                }
+                
+                connection = queue.pop();
+            }
+        }
+    }
+    
+    void *Heartbeater::heartbeatRoutine( void * arg ) {
+        Heartbeater *self = (Heartbeater *)arg;
+        
+        self->_heartbeatRoutine = co_self();
+        self->_heartbeatRoutineHang = false;
+        
+        while (true) {
+            if (self->_heartbeatList.empty()) {
+                // 挂起
+                self->_heartbeatRoutineHang = true;
+                co_yield_ct();
+                self->_heartbeatRoutineHang = false;
+                
+                continue;
+            }
+            
+            struct timeval now = { 0 };
+            gettimeofday( &now,NULL );
+            uint64_t nowms = now.tv_sec;
+            nowms *= 1000;
+            nowms += now.tv_usec / 1000;
+            
+            HeartbeatItem item = self->_heartbeatList.front();
+            self->_heartbeatList.pop_front();
+            
+            if (item.connection->_closed) {
+                continue;
+            }
+            
+            if (!item.connection->getLastRecvHBTime()) {
+                item.connection->setLastRecvHBTime(nowms);
+            }
+            
+            if (nowms - item.connection->getLastRecvHBTime() > CORPC_UDP_MAX_NO_HEARTBEAT_TIME) {
+                // 心跳超时，断线处理
+                printf("ERROR: UdpAcceptor::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
+                item.connection->close();
+                continue;
+            }
+            
+            if (item.nexttime > nowms) {
+                msleep(item.nexttime - nowms);
+                
+                gettimeofday( &now,NULL );
+                nowms = now.tv_sec;
+                nowms *= 1000;
+                nowms += now.tv_usec / 1000;
+            }
+            
+            if (item.connection->_closed) {
+                continue;
+            }
+            
+            // 发心跳包
+            item.connection->send(self->_heartbeatmsg);
+            printf("UdpAcceptor::heartbeatRoutine() -- send heartbeat for fd %d at %llu\n", item.connection->getfd(), nowms);
+            item.nexttime = nowms + CORPC_UDP_HEARTBEAT_PERIOD;
+            self->_heartbeatList.push_back(item);
+        }
+    }
+    
+    void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {
+        _queue.push(connection);
     }
     
     IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {

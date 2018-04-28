@@ -248,10 +248,10 @@ int co_accept( int fd, struct sockaddr *addr, socklen_t *len )
 	}
 	alloc_by_fd( cli );
     
-    int flag = g_sys_fcntl_func(fd, F_GETFL, 0 );
+    int flag = g_sys_fcntl_func(cli, F_GETFL, 0 );
     if (!(flag & O_NONBLOCK))
     {
-        fcntl( fd, F_SETFL, flag );
+        fcntl( cli, F_SETFL, flag );
     }
     
 	return cli;

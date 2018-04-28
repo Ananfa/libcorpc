@@ -41,6 +41,18 @@
 #define CORPC_MESSAGE_HEAD_SIZE 8
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 
+#define CORPC_MAX_UDP_MESSAGE_SIZE 540
+
+#define CORPC_MSG_TYPE_CONNECT -1
+#define CORPC_MSG_TYPE_CLOSE -2
+#define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
+#define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
+#define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
+#define CORPC_MSG_TYPE_UDP_HEARTBEAT -115
+
+#define CORPC_UDP_HEARTBEAT_PERIOD 5000
+#define CORPC_UDP_MAX_NO_HEARTBEAT_TIME 15000
+
 namespace CoRpc {
     
     struct PipeType {
@@ -56,6 +68,12 @@ namespace CoRpc {
     struct ServiceData {
         google::protobuf::Service *rpcService;
         std::vector<MethodData> methods;
+    };
+    
+    struct SendMessageInfo {
+        int32_t type;
+        bool isRaw;
+        std::shared_ptr<void> msg;  // 当isRaw为true时，msg中存的是std::string指针，当isRaw为false时，msg中存的是google::protobuf::Message指针。这是为了广播或转发消息给玩家时不需要对数据进行protobuf编解码
     };
     
     // 多生产者单消费者无锁队列实现
