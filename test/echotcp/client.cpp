@@ -17,6 +17,7 @@
 #include "foo.pb.h"
 
 // 注意：此客户端实现只是用于测试server端功能，不是游戏客户端参考使用的代码，游戏客户端的网络实现需要另外实现与服务器的连接、数据收发、编解码
+
 static int g_cnt = 0;
 
 static void *log_routine( void *arg )
@@ -289,8 +290,6 @@ void *TestTcpClient::connectRoutine( void * arg ) {
         connection->setPipeline(pipeline);
         
         client->setConnection(connection);
-        
-        CoRpc::RoutineEnvironment::startCoroutine(sendFooRequestRoutine, client);
     }
     
     return NULL;
@@ -411,6 +410,9 @@ void TestTcpClient::setConnection(std::shared_ptr<CoRpc::Connection>& connection
     if (connection->needHB()) {
         CoRpc::Heartbeater::Instance().addConnection(connection);
     }
+    
+    // 通知连接建立
+    onConnect(connection);
 }
 
 bool TestTcpClient::start() {
@@ -427,6 +429,8 @@ CoRpc::PipelineFactory * TestTcpClient::getPipelineFactory() {
 
 void TestTcpClient::onConnect(std::shared_ptr<CoRpc::Connection>& connection) {
     printf("TestTcpClient::onConnect -- fd %d\n", connection->getfd());
+    
+    CoRpc::RoutineEnvironment::startCoroutine(sendFooRequestRoutine, this);
 }
 
 void TestTcpClient::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
@@ -452,7 +456,7 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     CoRpc::IO *io = CoRpc::IO::create(1, 1);
     
-    for (int i=0; i<10; i++) {
+    for (int i=0; i<100; i++) {
         TestTcpClient *client = TestTcpClient::create(io, false, ip, port);
     
         client->registerMessage(1, new FooResponse, false, TestTcpClient::fooHandle);

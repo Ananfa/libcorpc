@@ -299,6 +299,7 @@ namespace CoRpc {
     Server::~Server() {}
     
     std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
+        printf("fd %d connected", fd);
         std::shared_ptr<CoRpc::Connection> connection(buildConnection(fd));
         std::shared_ptr<CoRpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);
@@ -445,6 +446,7 @@ namespace CoRpc {
     void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
         // 启动accept协程
         RoutineEnvironment::startCoroutine(acceptRoutine, self);
+        RoutineEnvironment::runEventLoop();
     }
     
     void *UdpAcceptor::acceptRoutine( void * arg ) {
@@ -453,7 +455,8 @@ namespace CoRpc {
         int listen_fd = self->_listen_fd;
         char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
         
-        // TODO: 设置listen_fd
+        co_register_fd(listen_fd);
+        co_set_timeout(listen_fd, -1, 1000);
                 
         struct sockaddr_in client_addr;
         socklen_t slen = sizeof(client_addr);
@@ -558,6 +561,8 @@ namespace CoRpc {
                 co_set_timeout(shake_fd, -1, 1000);
                 
                 std::shared_ptr<Connection> connection = server->buildAndAddConnection(shake_fd);
+                
+                shakeOK = true;
             }
         }
         
