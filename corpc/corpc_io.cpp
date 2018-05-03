@@ -995,7 +995,7 @@ namespace CoRpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Receiver::dispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    printf("ERROR: Heartbeater::dispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -1012,7 +1012,7 @@ namespace CoRpc {
                 uint64_t nowms = now.tv_sec;
                 nowms *= 1000;
                 nowms += now.tv_usec / 1000;
-                self->_heartbeatList.push_back({connection, nowms + CORPC_UDP_HEARTBEAT_PERIOD});
+                self->_heartbeatList.push_back({connection, nowms + CORPC_HEARTBEAT_PERIOD});
                 
                 if (self->_heartbeatRoutineHang) {
                     co_resume(self->_heartbeatRoutine);
@@ -1056,9 +1056,9 @@ namespace CoRpc {
                 item.connection->setLastRecvHBTime(nowms);
             }
             
-            if (nowms - item.connection->getLastRecvHBTime() > CORPC_UDP_MAX_NO_HEARTBEAT_TIME) {
+            if (nowms - item.connection->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
                 // 心跳超时，断线处理
-                printf("ERROR: UdpAcceptor::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
+                printf("ERROR: Heartbeater::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
                 item.connection->close();
                 continue;
             }
@@ -1078,8 +1078,7 @@ namespace CoRpc {
             
             // 发心跳包
             item.connection->send(self->_heartbeatmsg);
-            printf("UdpAcceptor::heartbeatRoutine() -- send heartbeat for fd %d at %llu\n", item.connection->getfd(), nowms);
-            item.nexttime = nowms + CORPC_UDP_HEARTBEAT_PERIOD;
+            item.nexttime = nowms + CORPC_HEARTBEAT_PERIOD;
             self->_heartbeatList.push_back(item);
         }
     }

@@ -242,7 +242,7 @@ namespace CoRpc {
         int _recvThreadIndex; // 分配到receiver的线程下标
         
         bool _needHB; // 是否进行心跳
-        std::atomic<uint64_t> _lastRecvHBTime; // 最后一次收到数据的时间（只在UDP连接中使用）
+        std::atomic<uint64_t> _lastRecvHBTime; // 最后一次收到数据的时间
         
         std::shared_ptr<Pipeline> _pipeline;
         std::list<std::shared_ptr<void>> _datas; // 等待发送的数据
