@@ -155,9 +155,10 @@ void TcpClient::threadEntry( TcpClient *self ) {
     *(uint32_t *)(heartbeatmsg + 4) = htonl(CORPC_MSG_TYPE_HEARTBEAT);
     
     int s = self->_s;
-    struct pollfd fd;
-    fd.fd = s;
-    fd.events = POLLIN;
+    struct pollfd fd_in, fd_out;
+    fd_out.fd = fd_in.fd = s;
+    fd_in.events = POLLIN;
+    fd_out.events = POLLOUT;
     
     int ret;
     
@@ -183,7 +184,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
     //   5.查看是否有数据需要发送，有则发送
     //   6.回第1步
     while (true) {
-        ret = poll(&fd, 1, 4);
+        ret = poll(&fd_in, 1, 4);
         
         if (self->_needHB) {
             struct timeval now = { 0 };
@@ -195,7 +196,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
         
         if (ret) {
             if (ret == -1) {
-                perror("recv data");
+                perror("poll fd_in");
                 close(s);
                 return;
             }
@@ -311,7 +312,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
             
             if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
                 if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
-                    printf("can't send heartbeat");
+                    perror("write heartbeat");
                     close(s);
                     return;
                 }
@@ -320,11 +321,15 @@ void TcpClient::threadEntry( TcpClient *self ) {
             }
         }
         
-        // TODO: 将要发送的数据拼在一起发送，提高效率
+        // 将要发送的数据拼在一起发送，提高效率
+        int sendNum = 0;
         // 发送数据
         MessageInfo *info = self->_sendQueue.pop();
         while (info) {
-            uint32_t msgSize = info->proto->ByteSize();
+            uint32_t msgSize = info->proto->GetCachedSize();
+            if (msgSize == 0) {
+                msgSize = info->proto->ByteSize();
+            }
             
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE > CORPC_MAX_MESSAGE_SIZE) {
                 printf("message size too large");
@@ -332,22 +337,48 @@ void TcpClient::threadEntry( TcpClient *self ) {
                 return;
             }
             
-            info->proto->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
-            
-            *(uint32_t *)buf = htonl(msgSize);
-            *(uint32_t *)(buf + 4) = htonl(info->type);
-            
-            int size = msgSize + CORPC_MESSAGE_HEAD_SIZE;
-            if (write(s, buf, size) != size) {
-                printf("can't send message");
-                close(s);
-                return;
+            if (msgSize + CORPC_MESSAGE_HEAD_SIZE <= CORPC_MAX_MESSAGE_SIZE - sendNum) {
+                info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
+                
+                *(uint32_t *)(buf + sendNum) = htonl(msgSize);
+                *(uint32_t *)(buf + sendNum + 4) = htonl(info->type);
+                
+                sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
+                
+                delete info->proto;
+                delete info;
+                
+                info = self->_sendQueue.pop();
+                
+                if (info) {
+                    continue;
+                }
             }
             
-            delete info->proto;
-            delete info;
+            int writeNum = 0;
+            while (writeNum < sendNum) {
+                ret = (int)write(s, buf, sendNum);
+                
+                if (ret == -1) {
+                    perror("write message");
+                    close(s);
+                    return;
+                }
+                
+                writeNum += ret;
+                if (writeNum < sendNum) {
+                    // 等到能写时再继续
+                    ret = poll(&fd_out, 1, -1);
+                    
+                    if (ret == -1) {
+                        perror("poll fd_out");
+                        close(s);
+                        return;
+                    }
+                }
+            }
             
-            info = self->_sendQueue.pop();
+            sendNum = 0;
         }
     }
 }
