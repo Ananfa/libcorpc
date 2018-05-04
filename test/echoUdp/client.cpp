@@ -10,8 +10,6 @@
 #include <thread>
 #include <list>
 #include <stdio.h> //printf
-#include <string.h> //memset
-#include <stdlib.h> //exit(0);
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -21,13 +19,12 @@
 #include <google/protobuf/message.h>
 #include "echo.pb.h"
 
-#define BUFLEN 512  //Max length of buffer
 #define LOCAL_PORT 20000
 
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
-#define CORPC_MSG_TYPE_UDP_HEARTBEAT -115
+#define CORPC_MSG_TYPE_HEARTBEAT -115
 
 #define CORPC_MESSAGE_HEAD_SIZE 8
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
@@ -80,12 +77,6 @@ private:
     std::list<T> _outqueue;
 };
 
-void die(char *s)
-{
-    perror(s);
-    exit(1);
-}
-
 class UdpClient {
     struct MessageInfo {
         int32_t type;
@@ -131,8 +122,7 @@ bool UdpClient::start() {
     socklen_t slen = sizeof(si_other);
     char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     
-    if ((_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    {
+    if ((_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror("can't create socket");
         return false;
     }
@@ -149,8 +139,7 @@ bool UdpClient::start() {
     setsockopt(_s, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     
     //bind socket to port
-    if(bind(_s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1)
-    {
+    if(bind(_s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1) {
         perror("can't bind socket");
         return false;
     }
@@ -161,8 +150,7 @@ bool UdpClient::start() {
     int nIP = inet_addr(_ip.c_str());
     si_other.sin_addr.s_addr = nIP;
     
-    if(connect(_s, (struct sockaddr *)&si_other, slen) == -1)
-    {
+    if(connect(_s, (struct sockaddr *)&si_other, slen) == -1) {
         perror("can't connect");
         return false;
     }
@@ -248,7 +236,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
     uint8_t buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     *(uint32_t *)heartbeatmsg = htonl(0);
-    *(uint32_t *)(heartbeatmsg + 4) = htonl(CORPC_MSG_TYPE_UDP_HEARTBEAT);
+    *(uint32_t *)(heartbeatmsg + 4) = htonl(CORPC_MSG_TYPE_HEARTBEAT);
     
     int s = self->_s;
     struct pollfd fd;
@@ -298,7 +286,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 msgType = ntohl(msgType);
                 
                 if (msgType < 0) {
-                    if (msgType == CORPC_MSG_TYPE_UDP_HEARTBEAT) {
+                    if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                         //printf("recv heartbeat\n");
                         self->_lastRecvHBTime = nowms;
                     }
@@ -431,7 +419,7 @@ void testThread(std::string ip, uint16_t port, uint16_t local_port) {
         int32_t rType;
         google::protobuf::Message *rMsg;
         do {
-            usleep(1);
+            usleep(100);
             client.recv(rType, rMsg);
         } while (!rType);
         

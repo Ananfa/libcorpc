@@ -8,13 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		2DEA99992085EB620095C62F /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA99982085EB610095C62F /* server.cpp */; };
-		2DEA99A12088346D0095C62F /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA999F2088346C0095C62F /* foo.pb.cc */; };
-		2DEA99AF20886F450095C62F /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA99A220886AFB0095C62F /* client.cpp */; };
-		2DEA99B020886F4A0095C62F /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA999F2088346C0095C62F /* foo.pb.cc */; };
 		2DEA99B120887C550095C62F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA999D2085EB770095C62F /* libco.dylib */; };
 		2DEA99B220887C550095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA999E2085EB770095C62F /* libcorpc.dylib */; };
 		2DEA99B320887C5A0095C62F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA999D2085EB770095C62F /* libco.dylib */; };
 		2DEA99B420887C5A0095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA999E2085EB770095C62F /* libcorpc.dylib */; };
+		2DEA9A2E209BF60F0095C62F /* echo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A2D209BF60F0095C62F /* echo.pb.cc */; };
+		2DEA9A2F209BF6310095C62F /* echo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A2D209BF60F0095C62F /* echo.pb.cc */; };
+		2DEA9A31209BF66E0095C62F /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A30209BF66E0095C62F /* client.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,10 +43,10 @@
 		2DEA99982085EB610095C62F /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
 		2DEA999D2085EB770095C62F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA999E2085EB770095C62F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA999F2088346C0095C62F /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../proto/foo.pb.cc; sourceTree = "<group>"; };
-		2DEA99A02088346D0095C62F /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../proto/foo.pb.h; sourceTree = "<group>"; };
-		2DEA99A220886AFB0095C62F /* client.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
 		2DEA99A820886F3B0095C62F /* echoTcpclt */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = echoTcpclt; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DEA9A2C209BF60F0095C62F /* echo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = echo.pb.h; path = ../proto/echo.pb.h; sourceTree = "<group>"; };
+		2DEA9A2D209BF60F0095C62F /* echo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = echo.pb.cc; path = ../proto/echo.pb.cc; sourceTree = "<group>"; };
+		2DEA9A30209BF66E0095C62F /* client.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,10 +92,10 @@
 		2DEA99972085E9AE0095C62F /* src */ = {
 			isa = PBXGroup;
 			children = (
-				2DEA999F2088346C0095C62F /* foo.pb.cc */,
-				2DEA99A02088346D0095C62F /* foo.pb.h */,
+				2DEA9A2D209BF60F0095C62F /* echo.pb.cc */,
+				2DEA9A2C209BF60F0095C62F /* echo.pb.h */,
 				2DEA99982085EB610095C62F /* server.cpp */,
-				2DEA99A220886AFB0095C62F /* client.cpp */,
+				2DEA9A30209BF66E0095C62F /* client.cpp */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -189,7 +189,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DEA99992085EB620095C62F /* server.cpp in Sources */,
-				2DEA99A12088346D0095C62F /* foo.pb.cc in Sources */,
+				2DEA9A2E209BF60F0095C62F /* echo.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,8 +197,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA99B020886F4A0095C62F /* foo.pb.cc in Sources */,
-				2DEA99AF20886F450095C62F /* client.cpp in Sources */,
+				2DEA9A2F209BF6310095C62F /* echo.pb.cc in Sources */,
+				2DEA9A31209BF66E0095C62F /* client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

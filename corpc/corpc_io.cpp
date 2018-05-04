@@ -961,7 +961,7 @@ namespace CoRpc {
     }
     
     Heartbeater::Heartbeater(): _heartbeatmsg(new SendMessageInfo) {
-        _heartbeatmsg->type = CORPC_MSG_TYPE_UDP_HEARTBEAT;
+        _heartbeatmsg->type = CORPC_MSG_TYPE_HEARTBEAT;
         _heartbeatmsg->isRaw = true;
         
         _t = std::thread(threadEntry, this);

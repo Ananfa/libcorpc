@@ -129,7 +129,7 @@ namespace CoRpc {
         // 处理系统类型消息，如：心跳
         // 注意：如果是UDP握手消息怎么办？
         if (msgType < 0) {
-            if (msgType == CORPC_MSG_TYPE_UDP_HEARTBEAT) {
+            if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                 struct timeval now = { 0 };
                 gettimeofday( &now,NULL );
                 uint64_t nowms = now.tv_sec;

@@ -13,13 +13,49 @@
 #include <signal.h>
 
 #include <google/protobuf/message.h>
-#include "foo.pb.h"
+#include "echo.pb.h"
+
+static int g_cnt = 0;
+
+static void *log_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    int total = 0;
+    int average = 0;
+    
+    time_t startAt = time(NULL);
+    
+    while (true) {
+        sleep(1);
+        
+        total += g_cnt;
+        
+        if (total == 0) {
+            startAt = time(NULL);
+            continue;
+        }
+        
+        time_t now = time(NULL);
+        
+        time_t difTime = now - startAt;
+        if (difTime > 0) {
+            average = total / difTime;
+        } else {
+            average = total;
+        }
+        
+        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, g_cnt, average, total);
+        
+        g_cnt = 0;
+    }
+    
+    return NULL;
+}
 
 class TestTcpServer : public CoRpc::TcpMessageServer {
 public:
     static TestTcpServer* create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
-    
-    static void fooHandle(std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn);
     
 private:
     TestTcpServer( CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
@@ -35,25 +71,6 @@ TestTcpServer* TestTcpServer::create(CoRpc::IO *io, bool needHB, const std::stri
     
     server->start();
     return server;
-}
-
-void TestTcpServer::fooHandle(std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn) {
-    FooRequest * request = static_cast<FooRequest*>(msg.get());
-    
-    std::shared_ptr<FooResponse> response(new FooResponse);
-    
-    std::string str = request->text();
-    std::string tmp = str;
-    for (int i = 1; i < request->times(); i++)
-        str += (" " + tmp);
-    response->set_text(str);
-    
-    std::shared_ptr<CoRpc::SendMessageInfo> sendInfo(new CoRpc::SendMessageInfo);
-    sendInfo->type = 1;
-    sendInfo->isRaw = false;
-    sendInfo->msg = response;
-    
-    conn->send(sendInfo);
 }
 
 int main(int argc, const char * argv[]) {
@@ -77,7 +94,27 @@ int main(int argc, const char * argv[]) {
     
     TestTcpServer *server = TestTcpServer::create(io, false, ip, port);
     
-    server->registerMessage(1, new FooRequest, false, TestTcpServer::fooHandle);
+    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn) {
+        FooRequest * request = static_cast<FooRequest*>(msg.get());
+        
+        g_cnt++;
+        std::shared_ptr<FooResponse> response(new FooResponse);
+        
+        std::string str = request->text();
+        std::string tmp = str;
+        for (int i = 1; i < request->times(); i++)
+            str += (" " + tmp);
+        response->set_text(str);
+        
+        std::shared_ptr<CoRpc::SendMessageInfo> sendInfo(new CoRpc::SendMessageInfo);
+        sendInfo->type = 1;
+        sendInfo->isRaw = false;
+        sendInfo->msg = response;
+        
+        conn->send(sendInfo);
+    });
+    
+    CoRpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     
     CoRpc::RoutineEnvironment::runEventLoop();
 }
