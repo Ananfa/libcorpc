@@ -11,16 +11,16 @@
       location = "group:corpc/corpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:example/interRpc/interRpc.xcodeproj">
+      location = "group:example/example_interRpc/example_interRpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:example/innerRpc/innerRpc.xcodeproj">
+      location = "group:example/example_innerRpc/example_innerRpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:example/echoTcp/echoTcp.xcodeproj">
+      location = "group:example/example_echoTcp/example_echoTcp.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:example/echoUdp/echoUdp.xcodeproj">
+      location = "group:example/example_echoUdp/example_echoUdp.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:tutorial/tutorial5/tutorial5.xcodeproj">

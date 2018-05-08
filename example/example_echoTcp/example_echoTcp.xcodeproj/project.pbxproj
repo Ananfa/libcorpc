@@ -165,7 +165,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 2DEA99882085E9180095C62F /* Build configuration list for PBXProject "echoTcp" */;
+			buildConfigurationList = 2DEA99882085E9180095C62F /* Build configuration list for PBXProject "example_echoTcp" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -357,7 +357,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2DEA99882085E9180095C62F /* Build configuration list for PBXProject "echoTcp" */ = {
+		2DEA99882085E9180095C62F /* Build configuration list for PBXProject "example_echoTcp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2DEA99922085E9180095C62F /* Debug */,

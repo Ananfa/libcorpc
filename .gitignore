@@ -3,10 +3,10 @@ libcorpc_mac.xcworkspace/xcuserdata
 co/co.xcodeproj/xcuserdata
 corpc/corpc.xcodeproj/xcuserdata
 corpc_mysql/corpc_mysql.xcodeproj/xcuserdata
-example/interRpc/interRpc.xcodeproj/xcuserdata
-example/innerRpc/innerRpc.xcodeproj/xcuserdata
-example/echoTcp/echoTcp.xcodeproj/xcuserdata
-example/echoUdp/echoUdp.xcodeproj/xcuserdata
+example/example_interRpc/interRpc.xcodeproj/xcuserdata
+example/example_innerRpc/innerRpc.xcodeproj/xcuserdata
+example/example_echoTcp/echoTcp.xcodeproj/xcuserdata
+example/example_echoUdp/echoUdp.xcodeproj/xcuserdata
 example/test*
 tutorial/tutorial1/tutorial1.xcodeproj/xcuserdata
 tutorial/tutorial2/tutorial2.xcodeproj/xcuserdata
