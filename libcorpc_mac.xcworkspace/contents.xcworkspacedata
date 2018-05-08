@@ -11,16 +11,16 @@
       location = "group:corpc/corpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/interRpc/interRpc.xcodeproj">
+      location = "group:example/interRpc/interRpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/innerRpc/innerRpc.xcodeproj">
+      location = "group:example/innerRpc/innerRpc.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/echoTcp/echoTcp.xcodeproj">
+      location = "group:example/echoTcp/echoTcp.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/echoUdp/echoUdp.xcodeproj">
+      location = "group:example/echoUdp/echoUdp.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:tutorial/tutorial5/tutorial5.xcodeproj">
@@ -38,21 +38,21 @@
       location = "group:tutorial/tutorial1/tutorial1.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testechosvr/testechosvr.xcodeproj">
+      location = "group:example/testechosvr/testechosvr.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testechocli/testechocli.xcodeproj">
+      location = "group:example/testechocli/testechocli.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testUdp/testUdp.xcodeproj">
+      location = "group:example/testUdp/testUdp.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testMySQL/testMySQL.xcodeproj">
+      location = "group:example/testMySQL/testMySQL.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testMemcached/testMemcached.xcodeproj">
+      location = "group:example/testMemcached/testMemcached.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:test/testpipe/testpipe.xcodeproj">
+      location = "group:example/testpipe/testpipe.xcodeproj">
    </FileRef>
 </Workspace>
