@@ -25,7 +25,7 @@
 
 // TODO: 使用统一的Log接口记录Log
 
-namespace CoRpc {
+namespace corpc {
     
     //Decoder::~Decoder() {}
     
@@ -155,7 +155,7 @@ namespace CoRpc {
         return true;
     }
     
-    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): CoRpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
     }
     
     bool TcpPipeline::upflow(uint8_t *buf, int size) {
@@ -234,7 +234,7 @@ namespace CoRpc {
         return true;
     }
     
-    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): CoRpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize) {
         
     }
     
@@ -271,12 +271,12 @@ namespace CoRpc {
     
     PipelineFactory::~PipelineFactory() {}
     
-    std::shared_ptr<CoRpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::TcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
+    std::shared_ptr<corpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
+        return std::shared_ptr<corpc::Pipeline>( new corpc::TcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
     }
     
-    std::shared_ptr<CoRpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_ptr<CoRpc::Connection> &connection) {
-        return std::shared_ptr<CoRpc::Pipeline>( new CoRpc::UdpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize) );
+    std::shared_ptr<corpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
+        return std::shared_ptr<corpc::Pipeline>( new corpc::UdpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize) );
     }
     
     Connection::Connection(int fd, IO* io, bool needHB): _fd(fd), _io(io), _needHB(needHB), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _decodeError(false), _closed(false), _isClosing(false), _canClose(false), _lastRecvHBTime(0) {
@@ -300,8 +300,8 @@ namespace CoRpc {
     
     std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
         printf("fd %d connected", fd);
-        std::shared_ptr<CoRpc::Connection> connection(buildConnection(fd));
-        std::shared_ptr<CoRpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
+        std::shared_ptr<corpc::Connection> connection(buildConnection(fd));
+        std::shared_ptr<corpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);
         
         // 将接受的连接分别发给Receiver和Sender

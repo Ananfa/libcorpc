@@ -20,7 +20,7 @@
 
 #include "factorial.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 class ThreadSpecialResource {
 public:

@@ -22,7 +22,7 @@
 
 #include <list>
 
-namespace CoRpc {
+namespace corpc {
     struct RoutineContext {
         pfn_co_routine_t pfn;
         void *arg;

@@ -1,11 +1,18 @@
-//
-//  udpsvr1.cpp
-//  testUdp
-//
-//  Created by Xianke Liu on 2018/4/27.
-//Copyright © 2018年 Dena. All rights reserved.
-//
-
+/*
+ * Created by Xianke Liu on 2018/4/27.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include "corpc_routine_env.h"
 #include "corpc_message_server.h"
@@ -54,19 +61,19 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-class TestUdpServer : public CoRpc::UdpMessageServer {
+class TestUdpServer : public corpc::UdpMessageServer {
 public:
-    static TestUdpServer* create(CoRpc::IO *io, const std::string& ip, uint16_t port);
+    static TestUdpServer* create(corpc::IO *io, const std::string& ip, uint16_t port);
     
 private:
-    TestUdpServer( CoRpc::IO *io, const std::string& ip, uint16_t port);
+    TestUdpServer( corpc::IO *io, const std::string& ip, uint16_t port);
     virtual ~TestUdpServer() {}
 };
 
-TestUdpServer::TestUdpServer(CoRpc::IO *io, const std::string& ip, uint16_t port): CoRpc::UdpMessageServer(io, true, ip, port) {
+TestUdpServer::TestUdpServer(corpc::IO *io, const std::string& ip, uint16_t port): corpc::UdpMessageServer(io, true, ip, port) {
 }
 
-TestUdpServer* TestUdpServer::create( CoRpc::IO *io, const std::string& ip, uint16_t port) {
+TestUdpServer* TestUdpServer::create( corpc::IO *io, const std::string& ip, uint16_t port) {
     assert(io);
     TestUdpServer *server = new TestUdpServer(io, ip, port);
     
@@ -91,11 +98,11 @@ int main(int argc, const char * argv[]) {
     sigaction( SIGPIPE, &sa, NULL );
     
     // 注册服务
-    CoRpc::IO *io = CoRpc::IO::create(1, 1);
+    corpc::IO *io = corpc::IO::create(1, 1);
     
     TestUdpServer *server = TestUdpServer::create(io, ip, port);
     
-    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn) {
+    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -107,7 +114,7 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
         
-        std::shared_ptr<CoRpc::SendMessageInfo> sendInfo(new CoRpc::SendMessageInfo);
+        std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
         sendInfo->type = 1;
         sendInfo->isRaw = false;
         sendInfo->msg = response;
@@ -115,8 +122,8 @@ int main(int argc, const char * argv[]) {
         conn->send(sendInfo);
     });
     
-    CoRpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
+    corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     
-    CoRpc::RoutineEnvironment::runEventLoop();
+    corpc::RoutineEnvironment::runEventLoop();
 }
 

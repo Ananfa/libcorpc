@@ -24,7 +24,7 @@
 
 #include "factorial.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 static void *rpc_routine( void *arg )
 {

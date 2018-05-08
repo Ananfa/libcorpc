@@ -25,7 +25,7 @@
 #include "helloworld.pb.h"
 #include "echo.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 static void *helloworld_routine( void *arg )
 {

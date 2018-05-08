@@ -22,7 +22,7 @@
 #include <map>
 #include <google/protobuf/service.h>
 
-namespace CoRpc {
+namespace corpc {
     
     // 进程内线程间通信rpc实现
     class InnerRpcClient;

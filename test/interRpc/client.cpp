@@ -28,7 +28,7 @@
 #include "bar.pb.h"
 #include "baz.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 static int iFooSuccCnt = 0;
 static int iFooFailCnt = 0;
@@ -86,7 +86,7 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-static void callDoneHandle(::google::protobuf::Message *request, CoRpc::Controller *controller) {
+static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
     if (controller->Failed()) {
         iBazFailCnt++;
     } else {

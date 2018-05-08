@@ -2,13 +2,7 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:test/echoTcp/echoTcp.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:test/echoUdp/echoUdp.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:test/testUdp/testUdp.xcodeproj">
+      location = "group:corpc_mysql/corpc_mysql.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:co/co.xcodeproj">
@@ -21,6 +15,12 @@
    </FileRef>
    <FileRef
       location = "group:test/innerRpc/innerRpc.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/echoTcp/echoTcp.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/echoUdp/echoUdp.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:tutorial/tutorial5/tutorial5.xcodeproj">
@@ -44,7 +44,13 @@
       location = "group:test/testechocli/testechocli.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:test/testUdp/testUdp.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:test/testMySQL/testMySQL.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:test/testMemcached/testMemcached.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:test/testpipe/testpipe.xcodeproj">

@@ -23,7 +23,7 @@
 #include "bar.pb.h"
 #include "baz.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 static int iFooCnt = 0;
 static int iBarCnt = 0;

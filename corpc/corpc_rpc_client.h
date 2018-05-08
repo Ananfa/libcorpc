@@ -29,7 +29,7 @@
 #include <google/protobuf/descriptor.h>
 
 // rpc channel需要注册到client中才能被服务
-namespace CoRpc {
+namespace corpc {
     
     // 注意：RpcClient的实现不考虑运行时的关闭销毁，只能通过关闭程序来关闭
     class RpcClient: public CoroutineWorker {
@@ -52,7 +52,7 @@ namespace CoRpc {
     public:
         class Channel;
     private:
-        class Connection: public CoRpc::Connection {
+        class Connection: public corpc::Connection {
             enum Status {CLOSED, CONNECTING, CONNECTED};
             typedef std::list<std::shared_ptr<ClientTask> > WaitTaskList;
             typedef std::map<uint64_t, std::shared_ptr<ClientTask> > WaitTaskMap;
@@ -133,9 +133,9 @@ namespace CoRpc {
         
         ~RpcClient() {}
         
-        static void* decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         
-        static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
+        static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
         // 注意：需要开启线程来执行connectionRoutine和taskHandleRoutine协程，原因是not_care_response类型的rpc调用不会触发调用处协程切换，
         // 此时如果在同一线程中开启connectionRoutine和taskHandleRoutine协程，它们将等到调用处协程将来让出执行后才能得到调度，导致数据不能及时发送。

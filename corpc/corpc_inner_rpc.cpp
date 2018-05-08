@@ -26,7 +26,7 @@
 #include "corpc_option.pb.h"
 #include <sys/time.h>
 
-namespace CoRpc {
+namespace corpc {
     
     __thread InnerRpcClient *InnerRpcClient::_instance(nullptr);
     

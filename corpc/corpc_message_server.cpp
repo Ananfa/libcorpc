@@ -11,9 +11,9 @@
 
 #include <sys/time.h>
 
-namespace CoRpc {
+namespace corpc {
     
-    MessageServer::Connection::Connection(int fd, MessageServer* server): CoRpc::Connection(fd, server->_io, server->_needHB), _server(server) {
+    MessageServer::Connection::Connection(int fd, MessageServer* server): corpc::Connection(fd, server->_io, server->_needHB), _server(server) {
     }
     
     MessageServer::Connection::~Connection() {
@@ -21,7 +21,7 @@ namespace CoRpc {
     }
     
     void MessageServer::Connection::onClose() {
-        std::shared_ptr<CoRpc::Connection> self = CoRpc::Connection::shared_from_this();
+        std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
         _server->onClose(self);
     }
     
@@ -63,7 +63,7 @@ namespace CoRpc {
                 }
                 
                 if (iter->second.needCoroutine) {
-                    CoRpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
+                    corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
                 } else {
                     iter->second.handle(task->msg, task->connection);
                     
@@ -75,7 +75,7 @@ namespace CoRpc {
         }
     }
     
-    MessageServer::MessageServer(IO *io, bool needHB): CoRpc::Server(io), _needHB(needHB) {
+    MessageServer::MessageServer(IO *io, bool needHB): corpc::Server(io), _needHB(needHB) {
         _worker = new Worker(this);
     }
 
@@ -96,11 +96,11 @@ namespace CoRpc {
         return false;
     }
     
-    CoRpc::Connection *MessageServer::buildConnection(int fd) {
+    corpc::Connection *MessageServer::buildConnection(int fd) {
         return new Connection(fd, this);
     }
     
-    void MessageServer::onConnect(std::shared_ptr<CoRpc::Connection>& connection) {
+    void MessageServer::onConnect(std::shared_ptr<corpc::Connection>& connection) {
         WorkerTask *task = new WorkerTask;
         task->type = CORPC_MSG_TYPE_CONNECT;
         task->connection = std::static_pointer_cast<Connection>(connection);
@@ -108,7 +108,7 @@ namespace CoRpc {
         _worker->addMessage(task);
     }
     
-    void MessageServer::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
+    void MessageServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
         WorkerTask *task = new WorkerTask;
         task->type = CORPC_MSG_TYPE_CLOSE;
         task->connection = std::static_pointer_cast<Connection>(connection);
@@ -116,7 +116,7 @@ namespace CoRpc {
         _worker->addMessage(task);
     }
     
-    void* MessageServer::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         MessageServer *server = conn->getServer();
@@ -167,7 +167,7 @@ namespace CoRpc {
         return task;
     }
     
-    bool MessageServer::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<SendMessageInfo> msgInfo = std::static_pointer_cast<SendMessageInfo>(data);
         uint32_t msgSize;
         if (msgInfo->isRaw) {
@@ -204,15 +204,15 @@ namespace CoRpc {
         return true;
     }
     
-    TcpMessageServer::TcpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
+    TcpMessageServer::TcpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
         _acceptor = new TcpAcceptor(this, ip, port);
         
-        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
     }
     
     TcpMessageServer::~TcpMessageServer() {}
 
-    UdpMessageServer::UdpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
+    UdpMessageServer::UdpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
         _acceptor = new UdpAcceptor(this, ip, port);
         
         _pipelineFactory = new UdpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE);

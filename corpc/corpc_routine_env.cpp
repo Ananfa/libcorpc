@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <vector>
 
-namespace CoRpc {
+namespace corpc {
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
     
     RoutineEnvironment::RoutineEnvironment() {

@@ -22,7 +22,7 @@
 
 #include <thread>
 
-using namespace CoRpc;
+using namespace corpc;
 
 class HelloWorldServiceImpl : public HelloWorldService {
 public:

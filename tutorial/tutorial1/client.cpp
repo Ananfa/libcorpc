@@ -24,7 +24,7 @@
 
 #include "helloworld.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 static void *helloworld_routine( void *arg )
 {

@@ -20,7 +20,7 @@
 #include <google/protobuf/service.h>
 #include <string>
 
-namespace CoRpc {
+namespace corpc {
     class Controller : public google::protobuf::RpcController {
         std::string _error_str;
         bool _is_failed;

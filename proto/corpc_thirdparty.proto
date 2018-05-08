@@ -1,0 +1,23 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+package corpc.thirdparty;
+
+message Handle {
+    required uint64 handle = 1;
+}
+
+service ThirdPartyService {
+    option (corpc.global_service_id) = 1;
+
+    rpc take(corpc.Void) returns(Handle)
+    {
+        option (corpc.need_coroutine) = true; // default is false
+    }
+
+    rpc put(Handle) returns(corpc.Void)
+    {
+        option (corpc.not_care_response) = true; // default is false
+    }
+}

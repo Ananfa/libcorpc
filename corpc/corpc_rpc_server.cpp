@@ -35,9 +35,9 @@
 
 // TODO: 使用统一的Log接口记录Log
 
-namespace CoRpc {
+namespace corpc {
     
-    RpcServer::Connection::Connection(int fd, RpcServer* server): CoRpc::Connection(fd, server->_io, false), _server(server) {
+    RpcServer::Connection::Connection(int fd, RpcServer* server): corpc::Connection(fd, server->_io, false), _server(server) {
     }
     
     RpcServer::Connection::~Connection() {
@@ -45,7 +45,7 @@ namespace CoRpc {
     }
     
     void RpcServer::Connection::onClose() {
-        std::shared_ptr<CoRpc::Connection> self = CoRpc::Connection::shared_from_this();
+        std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
         _server->onClose(self);
     }
     
@@ -131,7 +131,7 @@ namespace CoRpc {
         }
     }
     
-    RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): CoRpc::Server(io) {
+    RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): corpc::Server(io) {
         _acceptor = new TcpAcceptor(this, ip, port);
 
         // 根据需要创建多线程worker或协程worker
@@ -141,7 +141,7 @@ namespace CoRpc {
             _worker = new CoroutineWorker(this);
         }
         
-        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
     }
     
     RpcServer::~RpcServer() {}
@@ -154,7 +154,7 @@ namespace CoRpc {
         return server;
     }
     
-    void * RpcServer::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         RpcServer *server = conn->getServer();
@@ -204,7 +204,7 @@ namespace CoRpc {
         }
     }
     
-    bool RpcServer::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
         uint32_t msgSize = rpcTask->response->GetCachedSize();
         if (msgSize == 0) {
@@ -271,11 +271,11 @@ namespace CoRpc {
         return &(it->second.methods[methodId]);
     }
     
-    CoRpc::Connection *RpcServer::buildConnection(int fd) {
+    corpc::Connection *RpcServer::buildConnection(int fd) {
         return new Connection(fd, this);
     }
     
-    void RpcServer::onClose(std::shared_ptr<CoRpc::Connection>& connection) {
+    void RpcServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
         printf("INFO: RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
     }
     

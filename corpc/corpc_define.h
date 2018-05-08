@@ -53,7 +53,7 @@
 #define CORPC_HEARTBEAT_PERIOD 10000
 #define CORPC_MAX_NO_HEARTBEAT_TIME 30000
 
-namespace CoRpc {
+namespace corpc {
     
     struct PipeType {
         int pipefd[2];

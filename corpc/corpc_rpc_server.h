@@ -26,13 +26,13 @@
 #include <thread>
 #include <google/protobuf/service.h>
 
-namespace CoRpc {
+namespace corpc {
 
-    class RpcServer: public CoRpc::Server {
+    class RpcServer: public corpc::Server {
         
-        class MultiThreadWorker: public CoRpc::MultiThreadWorker {
+        class MultiThreadWorker: public corpc::MultiThreadWorker {
         public:
-            MultiThreadWorker(RpcServer *server, uint16_t threadNum): CoRpc::MultiThreadWorker(threadNum), _server(server) {}
+            MultiThreadWorker(RpcServer *server, uint16_t threadNum): corpc::MultiThreadWorker(threadNum), _server(server) {}
             virtual ~MultiThreadWorker() {}
             
         protected:
@@ -44,7 +44,7 @@ namespace CoRpc {
             RpcServer *_server;
         };
         
-        class CoroutineWorker: public CoRpc::CoroutineWorker {
+        class CoroutineWorker: public corpc::CoroutineWorker {
         public:
             CoroutineWorker(RpcServer *server): _server(server) {}
             virtual ~CoroutineWorker() {}
@@ -58,7 +58,7 @@ namespace CoRpc {
             RpcServer *_server;
         };
         
-        class Connection: public CoRpc::Connection {
+        class Connection: public corpc::Connection {
         public:
             Connection(int fd, RpcServer* server);
             virtual ~Connection();
@@ -85,7 +85,7 @@ namespace CoRpc {
         };
         
         struct WorkerTask {
-            std::shared_ptr<CoRpc::Connection> connection;
+            std::shared_ptr<corpc::Connection> connection;
             std::shared_ptr<RpcTask> rpcTask;
         };
         
@@ -99,21 +99,21 @@ namespace CoRpc {
         const MethodData *getMethod(uint32_t serviceId, uint32_t methodId) const;
         
         // override
-        virtual CoRpc::Connection * buildConnection(int fd);
+        virtual corpc::Connection * buildConnection(int fd);
         
         // override
-        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection) {}
+        virtual void onConnect(std::shared_ptr<corpc::Connection>& connection) {}
         
         // override
-        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection);
+        virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
         
     private:
         RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
         virtual ~RpcServer();  // 不允许在栈上创建server
         
-        static void* decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         
-        static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
+        static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
     private:
         std::map<uint32_t, ServiceData> _services;

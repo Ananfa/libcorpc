@@ -31,9 +31,9 @@
 
 #include "corpc_option.pb.h"
 
-namespace CoRpc {
+namespace corpc {
     
-    void * RpcClient::decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+    void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         uint32_t respSize = *(uint32_t *)head;
@@ -74,7 +74,7 @@ namespace CoRpc {
         return task->rpcTask->co;
     }
     
-    bool RpcClient::encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
@@ -105,13 +105,13 @@ namespace CoRpc {
         return true;
     }
     
-    RpcClient::Connection::Connection(Channel *channel): CoRpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
+    RpcClient::Connection::Connection(Channel *channel): corpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
     }
     
     void RpcClient::Connection::onClose() {
         ConnectionTask *connectionTask = new ConnectionTask;
         connectionTask->type = ConnectionTask::CLOSE;
-        connectionTask->connection = std::static_pointer_cast<Connection>(CoRpc::Connection::shared_from_this());
+        connectionTask->connection = std::static_pointer_cast<Connection>(corpc::Connection::shared_from_this());
         
         _channel->_client->_connectionTaskQueue.push(connectionTask);
     }
@@ -150,9 +150,9 @@ namespace CoRpc {
         if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
             _connections[_conIndex] = std::make_shared<Connection>(this);
             
-            std::shared_ptr<CoRpc::Connection> connection = _connections[_conIndex];
+            std::shared_ptr<corpc::Connection> connection = _connections[_conIndex];
             
-            std::shared_ptr<CoRpc::Pipeline> pipeline = _client->_pipelineFactory->buildPipeline(connection);
+            std::shared_ptr<corpc::Pipeline> pipeline = _client->_pipelineFactory->buildPipeline(connection);
             connection->setPipeline(pipeline);
         }
         
@@ -198,7 +198,7 @@ namespace CoRpc {
     }
     
     RpcClient::RpcClient(IO *io): _io(io) {
-        _pipelineFactory = new TcpPipelineFactory(this, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, CoRpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(this, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
     }
     
     RpcClient* RpcClient::create(IO *io) {
@@ -397,7 +397,7 @@ namespace CoRpc {
                         connection->_channel->_connectDelay = false;
                         
                         // 加入到IO中
-                        std::shared_ptr<CoRpc::Connection> ioConnection = std::static_pointer_cast<CoRpc::Connection>(connection);
+                        std::shared_ptr<corpc::Connection> ioConnection = std::static_pointer_cast<corpc::Connection>(connection);
                         io->addConnection(ioConnection);
                         
                         // 发送等待发送队列中的任务
@@ -405,7 +405,7 @@ namespace CoRpc {
                             std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                             connection->_waitSendTaskCoList.pop_front();
                             
-                            std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(connection);
+                            std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(connection);
                             
                             if (task->rpcTask->response) {
                                 std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
@@ -473,7 +473,7 @@ namespace CoRpc {
                 if (conn->_st == Connection::CONNECTING) {
                     conn->_waitSendTaskCoList.push_back(task);
                 } else {
-                    std::shared_ptr<CoRpc::Connection> ioConn = std::static_pointer_cast<CoRpc::Connection>(conn);
+                    std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(conn);
                     
                     if (task->rpcTask->response) {
                         std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);

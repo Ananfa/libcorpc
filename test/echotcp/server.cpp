@@ -53,19 +53,19 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-class TestTcpServer : public CoRpc::TcpMessageServer {
+class TestTcpServer : public corpc::TcpMessageServer {
 public:
-    static TestTcpServer* create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
+    static TestTcpServer* create(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     
 private:
-    TestTcpServer( CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
+    TestTcpServer( corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
     virtual ~TestTcpServer() {}
 };
 
-TestTcpServer::TestTcpServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port): CoRpc::TcpMessageServer(io, needHB, ip, port) {
+TestTcpServer::TestTcpServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): corpc::TcpMessageServer(io, needHB, ip, port) {
 }
 
-TestTcpServer* TestTcpServer::create(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port) {
+TestTcpServer* TestTcpServer::create(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port) {
     assert(io);
     TestTcpServer *server = new TestTcpServer(io, needHB, ip, port);
     
@@ -90,11 +90,11 @@ int main(int argc, const char * argv[]) {
     sigaction( SIGPIPE, &sa, NULL );
     
     // 注册服务
-    CoRpc::IO *io = CoRpc::IO::create(1, 1);
+    corpc::IO *io = corpc::IO::create(1, 1);
     
     TestTcpServer *server = TestTcpServer::create(io, false, ip, port);
     
-    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<CoRpc::Connection> conn) {
+    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -106,7 +106,7 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
         
-        std::shared_ptr<CoRpc::SendMessageInfo> sendInfo(new CoRpc::SendMessageInfo);
+        std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
         sendInfo->type = 1;
         sendInfo->isRaw = false;
         sendInfo->msg = response;
@@ -114,7 +114,7 @@ int main(int argc, const char * argv[]) {
         conn->send(sendInfo);
     });
     
-    CoRpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
+    corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     
-    CoRpc::RoutineEnvironment::runEventLoop();
+    corpc::RoutineEnvironment::runEventLoop();
 }

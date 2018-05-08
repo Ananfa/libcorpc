@@ -20,7 +20,7 @@
 
 #include "helloworld.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 class ThreadSpecialResource {
 public:

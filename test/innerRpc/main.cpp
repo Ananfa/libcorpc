@@ -24,7 +24,7 @@
 
 #include <thread>
 
-using namespace CoRpc;
+using namespace corpc;
 
 class FooServiceImpl : public FooService {
 public:
@@ -230,19 +230,6 @@ static void *rpc_routine( void *arg )
     return NULL;
 }
 
-static void *test_routine( void *arg )
-{
-    co_enable_hook_sys();
-    
-    printf("test_routine begin\n");
-    
-    for (int i=0; i<500; i++) {
-        RoutineEnvironment::startCoroutine(rpc_routine, arg);
-    }
-    
-    return NULL;
-}
-
 static void clientEntry( InnerRpcServer *server ) {
     InnerRpcClient *client = InnerRpcClient::instance();
     
@@ -251,8 +238,6 @@ static void clientEntry( InnerRpcServer *server ) {
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
-    
-    //RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
     for (int i=0; i<500; i++) {
         RoutineEnvironment::startCoroutine(rpc_routine, &g_stubs);

@@ -2,6 +2,7 @@ DerivedData
 libcorpc_mac.xcworkspace/xcuserdata
 co/co.xcodeproj/xcuserdata
 corpc/corpc.xcodeproj/xcuserdata
+corpc_mysql/corpc_mysql.xcodeproj/xcuserdata
 test/interRpc/interRpc.xcodeproj/xcuserdata
 test/innerRpc/innerRpc.xcodeproj/xcuserdata
 test/echoTcp/echoTcp.xcodeproj/xcuserdata

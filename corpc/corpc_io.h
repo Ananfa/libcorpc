@@ -22,7 +22,7 @@
 
 #include <thread>
 
-namespace CoRpc {
+namespace corpc {
     
     class IO;
     class Receiver;
@@ -170,7 +170,7 @@ namespace CoRpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(CoRpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
+        PipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;

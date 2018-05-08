@@ -19,7 +19,7 @@
 
 #include "helloworld.pb.h"
 
-using namespace CoRpc;
+using namespace corpc;
 
 class HelloWorldServiceImpl : public HelloWorldService {
 public:

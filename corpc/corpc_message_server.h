@@ -22,11 +22,11 @@
 
 #include <google/protobuf/message.h>
 
-namespace CoRpc {
+namespace corpc {
     
-    class MessageServer: public CoRpc::Server {
+    class MessageServer: public corpc::Server {
     private:
-        class Connection: public CoRpc::Connection {
+        class Connection: public corpc::Connection {
         public:
             Connection(int fd, MessageServer* server);
             virtual ~Connection();
@@ -54,7 +54,7 @@ namespace CoRpc {
         };
         
         
-        class Worker: public CoRpc::CoroutineWorker {
+        class Worker: public corpc::CoroutineWorker {
         public:
             Worker(MessageServer *server): _server(server) {}
             virtual ~Worker() {}
@@ -77,16 +77,16 @@ namespace CoRpc {
                              bool needCoroutine,
                              MessageHandle handle);
         
-        static void* decode(std::shared_ptr<CoRpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         
-        static bool encode(std::shared_ptr<CoRpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
+        static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size);
         
     protected:
-        virtual CoRpc::Connection * buildConnection(int fd);
+        virtual corpc::Connection * buildConnection(int fd);
         
-        virtual void onConnect(std::shared_ptr<CoRpc::Connection>& connection);
+        virtual void onConnect(std::shared_ptr<corpc::Connection>& connection);
         
-        virtual void onClose(std::shared_ptr<CoRpc::Connection>& connection);
+        virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
         
     protected:
         bool _needHB; // 是否进行心跳
@@ -96,13 +96,13 @@ namespace CoRpc {
     
     class TcpMessageServer: public MessageServer {
     public:
-        TcpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
+        TcpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
         virtual ~TcpMessageServer() = 0;
     };
     
     class UdpMessageServer: public MessageServer {
     public:
-        UdpMessageServer(CoRpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
+        UdpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
         virtual ~UdpMessageServer() = 0;
     };
 }
