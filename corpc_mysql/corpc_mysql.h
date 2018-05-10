@@ -18,22 +18,50 @@
 #include <mysql.h>
 #include <thread>
 #include <list>
+#include <map>
 
 using namespace corpc;
 
 class MysqlConnectPool : public thirdparty::ThirdPartyService {
 public:
-    MysqlConnectPool(std::string &host, std::string &user, std::string &passwd, std::string &db, unsigned int port, std::string &unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum): _host(host), _user(user), _passwd(passwd), _db(db), _port(port), _unix_socket(unix_socket), _clientflag(clientflag), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum) {}
-    ~MysqlConnectPool() {}
+    class Proxy {
+    public:
+        MYSQL* take();
+        void put(MYSQL* mysql, bool error);
+        
+    private:
+        Proxy(MysqlConnectPool *pool);
+        ~Proxy();
+        
+        static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
+        
+    private:
+        thirdparty::ThirdPartyService::Stub *_stub;
+        
+    public:
+        friend class MysqlConnectPool;
+    };
+
+public:
     virtual void take(::google::protobuf::RpcController* controller,
                      const Void* request,
-                     thirdparty::Handle* response,
+                     thirdparty::TakeResponse* response,
                       ::google::protobuf::Closure* done);
     virtual void put(::google::protobuf::RpcController* controller,
-                     const thirdparty::Handle* request,
+                     const thirdparty::PutRequest* request,
                      Void* response,
                      ::google::protobuf::Closure* done);
     
+public:
+    static MysqlConnectPool* create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum);
+    
+    Proxy* getProxy();
+    
+private:
+    MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum);
+    ~MysqlConnectPool() {}
+    
+    void init();
 private:
     std::string _host;
     std::string _user;
@@ -49,6 +77,9 @@ private:
     
     std::list<MYSQL*> _idleList; // 空闲连接表
     std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
+    
+    InnerRpcServer *_server;
+    std::map<pid_t, Proxy*> _threadProxyMap; // 线程相关代理
 };
 
 #endif /* corpc_mysql_h */

@@ -36,18 +36,19 @@ void  protobuf_AddDesc_corpc_5fthirdparty_2eproto();
 void protobuf_AssignDesc_corpc_5fthirdparty_2eproto();
 void protobuf_ShutdownFile_corpc_5fthirdparty_2eproto();
 
-class Handle;
+class TakeResponse;
+class PutRequest;
 
 // ===================================================================
 
-class Handle : public ::google::protobuf::Message {
+class TakeResponse : public ::google::protobuf::Message {
  public:
-  Handle();
-  virtual ~Handle();
+  TakeResponse();
+  virtual ~TakeResponse();
 
-  Handle(const Handle& from);
+  TakeResponse(const TakeResponse& from);
 
-  inline Handle& operator=(const Handle& from) {
+  inline TakeResponse& operator=(const TakeResponse& from) {
     CopyFrom(from);
     return *this;
   }
@@ -61,17 +62,17 @@ class Handle : public ::google::protobuf::Message {
   }
 
   static const ::google::protobuf::Descriptor* descriptor();
-  static const Handle& default_instance();
+  static const TakeResponse& default_instance();
 
-  void Swap(Handle* other);
+  void Swap(TakeResponse* other);
 
   // implements Message ----------------------------------------------
 
-  Handle* New() const;
+  TakeResponse* New() const;
   void CopyFrom(const ::google::protobuf::Message& from);
   void MergeFrom(const ::google::protobuf::Message& from);
-  void CopyFrom(const Handle& from);
-  void MergeFrom(const Handle& from);
+  void CopyFrom(const TakeResponse& from);
+  void MergeFrom(const TakeResponse& from);
   void Clear();
   bool IsInitialized() const;
 
@@ -100,7 +101,7 @@ class Handle : public ::google::protobuf::Message {
   inline ::google::protobuf::uint64 handle() const;
   inline void set_handle(::google::protobuf::uint64 value);
 
-  // @@protoc_insertion_point(class_scope:corpc.thirdparty.Handle)
+  // @@protoc_insertion_point(class_scope:corpc.thirdparty.TakeResponse)
  private:
   inline void set_has_handle();
   inline void clear_has_handle();
@@ -115,7 +116,96 @@ class Handle : public ::google::protobuf::Message {
   friend void protobuf_ShutdownFile_corpc_5fthirdparty_2eproto();
 
   void InitAsDefaultInstance();
-  static Handle* default_instance_;
+  static TakeResponse* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class PutRequest : public ::google::protobuf::Message {
+ public:
+  PutRequest();
+  virtual ~PutRequest();
+
+  PutRequest(const PutRequest& from);
+
+  inline PutRequest& operator=(const PutRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const PutRequest& default_instance();
+
+  void Swap(PutRequest* other);
+
+  // implements Message ----------------------------------------------
+
+  PutRequest* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const PutRequest& from);
+  void MergeFrom(const PutRequest& from);
+  void Clear();
+  bool IsInitialized() const;
+
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+  ::google::protobuf::Metadata GetMetadata() const;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // required uint64 handle = 1;
+  inline bool has_handle() const;
+  inline void clear_handle();
+  static const int kHandleFieldNumber = 1;
+  inline ::google::protobuf::uint64 handle() const;
+  inline void set_handle(::google::protobuf::uint64 value);
+
+  // optional bool error = 2;
+  inline bool has_error() const;
+  inline void clear_error();
+  static const int kErrorFieldNumber = 2;
+  inline bool error() const;
+  inline void set_error(bool value);
+
+  // @@protoc_insertion_point(class_scope:corpc.thirdparty.PutRequest)
+ private:
+  inline void set_has_handle();
+  inline void clear_has_handle();
+  inline void set_has_error();
+  inline void clear_has_error();
+
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+
+  ::google::protobuf::uint32 _has_bits_[1];
+  mutable int _cached_size_;
+  ::google::protobuf::uint64 handle_;
+  bool error_;
+  friend void  protobuf_AddDesc_corpc_5fthirdparty_2eproto();
+  friend void protobuf_AssignDesc_corpc_5fthirdparty_2eproto();
+  friend void protobuf_ShutdownFile_corpc_5fthirdparty_2eproto();
+
+  void InitAsDefaultInstance();
+  static PutRequest* default_instance_;
 };
 // ===================================================================
 
@@ -134,10 +224,10 @@ class ThirdPartyService : public ::google::protobuf::Service {
 
   virtual void take(::google::protobuf::RpcController* controller,
                        const ::corpc::Void* request,
-                       ::corpc::thirdparty::Handle* response,
+                       ::corpc::thirdparty::TakeResponse* response,
                        ::google::protobuf::Closure* done);
   virtual void put(::google::protobuf::RpcController* controller,
-                       const ::corpc::thirdparty::Handle* request,
+                       const ::corpc::thirdparty::PutRequest* request,
                        ::corpc::Void* response,
                        ::google::protobuf::Closure* done);
 
@@ -171,10 +261,10 @@ class ThirdPartyService_Stub : public ThirdPartyService {
 
   void take(::google::protobuf::RpcController* controller,
                        const ::corpc::Void* request,
-                       ::corpc::thirdparty::Handle* response,
+                       ::corpc::thirdparty::TakeResponse* response,
                        ::google::protobuf::Closure* done);
   void put(::google::protobuf::RpcController* controller,
-                       const ::corpc::thirdparty::Handle* request,
+                       const ::corpc::thirdparty::PutRequest* request,
                        ::corpc::Void* response,
                        ::google::protobuf::Closure* done);
  private:
@@ -189,30 +279,82 @@ class ThirdPartyService_Stub : public ThirdPartyService {
 
 // ===================================================================
 
-// Handle
+// TakeResponse
 
 // required uint64 handle = 1;
-inline bool Handle::has_handle() const {
+inline bool TakeResponse::has_handle() const {
   return (_has_bits_[0] & 0x00000001u) != 0;
 }
-inline void Handle::set_has_handle() {
+inline void TakeResponse::set_has_handle() {
   _has_bits_[0] |= 0x00000001u;
 }
-inline void Handle::clear_has_handle() {
+inline void TakeResponse::clear_has_handle() {
   _has_bits_[0] &= ~0x00000001u;
 }
-inline void Handle::clear_handle() {
+inline void TakeResponse::clear_handle() {
   handle_ = GOOGLE_ULONGLONG(0);
   clear_has_handle();
 }
-inline ::google::protobuf::uint64 Handle::handle() const {
-  // @@protoc_insertion_point(field_get:corpc.thirdparty.Handle.handle)
+inline ::google::protobuf::uint64 TakeResponse::handle() const {
+  // @@protoc_insertion_point(field_get:corpc.thirdparty.TakeResponse.handle)
   return handle_;
 }
-inline void Handle::set_handle(::google::protobuf::uint64 value) {
+inline void TakeResponse::set_handle(::google::protobuf::uint64 value) {
   set_has_handle();
   handle_ = value;
-  // @@protoc_insertion_point(field_set:corpc.thirdparty.Handle.handle)
+  // @@protoc_insertion_point(field_set:corpc.thirdparty.TakeResponse.handle)
+}
+
+// -------------------------------------------------------------------
+
+// PutRequest
+
+// required uint64 handle = 1;
+inline bool PutRequest::has_handle() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void PutRequest::set_has_handle() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void PutRequest::clear_has_handle() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void PutRequest::clear_handle() {
+  handle_ = GOOGLE_ULONGLONG(0);
+  clear_has_handle();
+}
+inline ::google::protobuf::uint64 PutRequest::handle() const {
+  // @@protoc_insertion_point(field_get:corpc.thirdparty.PutRequest.handle)
+  return handle_;
+}
+inline void PutRequest::set_handle(::google::protobuf::uint64 value) {
+  set_has_handle();
+  handle_ = value;
+  // @@protoc_insertion_point(field_set:corpc.thirdparty.PutRequest.handle)
+}
+
+// optional bool error = 2;
+inline bool PutRequest::has_error() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void PutRequest::set_has_error() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void PutRequest::clear_has_error() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void PutRequest::clear_error() {
+  error_ = false;
+  clear_has_error();
+}
+inline bool PutRequest::error() const {
+  // @@protoc_insertion_point(field_get:corpc.thirdparty.PutRequest.error)
+  return error_;
+}
+inline void PutRequest::set_error(bool value) {
+  set_has_error();
+  error_ = value;
+  // @@protoc_insertion_point(field_set:corpc.thirdparty.PutRequest.error)
 }
 
 

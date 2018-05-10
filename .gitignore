@@ -7,6 +7,7 @@ example/example_interRpc/interRpc.xcodeproj/xcuserdata
 example/example_innerRpc/innerRpc.xcodeproj/xcuserdata
 example/example_echoTcp/echoTcp.xcodeproj/xcuserdata
 example/example_echoUdp/echoUdp.xcodeproj/xcuserdata
+example/example_mysql/example_mysql.xcodeproj/xcuserdata
 example/test*
 tutorial/tutorial1/tutorial1.xcodeproj/xcuserdata
 tutorial/tutorial2/tutorial2.xcodeproj/xcuserdata

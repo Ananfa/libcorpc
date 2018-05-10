@@ -82,6 +82,9 @@ static int iBarFailCnt = 0;
 static int iBazSuccCnt = 0;
 static int iBazFailCnt = 0;
 
+static int iTotalBazSend = 0;
+static int iTotalBazDone = 0;
+
 struct Test_Stubs {
     FooService::Stub *foo_clt;
     BarService::Stub *bar_clt;
@@ -115,7 +118,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d, average:Succ %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, averageSucc);
+        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -126,6 +129,19 @@ static void *log_routine( void *arg )
     }
     
     return NULL;
+}
+
+static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
+    if (controller->Failed()) {
+        iBazFailCnt++;
+    } else {
+        iBazSuccCnt++;
+    }
+    
+    iTotalBazDone++;
+    
+    delete controller;
+    delete request;
 }
 
 static void *rpc_routine( void *arg )
@@ -202,23 +218,9 @@ static void *rpc_routine( void *arg )
                 
                 request->set_text("Hello Baz");
                 
-                do {
-                    controller->Reset();
-                    testStubs->baz_clt->Baz(controller, request, NULL, NULL);
-                    
-                    if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                        iBazFailCnt++;
-                        
-                        usleep(100000);
-                    } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
-                        iBazSuccCnt++;
-                    }
-                } while (controller->Failed());
+                testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
                 
-                delete controller;
-                delete request;
+                iTotalBazSend++;
                 
                 break;
             }

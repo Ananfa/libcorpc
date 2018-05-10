@@ -36,20 +36,24 @@ namespace corpc {
         req->server = _server;
         req->co = co_self();
         req->request = request;
-        req->response = response;
+        
+        bool care_response = !method->options().GetExtension(corpc::not_care_response);
+        assert(care_response || done); // not_care_response need done
+        req->response = care_response ? response : NULL;
         req->controller = controller;
+        req->done = done;
         req->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         req->methodId = method->index();
         
-        _server->request(req);
+        _server->_queue.push(req);
         
-        co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
-        
-        delete req;
-        
-        // 正确返回
-        if (done) {
-            done->Run();
+        if (care_response) {
+            co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
+            
+            // 正确返回
+            if (done) {
+                done->Run();
+            }
         }
     }
     
@@ -64,10 +68,6 @@ namespace corpc {
     
     void InnerRpcClient::start() {
         RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
-    }
-    
-    void InnerRpcClient::response(stCoRoutine_t *co) {
-        _queue.push(co);
     }
     
     void *InnerRpcClient::responseQueueRoutine( void * arg ) {
@@ -168,10 +168,6 @@ namespace corpc {
         RoutineEnvironment::startCoroutine(requestQueueRoutine, this);
     }
     
-    void InnerRpcServer::request(InnerRpcRequest *request) {
-        _queue.push(request);
-    }
-    
     void *InnerRpcServer::requestQueueRoutine( void * arg ) {
         InnerRpcServer *server = (InnerRpcServer*)arg;
         
@@ -219,8 +215,16 @@ namespace corpc {
                     // rpc处理方法调用
                     server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
                     
-                    // 处理结果发回给Client
-                    request->client->response(request->co);
+                    if (request->response) {
+                        // 处理结果发回给Client
+                        request->client->_queue.push(request->co);
+                    } else {
+                        // not_care_response类型的rpc需要在这里触发回调清理request
+                        assert(request->done);
+                        request->done->Run();
+                    }
+                    
+                    delete request;
                 }
                 
                 // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
@@ -246,8 +250,16 @@ namespace corpc {
         
         server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
         
-        // 处理结果发回给Client
-        request->client->response(request->co);
+        if (request->response) {
+            // 处理结果发回给Client
+            request->client->_queue.push(request->co);
+        } else {
+            // not_care_response类型的rpc需要在这里触发回调清理request
+            assert(request->done);
+            request->done->Run();
+        }
+        
+        delete request;
         
         return NULL;
     }

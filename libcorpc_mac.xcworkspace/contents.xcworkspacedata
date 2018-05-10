@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:example/example_mysql/example_mysql.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:corpc_mysql/corpc_mysql.xcodeproj">
    </FileRef>
    <FileRef

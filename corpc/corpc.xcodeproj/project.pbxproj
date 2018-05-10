@@ -11,14 +11,12 @@
 		2D161BEC2058CAF10062BA35 /* corpc_utils.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D161BEA2058CAF10062BA35 /* corpc_utils.h */; };
 		2DB2B301204931A500114392 /* corpc_define.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F2204931A300114392 /* corpc_define.h */; };
 		2DB2B303204931A500114392 /* corpc_controller.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F4204931A300114392 /* corpc_controller.h */; };
-		2DB2B304204931A500114392 /* corpc_option.pb.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F5204931A300114392 /* corpc_option.pb.h */; };
 		2DB2B305204931A500114392 /* corpc_routine_env.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F6204931A300114392 /* corpc_routine_env.h */; };
 		2DB2B306204931A500114392 /* corpc_io.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2F7204931A300114392 /* corpc_io.cpp */; };
 		2DB2B308204931A500114392 /* corpc_rpc_server.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2F9204931A300114392 /* corpc_rpc_server.h */; };
 		2DB2B309204931A500114392 /* corpc_inner_rpc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2FA204931A400114392 /* corpc_inner_rpc.cpp */; };
 		2DB2B30A204931A500114392 /* corpc_rpc_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2FB204931A400114392 /* corpc_rpc_server.cpp */; };
 		2DB2B30B204931A500114392 /* corpc_io.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2FC204931A400114392 /* corpc_io.h */; };
-		2DB2B30C204931A500114392 /* corpc_option.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2FD204931A400114392 /* corpc_option.pb.cc */; };
 		2DB2B30D204931A500114392 /* corpc_inner_rpc.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DB2B2FE204931A400114392 /* corpc_inner_rpc.h */; };
 		2DB2B30E204931A500114392 /* corpc_routine_env.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2FF204931A400114392 /* corpc_routine_env.cpp */; };
 		2DB2B3352049366C00114392 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DB2B2ED204929EE00114392 /* libco.dylib */; };
@@ -26,6 +24,8 @@
 		2DEA997D208480960095C62F /* corpc_rpc_client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DB2B2F3204931A300114392 /* corpc_rpc_client.cpp */; };
 		2DEA99B8208DAE3A0095C62F /* corpc_message_server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA99B6208DAE3A0095C62F /* corpc_message_server.cpp */; };
 		2DEA99B9208DAE3A0095C62F /* corpc_message_server.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA99B7208DAE3A0095C62F /* corpc_message_server.h */; };
+		2DEA9A8C20A2E7C90095C62F /* corpc_option.pb.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9A8A20A2E7C90095C62F /* corpc_option.pb.h */; };
+		2DEA9A8D20A2E7C90095C62F /* corpc_option.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A8B20A2E7C90095C62F /* corpc_option.pb.cc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,7 +36,6 @@
 		2DB2B2F2204931A300114392 /* corpc_define.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_define.h; sourceTree = "<group>"; };
 		2DB2B2F3204931A300114392 /* corpc_rpc_client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_rpc_client.cpp; sourceTree = "<group>"; };
 		2DB2B2F4204931A300114392 /* corpc_controller.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_controller.h; sourceTree = "<group>"; };
-		2DB2B2F5204931A300114392 /* corpc_option.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_option.pb.h; sourceTree = "<group>"; };
 		2DB2B2F6204931A300114392 /* corpc_routine_env.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_routine_env.h; sourceTree = "<group>"; };
 		2DB2B2F7204931A300114392 /* corpc_io.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_io.cpp; sourceTree = "<group>"; };
 		2DB2B2F8204931A300114392 /* corpc_rpc_client.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_rpc_client.h; sourceTree = "<group>"; };
@@ -44,11 +43,12 @@
 		2DB2B2FA204931A400114392 /* corpc_inner_rpc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_inner_rpc.cpp; sourceTree = "<group>"; };
 		2DB2B2FB204931A400114392 /* corpc_rpc_server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_rpc_server.cpp; sourceTree = "<group>"; };
 		2DB2B2FC204931A400114392 /* corpc_io.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_io.h; sourceTree = "<group>"; };
-		2DB2B2FD204931A400114392 /* corpc_option.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_option.pb.cc; sourceTree = "<group>"; };
 		2DB2B2FE204931A400114392 /* corpc_inner_rpc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_inner_rpc.h; sourceTree = "<group>"; };
 		2DB2B2FF204931A400114392 /* corpc_routine_env.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_routine_env.cpp; sourceTree = "<group>"; };
 		2DEA99B6208DAE3A0095C62F /* corpc_message_server.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_message_server.cpp; sourceTree = "<group>"; };
 		2DEA99B7208DAE3A0095C62F /* corpc_message_server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_message_server.h; sourceTree = "<group>"; };
+		2DEA9A8A20A2E7C90095C62F /* corpc_option.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = corpc_option.pb.h; path = ../proto/corpc_option.pb.h; sourceTree = "<group>"; };
+		2DEA9A8B20A2E7C90095C62F /* corpc_option.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = corpc_option.pb.cc; path = ../proto/corpc_option.pb.cc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +83,8 @@
 		2DB2B2CE2049298900114392 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				2DEA9A8B20A2E7C90095C62F /* corpc_option.pb.cc */,
+				2DEA9A8A20A2E7C90095C62F /* corpc_option.pb.h */,
 				2DB2B2F3204931A300114392 /* corpc_rpc_client.cpp */,
 				2DB2B2F8204931A300114392 /* corpc_rpc_client.h */,
 				2DB2B2F4204931A300114392 /* corpc_controller.h */,
@@ -91,8 +93,6 @@
 				2DB2B2FE204931A400114392 /* corpc_inner_rpc.h */,
 				2DB2B2F7204931A300114392 /* corpc_io.cpp */,
 				2DB2B2FC204931A400114392 /* corpc_io.h */,
-				2DB2B2FD204931A400114392 /* corpc_option.pb.cc */,
-				2DB2B2F5204931A300114392 /* corpc_option.pb.h */,
 				2DB2B2FF204931A400114392 /* corpc_routine_env.cpp */,
 				2DB2B2F6204931A300114392 /* corpc_routine_env.h */,
 				2DB2B2FB204931A400114392 /* corpc_rpc_server.cpp */,
@@ -122,13 +122,13 @@
 			files = (
 				2DB2B303204931A500114392 /* corpc_controller.h in Headers */,
 				2DEA99B9208DAE3A0095C62F /* corpc_message_server.h in Headers */,
+				2DEA9A8C20A2E7C90095C62F /* corpc_option.pb.h in Headers */,
 				2DB2B305204931A500114392 /* corpc_routine_env.h in Headers */,
 				2DB2B30B204931A500114392 /* corpc_io.h in Headers */,
 				2DB2B301204931A500114392 /* corpc_define.h in Headers */,
 				2DB2B308204931A500114392 /* corpc_rpc_server.h in Headers */,
 				2DB2B30D204931A500114392 /* corpc_inner_rpc.h in Headers */,
 				2D161BEC2058CAF10062BA35 /* corpc_utils.h in Headers */,
-				2DB2B304204931A500114392 /* corpc_option.pb.h in Headers */,
 				2DEA997C208480940095C62F /* corpc_rpc_client.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -191,11 +191,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DEA997D208480960095C62F /* corpc_rpc_client.cpp in Sources */,
-				2DB2B30C204931A500114392 /* corpc_option.pb.cc in Sources */,
 				2DEA99B8208DAE3A0095C62F /* corpc_message_server.cpp in Sources */,
 				2D161BEB2058CAF10062BA35 /* corpc_utils.cpp in Sources */,
 				2DB2B309204931A500114392 /* corpc_inner_rpc.cpp in Sources */,
 				2DB2B30A204931A500114392 /* corpc_rpc_server.cpp in Sources */,
+				2DEA9A8D20A2E7C90095C62F /* corpc_option.pb.cc in Sources */,
 				2DB2B30E204931A500114392 /* corpc_routine_env.cpp in Sources */,
 				2DB2B306204931A500114392 /* corpc_io.cpp in Sources */,
 			);

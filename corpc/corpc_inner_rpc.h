@@ -35,6 +35,7 @@ namespace corpc {
         const google::protobuf::Message* request;
         google::protobuf::Message* response;
         google::protobuf::RpcController *controller;
+        google::protobuf::Closure *done;
         uint32_t serviceId;
         uint32_t methodId;
     };
@@ -74,8 +75,6 @@ namespace corpc {
         
         void start();
         
-        void response(stCoRoutine_t *co);
-        
         static void *responseQueueRoutine( void * arg );
         
     private:
@@ -106,8 +105,6 @@ namespace corpc {
         ~InnerRpcServer() {}  // 不允许在栈上创建server
         
         void start();
-        
-        void request(InnerRpcRequest *request);
         
         static void *requestQueueRoutine( void * arg );   // 处理Request，若rpc定义了need_coroutine，启动单独的taskCallRoutine协程来处理rpc任务
         
