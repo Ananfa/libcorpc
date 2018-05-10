@@ -160,13 +160,13 @@ namespace corpc {
         RpcServer *server = conn->getServer();
         
         uint32_t reqSize = *(uint32_t *)head;
-        reqSize = ntohl(reqSize);
+        reqSize = be32toh(reqSize);
         uint32_t serviceId = *(uint32_t *)(head + 4);
-        serviceId = ntohl(serviceId);
+        serviceId = be32toh(serviceId);
         uint32_t methodId = *(uint32_t *)(head + 8);
-        methodId = ntohl(methodId);
+        methodId = be32toh(methodId);
         uint64_t callId = *(uint64_t *)(head + 12);
-        callId = ntohll(callId);
+        callId = be64toh(callId);
         
         // 生成ServerRpcTask
         // 根据serverId和methodId查表
@@ -215,8 +215,8 @@ namespace corpc {
             return true;
         }
         
-        *(uint32_t *)buf = htonl(msgSize);
-        *(uint64_t *)(buf + 4) = htonll(rpcTask->callId);
+        *(uint32_t *)buf = htobe32(msgSize);
+        *(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
         
         rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
         size = CORPC_RESPONSE_HEAD_SIZE + msgSize;

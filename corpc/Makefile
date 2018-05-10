@@ -23,7 +23,7 @@ DIR_OBJ = ./${v}/obj/
 DIR_STATICLIB = ./lib/
 DIR_DYNAMICLIB = ./solib/
 
-OBJS = corpc_option.pb.o corpc_utils.o corpc_routine_env.o corpc_io.o corpc_server.o corpc_client.o corpc_inner.o
+OBJS = corpc_option.pb.o corpc_utils.o corpc_routine_env.o corpc_io.o corpc_rpc_server.o corpc_rpc_client.o corpc_inner_rpc.o corpc_message_server.o
 OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
 empty =  

@@ -185,11 +185,11 @@ namespace corpc {
                 // 解析消息长度值
                 if (_bodySizeType == TWO_BYTES) {
                     uint16_t x = *(uint16_t*)(_headBuf + _bodySizeOffset);
-                    _bodySize = ntohs(x);
+                    _bodySize = be16toh(x);
                 } else {
                     assert(_bodySizeType == FOUR_BYTES);
                     uint32_t x = *(uint32_t*)(_headBuf + _bodySizeOffset);
-                    _bodySize = ntohl(x);
+                    _bodySize = be32toh(x);
                 }
                 
                 if (_bodySize > _maxBodySize) { // 数据超长
@@ -439,8 +439,8 @@ namespace corpc {
     
     UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0) {
         _shakemsg2buf = (uint8_t *)_shakemsg2.data();
-        *(uint32_t *)_shakemsg2buf = htonl(0);
-        *(uint32_t *)(_shakemsg2buf + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+        *(uint32_t *)_shakemsg2buf = htobe32(0);
+        *(uint32_t *)(_shakemsg2buf + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
     }
     
     void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -473,9 +473,9 @@ namespace corpc {
             }
             
             uint32_t bodySize = *(uint32_t *)buf;
-            bodySize = ntohl(bodySize);
+            bodySize = be32toh(bodySize);
             int32_t msgType = *(int32_t *)(buf + 4);
-            msgType = ntohl(msgType);
+            msgType = be32toh(msgType);
             
             // 判断是否“连接请求”消息
             if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
@@ -548,7 +548,7 @@ namespace corpc {
             } else {
                 // 判断是否“最终确认消息”
                 uint32_t msgtype = *(uint32_t *)(buf + 4);
-                msgtype = ntohl(msgtype);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
                     // 消息类型不对

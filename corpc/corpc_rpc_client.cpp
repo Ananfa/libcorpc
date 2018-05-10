@@ -37,9 +37,9 @@ namespace corpc {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         uint32_t respSize = *(uint32_t *)head;
-        respSize = ntohl(respSize);
+        respSize = be32toh(respSize);
         uint64_t callId = *(uint64_t *)(head + 4);
-        callId = ntohll(callId);
+        callId = be64toh(callId);
         
         std::shared_ptr<ClientTask> task;
         // 注意: _waitResultCoMap需进行线程同步
@@ -87,11 +87,11 @@ namespace corpc {
             return true;
         }
         
-        *(uint32_t *)buf = htonl(msgSize);
-        *(uint32_t *)(buf + 4) = htonl(rpcTask->serviceId);
-        *(uint32_t *)(buf + 8) = htonl(rpcTask->methodId);
+        *(uint32_t *)buf = htobe32(msgSize);
+        *(uint32_t *)(buf + 4) = htobe32(rpcTask->serviceId);
+        *(uint32_t *)(buf + 8) = htobe32(rpcTask->methodId);
         uint64_t callId = uint64_t(rpcTask->co);
-        *(uint64_t *)(buf + 12) = htonll(callId);
+        *(uint64_t *)(buf + 12) = htobe64(callId);
         
         rpcTask->request->SerializeWithCachedSizesToArray(buf + CORPC_REQUEST_HEAD_SIZE);
         size = CORPC_REQUEST_HEAD_SIZE + msgSize;

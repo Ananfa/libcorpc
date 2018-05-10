@@ -122,9 +122,9 @@ namespace corpc {
         MessageServer *server = conn->getServer();
         
         uint32_t bodySize = *(uint32_t *)head;
-        bodySize = ntohl(bodySize);
+        bodySize = be32toh(bodySize);
         int32_t msgType = *(int32_t *)(head + 4);
-        msgType = ntohl(msgType);
+        msgType = be32toh(msgType);
         
         // 处理系统类型消息，如：心跳
         // 注意：如果是UDP握手消息怎么办？
@@ -197,8 +197,8 @@ namespace corpc {
             msg->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
         }
         
-        *(uint32_t *)buf = htonl(msgSize);
-        *(uint32_t *)(buf + 4) = htonl(msgInfo->type);
+        *(uint32_t *)buf = htobe32(msgSize);
+        *(uint32_t *)(buf + 4) = htobe32(msgInfo->type);
         size = CORPC_MESSAGE_HEAD_SIZE + msgSize;
         
         return true;
