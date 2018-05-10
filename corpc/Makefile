@@ -14,49 +14,78 @@
 # limitations under the License.
 #
 
-
-COMM_MAKE = 1
-COMM_ECHO = 1
-version=0.1
 v=debug
-include ../co/co.mk
 
-########## options ##########
-CFLAGS += -fno-strict-aliasing -Wall -export-dynamic \
-	-Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64
+DIR_SRC = ./ ../proto/
+DIR_LIB = ../co/lib/ /usr/local/lib/
+DIR_INC = ./ ../proto/ ../co/
+DIR_OBJ = ./${v}/obj/
+DIR_STATICLIB = ./lib/
+DIR_DYNAMICLIB = ./solib/
 
-UNAME := $(shell uname -s)
+OBJS = corpc_option.pb.o corpc_utils.o corpc_routine_env.o corpc_io.o corpc_server.o corpc_client.o corpc_inner.o
+OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
-INCLS += -I../co
+empty =  
+space =${empty} ${empty}  
+VPATH := ${subst ${space},:,${DIR_SRC}}:${DIR_STATICLIB}:${DIR_DYNAMICLIB}  
+vpath %.o ${DIR_OBJ}  
+vpath %.d ${DIR_OBJ}  
 
-ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L../co/lib -L/usr/local/lib -lcolib -lprotobuf -lpthread
+INCLS = ${foreach n,${DIR_INC},-I${n}}
+
+CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
+    -fno-strict-aliasing -Wall -export-dynamic \
+    -D_GNU_SOURCE -D_REENTRANT -Wno-deprecated -m64
+
+ifeq ($v,release)
+CFLAGS += -O2
 else
-LINKS += -g -L../co/lib -L/usr/local/lib -lcolib -lprotobuf -lpthread -ldl
+CFLAGS += -g -Ddebug -fno-inline
 endif
 
-CORPCLIB_OBJS=corpc_option.pb.o corpc_utils.o corpc_routine_env.o corpc_io.o corpc_server.o corpc_client.o corpc_inner.o
+CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
 
-PROGS = corpclib
+ARSTATICLIB = ar -rc $(DIR_STATICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}}
 
-all:$(PROGS)
+BUILDSHARELIB = ${CXX} -fPIC -shared -O2 -pipe -L../co/solib/ -o $(DIR_DYNAMICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}}
 
-corpclib:libcorpclib.a libcorpclib.so
+BUILDDEP = ${CXX} $(CFLAGS) -MM -MT "$(subst .c,.o,${notdir $<}) $(subst .c,.d,${notdir $<})" -MF "$(subst .c,.d,${DIR_OBJ}${notdir $<})" $< 
 
-libcorpclib.a: $(CORPCLIB_OBJS)
-	$(ARSTATICLIB) 
-libcorpclib.so: $(CORPCLIB_OBJS)
-	$(BUILDSHARELIB) 
+STATICLIB = libcorpc.a
+DYNAMICLIB = libcorpc.so
 
-dist: clean libcorpc-$(version).src.tar.gz
+%.o: %.cpp
+	${CPPCOMPILE}
+%.o: %.cc
+	${CPPCOMPILE}
 
-libcorpc-$(version).src.tar.gz:
-	@find . -type f | grep -v CVS | grep -v .svn | sed s:^./:libcorpc-$(version)/: > MANIFEST
-	@(cd ..; ln -s libcorpc_pub libcorpc-$(version))
-	(cd ..; tar cvf - `cat libcorpc_pub/MANIFEST` | gzip > libcorpc_pub/libco-$(version).src.tar.gz)
-	@(cd ..; rm libcorpc-$(version))
+%.d:%.cpp
+	${CXX} $(CFLAGS) -MM -MT "${subst .cpp,.o,${notdir $<}} ${subst .cpp,.d,${notdir $<}}" -MF "${subst .cpp,.d,${DIR_OBJ}${notdir $<}}" $< 
+%.d:%.cc
+	${CXX} $(CFLAGS) -MM -MT "${subst .cc,.o,${notdir $<}} ${subst .cc,.d,${notdir $<}}" -MF "${subst .cc,.d,${DIR_OBJ}${notdir $<}}" $< 
+  
+.PHONY: all
+all: directories ${STATICLIB} ${DYNAMICLIB}
 
+libcorpc.a: ${OBJS:.o=.d} ${OBJS}
+	${ARSTATICLIB}
+
+libcorpc.so: ${OBJS:.o=.d} ${OBJS}
+	${BUILDSHARELIB}
+
+.PHONY: directories 
+directories:
+	mkdir -p ${DIR_OBJ}
+	mkdir -p ${DIR_STATICLIB}
+	mkdir -p ${DIR_DYNAMICLIB}
+
+ifneq ($(MAKECMDGOALS),clean)
+-include ${OBJS_WITH_PATH:.o=.d}
+endif
+
+.PHONY: clean
 clean:
-	$(CLEAN) *.o $(PROGS)
-	rm -fr MANIFEST lib solib libcorpc-$(version).src.tar.gz libcorpc-$(version)
-
+	rm -rf ${DIR_OBJ}
+	rm -rf ${DIR_STATICLIB}
+	rm -rf ${DIR_DYNAMICLIB}
