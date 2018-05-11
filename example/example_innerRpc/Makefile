@@ -41,7 +41,7 @@ CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
 ifeq ($v,release)
 CFLAGS += -O2
 else
-CFLAGS += -g -Ddebug -fno-inline
+CFLAGS += -g -DDebug -fno-inline
 endif
 
 ifneq ($v,release)
@@ -57,7 +57,7 @@ LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread -ldl
 endif
 
 CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
-BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
+BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}} ${LINKS} 
 
 PROGS = inner
 
