@@ -30,9 +30,9 @@ CFLAGS += -fno-strict-aliasing -Wall -export-dynamic \
 UNAME := $(shell uname -s)
 
 ifeq ($(UNAME), FreeBSD)
-LINKS += -g -L./lib -lcolib -lpthread
+LINKS += -g -L./lib -lco -lpthread
 else
-LINKS += -g -L./lib -lcolib -lpthread -ldl
+LINKS += -g -L./lib -lco -lpthread -ldl
 endif
 
 COLIB_OBJS=co_epoll.o co_routine.o co_hook_sys_call.o coctx_swap.o coctx.o
@@ -42,11 +42,11 @@ PROGS = colib example_poll example_echosvr example_echocli example_thread  examp
 
 all:$(PROGS)
 
-colib:libcolib.a libcolib.so
+colib:libco.a libco.so
 
-libcolib.a: $(COLIB_OBJS)
+libco.a: $(COLIB_OBJS)
 	$(ARSTATICLIB) 
-libcolib.so: $(COLIB_OBJS)
+libco.so: $(COLIB_OBJS)
 	$(BUILDSHARELIB) 
 
 example_echosvr:example_echosvr.o

@@ -17,7 +17,6 @@
 v=debug
 
 DIR_SRC = ./ ../proto/
-DIR_LIB = ../co/lib/ /usr/local/lib/
 DIR_INC = ./ ../proto/ ../co/
 DIR_OBJ = ./${v}/obj/
 DIR_STATICLIB = ./lib/
@@ -41,16 +40,14 @@ CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
 ifeq ($v,release)
 CFLAGS += -O2
 else
-CFLAGS += -g -Ddebug -fno-inline
+CFLAGS += -g -DDebug -fno-inline
 endif
 
 CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
 
-ARSTATICLIB = ar -rc $(DIR_STATICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}}
+ARSTATICLIB = ar -rc $(DIR_STATICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}}
 
-BUILDSHARELIB = ${CXX} -fPIC -shared -O2 -pipe -L../co/solib/ -o $(DIR_DYNAMICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}}
-
-BUILDDEP = ${CXX} $(CFLAGS) -MM -MT "$(subst .c,.o,${notdir $<}) $(subst .c,.d,${notdir $<})" -MF "$(subst .c,.d,${DIR_OBJ}${notdir $<})" $< 
+BUILDSHARELIB = ${CXX} -fPIC -shared -O2 -pipe -L../co/solib/ -o $(DIR_DYNAMICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}}
 
 STATICLIB = libcorpc.a
 DYNAMICLIB = libcorpc.so

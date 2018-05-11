@@ -1,5 +1,5 @@
 #
-# Created by Xianke Liu on 2018/3/14.
+# Created by Xianke Liu on 2018/5/11.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); 
 # you may not use this file except in compliance with the License. 
@@ -22,7 +22,7 @@ DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
 DIR_OBJ = ./${v}/obj/
 DIR_BIN = ./${v}/bin/
 
-PROTO_OBJS = factorial.pb.o
+PROTO_OBJS = echo.pb.o
 SERVER_OBJS = ${PROTO_OBJS} server.o
 CLIENT_OBJS = ${PROTO_OBJS} client.o
 ALL_OBJS = ${PROTO_OBJS} server.o client.o

@@ -51,15 +51,13 @@ endif
 UNAME := ${shell uname -s}
 
 ifeq (${UNAME}, FreeBSD)
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread
 else
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpclib -lcolib -lprotobuf -lpthread -ldl
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread -ldl
 endif
 
 CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
 BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
-
-BUILDDEP = ${CXX} $(CFLAGS) -MM -MT "$(subst .c,.o,${notdir $<}) $(subst .c,.d,${notdir $<})" -MF "$(subst .c,.d,${DIR_OBJ}${notdir $<})" $< 
 
 PROGS = inner
 

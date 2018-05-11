@@ -313,6 +313,7 @@ int connect(int fd, const struct sockaddr *address, socklen_t address_len)
 		// return 0;
         //
         // code now:
+#if defined( __APPLE__ )
         g_sys_connect_func( fd,address,address_len );
         if (errno == EISCONN)
         {
@@ -323,6 +324,10 @@ int connect(int fd, const struct sockaddr *address, socklen_t address_len)
         {
             return -1;
         }
+#else
+        errno = 0;
+        return 0;
+#endif
 	}
 
 	//3.set errno

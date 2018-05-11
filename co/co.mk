@@ -33,7 +33,7 @@ CSHARE = $(CC) -fPIC -shared -O2 -pipe -L$(SRCROOT)/solib/ -o
 ifeq ($v,release)
 CFLAGS= -O2 $(INCLS) -std=gnu++11 -fPIC  -DLINUX -pipe -Wno-deprecated -c
 else
-CFLAGS= -g -Ddebug $(INCLS) -std=gnu++11 -fPIC -DLINUX -pipe -c -fno-inline
+CFLAGS= -g -DDebug $(INCLS) -std=gnu++11 -fPIC -DLINUX -pipe -c -fno-inline
 endif
 
 ifneq ($v,release)

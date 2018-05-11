@@ -175,7 +175,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
 }
 
 MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    MysqlConnectPool *pool = new MysqlConnectPool(host, user, passwd, db, 0, unix_socket, 0, maxConnectNum, maxIdleNum);
+    MysqlConnectPool *pool = new MysqlConnectPool(host, user, passwd, db, port, unix_socket, clientflag, maxConnectNum, maxIdleNum);
     pool->init();
     
     return pool;

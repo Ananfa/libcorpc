@@ -1,5 +1,5 @@
 #
-# Created by Xianke Liu on 2018/3/14.
+# Created by Xianke Liu on 2018/5/10.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); 
 # you may not use this file except in compliance with the License. 
@@ -17,20 +17,17 @@
 v=debug
 
 DIR_SRC = ./ ../proto/
-DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
-DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_INC = ./ ../proto/ ../co/ ../corpc/ /usr/include/mysql/
 DIR_OBJ = ./${v}/obj/
-DIR_BIN = ./${v}/bin/
+DIR_STATICLIB = ./lib/
+DIR_DYNAMICLIB = ./solib/
 
-PROTO_OBJS = factorial.pb.o
-SERVER_OBJS = ${PROTO_OBJS} server.o
-CLIENT_OBJS = ${PROTO_OBJS} client.o
-ALL_OBJS = ${PROTO_OBJS} server.o client.o
-ALL_OBJS_WITH_PATH = ${foreach n,${ALL_OBJS},${DIR_OBJ}${n}}
+OBJS = corpc_thirdparty.pb.o corpc_mysql.o
+OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
 empty =  
 space =${empty} ${empty}  
-VPATH := ${subst ${space},:,${DIR_SRC}}:${DIR_BIN}  
+VPATH := ${subst ${space},:,${DIR_SRC}}:${DIR_STATICLIB}:${DIR_DYNAMICLIB}  
 vpath %.o ${DIR_OBJ}  
 vpath %.d ${DIR_OBJ}  
 
@@ -43,25 +40,17 @@ CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
 ifeq ($v,release)
 CFLAGS += -O2
 else
-CFLAGS += -g -Ddebug -fno-inline
-endif
-
-ifneq ($v,release)
-BFLAGS = -g
-endif
-
-UNAME := ${shell uname -s}
-
-ifeq (${UNAME}, FreeBSD)
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread
-else
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread -ldl
+CFLAGS += -g -DDebug -fno-inline
 endif
 
 CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
-BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
 
-PROGS = server client
+ARSTATICLIB = ar -rc $(DIR_STATICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}}
+
+BUILDSHARELIB = ${CXX} -fPIC -shared -O2 -pipe -L../co/solib/ -o $(DIR_DYNAMICLIB)$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}}
+
+STATICLIB = libcorpc_mysql.a
+DYNAMICLIB = libcorpc_mysql.so
 
 %.o: %.cpp
 	${CPPCOMPILE}
@@ -74,23 +63,26 @@ PROGS = server client
 	${CXX} $(CFLAGS) -MM -MT "${subst .cc,.o,${notdir $<}} ${subst .cc,.d,${notdir $<}}" -MF "${subst .cc,.d,${DIR_OBJ}${notdir $<}}" $< 
   
 .PHONY: all
-all: directories ${PROGS}
+all: directories ${STATICLIB} ${DYNAMICLIB}
 
-server: ${SERVER_OBJS:.o=.d} ${SERVER_OBJS}
-	${BUILDEXE}
-client: ${CLIENT_OBJS:.o=.d} $(CLIENT_OBJS)
-	${BUILDEXE}
+libcorpc_mysql.a: ${OBJS:.o=.d} ${OBJS}
+	${ARSTATICLIB}
+
+libcorpc_mysql.so: ${OBJS:.o=.d} ${OBJS}
+	${BUILDSHARELIB}
 
 .PHONY: directories 
 directories:
 	mkdir -p ${DIR_OBJ}
-	mkdir -p ${DIR_BIN}
+	mkdir -p ${DIR_STATICLIB}
+	mkdir -p ${DIR_DYNAMICLIB}
 
 ifneq ($(MAKECMDGOALS),clean)
--include ${ALL_OBJS_WITH_PATH:.o=.d}
+-include ${OBJS_WITH_PATH:.o=.d}
 endif
 
 .PHONY: clean
 clean:
 	rm -rf ${DIR_OBJ}
-	rm -rf ${DIR_BIN}
+	rm -rf ${DIR_STATICLIB}
+	rm -rf ${DIR_DYNAMICLIB}

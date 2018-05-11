@@ -1,5 +1,5 @@
 #
-# Created by Xianke Liu on 2018/3/14.
+# Created by Xianke Liu on 2018/5/10.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); 
 # you may not use this file except in compliance with the License. 
@@ -17,16 +17,13 @@
 v=debug
 
 DIR_SRC = ./ ../proto/
-DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
-DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_LIB = ../../co/lib/ ../../corpc/lib/ ../../corpc_mysql/lib/ /usr/local/lib/ /usr/lib64/mysql/
+DIR_INC = ./ ../../proto/ ../../co/ ../../corpc/ ../../corpc_mysql/ /usr/include/mysql/
 DIR_OBJ = ./${v}/obj/
 DIR_BIN = ./${v}/bin/
 
-PROTO_OBJS = factorial.pb.o
-SERVER_OBJS = ${PROTO_OBJS} server.o
-CLIENT_OBJS = ${PROTO_OBJS} client.o
-ALL_OBJS = ${PROTO_OBJS} server.o client.o
-ALL_OBJS_WITH_PATH = ${foreach n,${ALL_OBJS},${DIR_OBJ}${n}}
+OBJS = main.o
+OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
 empty =  
 space =${empty} ${empty}  
@@ -43,7 +40,7 @@ CFLAGS = ${INCLS} -std=gnu++11 -fPIC -DLINUX -pipe -c \
 ifeq ($v,release)
 CFLAGS += -O2
 else
-CFLAGS += -g -Ddebug -fno-inline
+CFLAGS += -g -DDebug -fno-inline
 endif
 
 ifneq ($v,release)
@@ -53,15 +50,15 @@ endif
 UNAME := ${shell uname -s}
 
 ifeq (${UNAME}, FreeBSD)
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc_mysql -lcorpc -lco -lprotobuf -lmysqlclient -lpthread
 else
-LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc -lco -lprotobuf -lpthread -ldl
+LINKS = -g ${foreach n,${DIR_LIB},-L${n}} -lcorpc_mysql -lcorpc -lco -lprotobuf -lmysqlclient -lpthread -ldl
 endif
 
 CPPCOMPILE = ${CXX} ${CFLAGS} $< -o ${DIR_OBJ}$@
-BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${n}} ${LINKS} 
+BUILDEXE = ${CXX} ${BFLAGS} -o ${DIR_BIN}$@ ${foreach n,${filter %.o, $^},${DIR_OBJ}${notdir ${n}}} ${LINKS} 
 
-PROGS = server client
+PROGS = example_mysql
 
 %.o: %.cpp
 	${CPPCOMPILE}
@@ -76,9 +73,7 @@ PROGS = server client
 .PHONY: all
 all: directories ${PROGS}
 
-server: ${SERVER_OBJS:.o=.d} ${SERVER_OBJS}
-	${BUILDEXE}
-client: ${CLIENT_OBJS:.o=.d} $(CLIENT_OBJS)
+example_mysql: ${OBJS:.o=.d} ${OBJS}
 	${BUILDEXE}
 
 .PHONY: directories 
@@ -87,7 +82,7 @@ directories:
 	mkdir -p ${DIR_BIN}
 
 ifneq ($(MAKECMDGOALS),clean)
--include ${ALL_OBJS_WITH_PATH:.o=.d}
+-include ${OBJS_WITH_PATH:.o=.d}
 endif
 
 .PHONY: clean
