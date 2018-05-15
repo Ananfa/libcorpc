@@ -1,5 +1,5 @@
 /*
- * Created by Xianke Liu on 2018/5/8.
+ * Created by Xianke Liu on 2018/5/14.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef corpc_mysql_h
-#define corpc_mysql_h
+#ifndef corpc_memcached_h
+#define corpc_memcached_h
 
 #include "corpc_routine_env.h"
 #include "corpc_controller.h"
@@ -23,22 +23,19 @@
 
 #include "corpc_thirdparty.pb.h"
 
-#include <mysql.h>
-#include <thread>
-#include <list>
-#include <map>
+#include <libmemcached/memcached.h>
 
 using namespace corpc;
 
-class MysqlConnectPool : public thirdparty::ThirdPartyService {
+class MemcachedConnectPool : public thirdparty::ThirdPartyService {
 public:
     class Proxy {
     public:
-        MYSQL* take();
-        void put(MYSQL* mysql, bool error);
+        memcached_st* take();
+        void put(memcached_st* memc, bool error);
         
     private:
-        Proxy(MysqlConnectPool *pool);
+        Proxy(MemcachedConnectPool *pool);
         ~Proxy();
         
         static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
@@ -47,13 +44,13 @@ public:
         thirdparty::ThirdPartyService::Stub *_stub;
         
     public:
-        friend class MysqlConnectPool;
+        friend class MemcachedConnectPool;
     };
-
+    
 public:
     virtual void take(::google::protobuf::RpcController* controller,
-                     const Void* request,
-                     thirdparty::TakeResponse* response,
+                      const Void* request,
+                      thirdparty::TakeResponse* response,
                       ::google::protobuf::Closure* done);
     virtual void put(::google::protobuf::RpcController* controller,
                      const thirdparty::PutRequest* request,
@@ -61,33 +58,27 @@ public:
                      ::google::protobuf::Closure* done);
     
 public:
-    static MysqlConnectPool* create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum);
+    static MemcachedConnectPool* create(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum);
     
     Proxy* getProxy();
     
 private:
-    MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum);
-    ~MysqlConnectPool() {}
+    MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum);
+    ~MemcachedConnectPool() {}
     
     void init();
 private:
-    std::string _host;
-    std::string _user;
-    std::string _passwd;
-    std::string _db;
-    unsigned int _port;
-    std::string _unix_socket;
-    unsigned long _clientflag;
+    memcached_server_st *_memcServers; // memcached服务器列表
     
     uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
     uint32_t _maxIdleNum;       // 最大空闲连接数量
     uint32_t _realConnectCount; // 当前实际建立连接的数量
     
-    std::list<MYSQL*> _idleList; // 空闲连接表
+    std::list<memcached_st*> _idleList; // 空闲连接表
     std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
     
     InnerRpcServer *_server;
     std::map<pid_t, Proxy*> _threadProxyMap; // 线程相关代理
 };
 
-#endif /* corpc_mysql_h */
+#endif /* corpc_memcached_h */

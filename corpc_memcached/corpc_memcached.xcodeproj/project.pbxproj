@@ -7,64 +7,64 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DEA9A5C20A143140095C62F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A5E20A143140095C62F /* libco.dylib */; };
-		2DEA9A5D20A143140095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A5F20A143140095C62F /* libcorpc.dylib */; };
-		2DEA9A6320A145A60095C62F /* corpc_mysql.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */; };
-		2DEA9A6420A145A60095C62F /* corpc_mysql.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9A6220A145A60095C62F /* corpc_mysql.h */; };
+		2DE7AA0620AA7B0800C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA0820AA7B0800C16383 /* libco.dylib */; };
+		2DE7AA0720AA7B0800C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA0920AA7B0800C16383 /* libcorpc.dylib */; };
+		2DEA9AA920A992090095C62F /* corpc_memcached.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9AA720A992090095C62F /* corpc_memcached.cpp */; };
+		2DEA9AAA20A992090095C62F /* corpc_memcached.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9AA820A992090095C62F /* corpc_memcached.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2DEA9A5420A142CD0095C62F /* libcorpc_mysql.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_mysql.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9A5E20A143140095C62F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9A5F20A143140095C62F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mysql.cpp; sourceTree = "<group>"; };
-		2DEA9A6220A145A60095C62F /* corpc_mysql.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_mysql.h; sourceTree = "<group>"; };
+		2DE7AA0820AA7B0800C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DE7AA0920AA7B0800C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DEA9A9F20A991AA0095C62F /* libcorpc_memcached.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_memcached.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DEA9AA720A992090095C62F /* corpc_memcached.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_memcached.cpp; sourceTree = "<group>"; };
+		2DEA9AA820A992090095C62F /* corpc_memcached.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_memcached.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		2DEA9A5120A142CD0095C62F /* Frameworks */ = {
+		2DEA9A9C20A991AA0095C62F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A5C20A143140095C62F /* libco.dylib in Frameworks */,
-				2DEA9A5D20A143140095C62F /* libcorpc.dylib in Frameworks */,
+				2DE7AA0620AA7B0800C16383 /* libco.dylib in Frameworks */,
+				2DE7AA0720AA7B0800C16383 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2DEA9A4B20A142CD0095C62F = {
+		2DE7AA0520AA7B0800C16383 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				2DEA9A6020A145670095C62F /* src */,
-				2DEA9A5520A142CD0095C62F /* Products */,
-				2DEA9A5B20A143140095C62F /* Frameworks */,
-			);
-			sourceTree = "<group>";
-		};
-		2DEA9A5520A142CD0095C62F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				2DEA9A5420A142CD0095C62F /* libcorpc_mysql.dylib */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		2DEA9A5B20A143140095C62F /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				2DEA9A5E20A143140095C62F /* libco.dylib */,
-				2DEA9A5F20A143140095C62F /* libcorpc.dylib */,
+				2DE7AA0820AA7B0800C16383 /* libco.dylib */,
+				2DE7AA0920AA7B0800C16383 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		2DEA9A6020A145670095C62F /* src */ = {
+		2DEA9A9620A991AA0095C62F = {
 			isa = PBXGroup;
 			children = (
-				2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */,
-				2DEA9A6220A145A60095C62F /* corpc_mysql.h */,
+				2DEA9AA620A991CD0095C62F /* src */,
+				2DEA9AA020A991AA0095C62F /* Products */,
+				2DE7AA0520AA7B0800C16383 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		2DEA9AA020A991AA0095C62F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2DEA9A9F20A991AA0095C62F /* libcorpc_memcached.dylib */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2DEA9AA620A991CD0095C62F /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2DEA9AA720A992090095C62F /* corpc_memcached.cpp */,
+				2DEA9AA820A992090095C62F /* corpc_memcached.h */,
 			);
 			name = src;
 			sourceTree = "<group>";
@@ -72,79 +72,79 @@
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
-		2DEA9A5220A142CD0095C62F /* Headers */ = {
+		2DEA9A9D20A991AA0095C62F /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A6420A145A60095C62F /* corpc_mysql.h in Headers */,
+				2DEA9AAA20A992090095C62F /* corpc_memcached.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
-		2DEA9A5320A142CD0095C62F /* corpc_mysql */ = {
+		2DEA9A9E20A991AA0095C62F /* corpc_memcached */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2DEA9A5820A142CD0095C62F /* Build configuration list for PBXNativeTarget "corpc_mysql" */;
+			buildConfigurationList = 2DEA9AA320A991AA0095C62F /* Build configuration list for PBXNativeTarget "corpc_memcached" */;
 			buildPhases = (
-				2DEA9A5020A142CD0095C62F /* Sources */,
-				2DEA9A5120A142CD0095C62F /* Frameworks */,
-				2DEA9A5220A142CD0095C62F /* Headers */,
+				2DEA9A9B20A991AA0095C62F /* Sources */,
+				2DEA9A9C20A991AA0095C62F /* Frameworks */,
+				2DEA9A9D20A991AA0095C62F /* Headers */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = corpc_mysql;
-			productName = corpc_mysql;
-			productReference = 2DEA9A5420A142CD0095C62F /* libcorpc_mysql.dylib */;
+			name = corpc_memcached;
+			productName = corpc_memcached;
+			productReference = 2DEA9A9F20A991AA0095C62F /* libcorpc_memcached.dylib */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2DEA9A4C20A142CD0095C62F /* Project object */ = {
+		2DEA9A9720A991AA0095C62F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0920;
 				ORGANIZATIONNAME = Dena;
 				TargetAttributes = {
-					2DEA9A5320A142CD0095C62F = {
+					2DEA9A9E20A991AA0095C62F = {
 						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 2DEA9A4F20A142CD0095C62F /* Build configuration list for PBXProject "corpc_mysql" */;
+			buildConfigurationList = 2DEA9A9A20A991AA0095C62F /* Build configuration list for PBXProject "corpc_memcached" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 			);
-			mainGroup = 2DEA9A4B20A142CD0095C62F;
-			productRefGroup = 2DEA9A5520A142CD0095C62F /* Products */;
+			mainGroup = 2DEA9A9620A991AA0095C62F;
+			productRefGroup = 2DEA9AA020A991AA0095C62F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2DEA9A5320A142CD0095C62F /* corpc_mysql */,
+				2DEA9A9E20A991AA0095C62F /* corpc_memcached */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2DEA9A5020A142CD0095C62F /* Sources */ = {
+		2DEA9A9B20A991AA0095C62F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A6320A145A60095C62F /* corpc_mysql.cpp in Sources */,
+				2DEA9AA920A992090095C62F /* corpc_memcached.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		2DEA9A5620A142CD0095C62F /* Debug */ = {
+		2DEA9AA120A991AA0095C62F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -199,7 +199,7 @@
 			};
 			name = Debug;
 		};
-		2DEA9A5720A142CD0095C62F /* Release */ = {
+		2DEA9AA220A991AA0095C62F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -247,7 +247,7 @@
 			};
 			name = Release;
 		};
-		2DEA9A5920A142CD0095C62F /* Debug */ = {
+		2DEA9AA420A991AA0095C62F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -255,25 +255,21 @@
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
-					/usr/local/mysql/include,
 					/usr/local/include,
 					../co,
 					../corpc,
 					../proto,
 				);
-				LIBRARY_SEARCH_PATHS = (
-					/usr/local/mysql/lib,
-					/usr/local/lib,
-				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
-					"-lmysqlclient",
+					"-lmemcached",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2DEA9A5A20A142CD0095C62F /* Release */ = {
+		2DEA9AA520A991AA0095C62F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -281,19 +277,15 @@
 				DYLIB_CURRENT_VERSION = 1;
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
-					/usr/local/mysql/include,
 					/usr/local/include,
 					../co,
 					../corpc,
 					../proto,
 				);
-				LIBRARY_SEARCH_PATHS = (
-					/usr/local/mysql/lib,
-					/usr/local/lib,
-				);
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
-					"-lmysqlclient",
+					"-lmemcached",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -302,25 +294,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2DEA9A4F20A142CD0095C62F /* Build configuration list for PBXProject "corpc_mysql" */ = {
+		2DEA9A9A20A991AA0095C62F /* Build configuration list for PBXProject "corpc_memcached" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2DEA9A5620A142CD0095C62F /* Debug */,
-				2DEA9A5720A142CD0095C62F /* Release */,
+				2DEA9AA120A991AA0095C62F /* Debug */,
+				2DEA9AA220A991AA0095C62F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2DEA9A5820A142CD0095C62F /* Build configuration list for PBXNativeTarget "corpc_mysql" */ = {
+		2DEA9AA320A991AA0095C62F /* Build configuration list for PBXNativeTarget "corpc_memcached" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2DEA9A5920A142CD0095C62F /* Debug */,
-				2DEA9A5A20A142CD0095C62F /* Release */,
+				2DEA9AA420A991AA0095C62F /* Debug */,
+				2DEA9AA520A991AA0095C62F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2DEA9A4C20A142CD0095C62F /* Project object */;
+	rootObject = 2DEA9A9720A991AA0095C62F /* Project object */;
 }

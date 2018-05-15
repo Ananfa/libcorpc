@@ -22,7 +22,7 @@ DIR_OBJ = ./${v}/obj/
 DIR_STATICLIB = ./lib/
 DIR_DYNAMICLIB = ./solib/
 
-OBJS = corpc_thirdparty.pb.o corpc_mysql.o
+OBJS = corpc_mysql.o
 OBJS_WITH_PATH = ${foreach n,${OBJS},${DIR_OBJ}${n}}
 
 empty =  

@@ -99,11 +99,12 @@ static void *mysql_routine( void *arg )
                 return NULL;
             }
             
-            g_cnt++;
             //printf("data length %lu \n", lengths[0]);
         }
         
         mysql_free_result(result);
+        
+        g_cnt++;
         
         // 归还连接
         proxy->put(con, false);

@@ -1,5 +1,5 @@
 /*
- * Created by Xianke Liu on 2018/5/8.
+ * Created by Xianke Liu on 2018/5/14.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "corpc_mysql.h"
+#include "corpc_memcached.h"
 
 using namespace corpc;
 
-MysqlConnectPool::Proxy::Proxy(MysqlConnectPool *pool) {
+MemcachedConnectPool::Proxy::Proxy(MemcachedConnectPool *pool) {
     InnerRpcClient *client = InnerRpcClient::instance();
     
     InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
@@ -26,16 +26,16 @@ MysqlConnectPool::Proxy::Proxy(MysqlConnectPool *pool) {
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
-MysqlConnectPool::Proxy::~Proxy() {
+MemcachedConnectPool::Proxy::~Proxy() {
     delete _stub;
 }
 
-void MysqlConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
+void MemcachedConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
     delete controller;
     delete request;
 }
 
-MYSQL* MysqlConnectPool::Proxy::take() {
+memcached_st* MemcachedConnectPool::Proxy::take() {
     Void *request = new Void();
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
     Controller *controller = new Controller();
@@ -47,20 +47,20 @@ MYSQL* MysqlConnectPool::Proxy::take() {
         return NULL;
     }
     
-    MYSQL* mysql = (MYSQL*)response->handle();
+    memcached_st* memc = (memcached_st*)response->handle();
     
     delete controller;
     delete response;
     delete request;
     
-    return mysql;
+    return memc;
 }
 
-void MysqlConnectPool::Proxy::put(MYSQL* mysql, bool error) {
+void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
     thirdparty::PutRequest *request = new thirdparty::PutRequest();
     Controller *controller = new Controller();
     
-    request->set_handle((intptr_t)mysql);
+    request->set_handle((intptr_t)memc);
     if (error) {
         request->set_error(error);
     }
@@ -68,11 +68,11 @@ void MysqlConnectPool::Proxy::put(MYSQL* mysql, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MysqlConnectPool::MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum): _host(host), _user(user), _passwd(passwd), _db(db), _port(port), _unix_socket(unix_socket), _clientflag(clientflag), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
     
 }
 
-void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
+void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
                             const Void* request,
                             thirdparty::TakeResponse* response,
                             ::google::protobuf::Closure* done) {
@@ -83,20 +83,17 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
-        // 注意：由于mysql_real_connect中的io操作会产生协程切换，当多个mysql连接同时正在建立时，有可能导致_realConnectCount值超出_maxConnectNum，因此_maxConnectNum不是硬性限制
-        MYSQL *con = mysql_init(NULL);
+        memcached_st *memc = memcached_create(NULL);
+        memcached_return rc = memcached_server_push(memc, _memcServers);
         
-        if (con) {
-            if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
-                response->set_handle((intptr_t)con);
-                _realConnectCount++;
-            } else {
-                mysql_close(con);
-                controller->SetFailed("can't connect to mysql server");
-            }
+        if (rc == MEMCACHED_SUCCESS) {
+            response->set_handle((intptr_t)memc);
+            _realConnectCount++;
         } else {
+            fprintf(stderr, "Couldn't add server: %s\n", memcached_strerror(memc, rc));
+            memcached_free(memc);
             // MYSQL对象创建失败
-            controller->SetFailed("can't create MYSQL object probably because not enough memory");
+            controller->SetFailed("Couldn't add memcached server");
         }
     } else {
         // 等待空闲连接
@@ -104,7 +101,7 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         co_yield_ct();
         
         if (_idleList.size() == 0) {
-            controller->SetFailed("can't connect to mysql server");
+            controller->SetFailed("can't connect to memcached server");
         } else {
             intptr_t handle = (intptr_t)_idleList.front();
             _idleList.pop_front();
@@ -114,45 +111,36 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
     }
 }
 
-void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
+void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                            const thirdparty::PutRequest* request,
                            Void* response,
                            ::google::protobuf::Closure* done) {
-    MYSQL *con = (MYSQL *)request->handle();
+    memcached_st *memc = (memcached_st *)request->handle();
     
     if (_idleList.size() < _maxIdleNum) {
         if (request->error()) {
             _realConnectCount--;
-            mysql_close(con);
+            memcached_free(memc);
             
             // 若有等待协程，尝试重连
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 0);
                 
                 if (_realConnectCount < _maxConnectNum) {
-                    MYSQL *con = mysql_init(NULL);
+                    memcached_st *memc = memcached_create(NULL);
+                    memcached_return rc = memcached_server_push(memc, _memcServers);
                     
-                    if (con) {
-                        if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
-                            _realConnectCount++;
-                            _idleList.push_back(con);
-                            
-                            stCoRoutine_t *co = _waitingList.front();
-                            _waitingList.pop_front();
-                            
-                            co_resume(co);
-                        } else {
-                            mysql_close(con);
-                            
-                            // 唤醒当前所有等待协程
-                            while (!_waitingList.empty()) {
-                                stCoRoutine_t *co = _waitingList.front();
-                                _waitingList.pop_front();
-                                
-                                co_resume(co);
-                            }
-                        }
+                    if (rc == MEMCACHED_SUCCESS) {
+                        _realConnectCount++;
+                        _idleList.push_back(memc);
+                        
+                        stCoRoutine_t *co = _waitingList.front();
+                        _waitingList.pop_front();
+                        
+                        co_resume(co);
                     } else {
+                        memcached_free(memc);
+                        
                         // 唤醒当前所有等待协程
                         while (!_waitingList.empty()) {
                             stCoRoutine_t *co = _waitingList.front();
@@ -164,7 +152,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(con);
+            _idleList.push_back(memc);
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -177,23 +165,23 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
     } else {
         assert(_waitingList.size() == 0);
         _realConnectCount--;
-        mysql_close(con);
+        memcached_free(memc);
     }
 }
 
-MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    MysqlConnectPool *pool = new MysqlConnectPool(host, user, passwd, db, port, unix_socket, clientflag, maxConnectNum, maxIdleNum);
+MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum) {
+    MemcachedConnectPool *pool = new MemcachedConnectPool(memcServers, maxConnectNum, maxIdleNum);
     pool->init();
     
     return pool;
 }
 
-void MysqlConnectPool::init() {
+void MemcachedConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
 }
 
-MysqlConnectPool::Proxy* MysqlConnectPool::getProxy() {
+MemcachedConnectPool::Proxy* MemcachedConnectPool::getProxy() {
     pid_t pid = GetPid();
     
     auto iter = _threadProxyMap.find(pid);
