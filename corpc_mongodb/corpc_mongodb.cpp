@@ -71,7 +71,7 @@ void MongodbConnectPool::Proxy::put(mongoc_client_t* mongoc, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MongodbConnectPool::MongodbConnectPool(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum): _uri(uri), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MongodbConnectPool::MongodbConnectPool(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum): _uri(uri), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
     
 }
 
@@ -92,7 +92,6 @@ void MongodbConnectPool::take(::google::protobuf::RpcController* controller,
             response->set_handle((intptr_t)mongoc);
             _realConnectCount++;
         } else {
-            // mongoc_client_t对象创建失败
             controller->SetFailed("new mongoc client fail");
         }
     } else {
@@ -127,17 +126,21 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
                 assert(_idleList.size() == 0);
                 
                 if (_realConnectCount < _maxConnectNum) {
+                    // 注意: 重连后等待列表可能为空（由其他协程释放连接唤醒列表中的等待协程），此时会出bug，因此先从等待列表中取出一个等待协程
+                    stCoRoutine_t *co = _waitingList.front();
+                    _waitingList.pop_front();
+                    
                     mongoc = mongoc_client_new(_uri.c_str());
                     
                     if (mongoc) {
                         _realConnectCount++;
                         _idleList.push_back(mongoc);
-                        
-                        stCoRoutine_t *co = _waitingList.front();
-                        _waitingList.pop_front();
-                        
-                        co_resume(co);
-                    } else {
+                    }
+                    
+                    // 唤醒先前取出的等待协程
+                    co_resume(co);
+                    
+                    if (!mongoc) {
                         // 唤醒当前所有等待协程
                         while (!_waitingList.empty()) {
                             stCoRoutine_t *co = _waitingList.front();
@@ -166,7 +169,7 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-MongodbConnectPool* MongodbConnectPool::create(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum) {
+MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum) {
     if (!_initialized) {
         std::unique_lock<std::mutex> lock( _initMutex );
         

@@ -1,5 +1,5 @@
 /*
- * Created by Xianke Liu on 2018/5/14.
+ * Created by Xianke Liu on 2018/5/16.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef corpc_memcached_h
-#define corpc_memcached_h
+#ifndef corpc_redis_h
+#define corpc_redis_h
 
 #include "corpc_routine_env.h"
 #include "corpc_controller.h"
@@ -23,19 +23,19 @@
 
 #include "corpc_thirdparty.pb.h"
 
-#include <libmemcached/memcached.h>
+#include <hiredis.h>
 
 namespace corpc {
     
-    class MemcachedConnectPool : public thirdparty::ThirdPartyService {
+    class RedisConnectPool : public thirdparty::ThirdPartyService {
     public:
         class Proxy {
         public:
-            memcached_st* take();
-            void put(memcached_st* memc, bool error);
+            redisContext* take();
+            void put(redisContext* redis, bool error);
             
         private:
-            Proxy(MemcachedConnectPool *pool);
+            Proxy(RedisConnectPool *pool);
             ~Proxy();
             
             static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
@@ -44,7 +44,7 @@ namespace corpc {
             thirdparty::ThirdPartyService::Stub *_stub;
             
         public:
-            friend class MemcachedConnectPool;
+            friend class RedisConnectPool;
         };
         
     public:
@@ -58,23 +58,25 @@ namespace corpc {
                          ::google::protobuf::Closure* done);
         
     public:
-        static MemcachedConnectPool* create(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        static RedisConnectPool* create(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum);
         
         Proxy* getProxy();
         
     private:
-        MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum);
-        ~MemcachedConnectPool() {}
+        RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        ~RedisConnectPool() {}
         
         void init();
+        
     private:
-        memcached_server_st *_memcServers; // memcached服务器列表
+        std::string _host;
+        unsigned int _port;
         
         uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
         uint32_t _maxIdleNum;       // 最大空闲连接数量
         uint32_t _realConnectCount; // 当前实际建立连接的数量
         
-        std::list<memcached_st*> _idleList; // 空闲连接表
+        std::list<redisContext*> _idleList; // 空闲连接表
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
@@ -83,4 +85,4 @@ namespace corpc {
 
 }
 
-#endif /* corpc_memcached_h */
+#endif /* corpc_redis_h */

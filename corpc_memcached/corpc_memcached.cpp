@@ -92,7 +92,7 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         } else {
             fprintf(stderr, "Couldn't add server: %s\n", memcached_strerror(memc, rc));
             memcached_free(memc);
-            // memcached_st对象创建失败
+            
             controller->SetFailed("Couldn't add memcached server");
         }
     } else {
@@ -127,6 +127,10 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                 assert(_idleList.size() == 0);
                 
                 if (_realConnectCount < _maxConnectNum) {
+                    // 注意: 重连后等待列表可能为空（由其他协程释放连接唤醒列表中的等待协程），此时会出bug，因此先从等待列表中取出一个等待协程
+                    stCoRoutine_t *co = _waitingList.front();
+                    _waitingList.pop_front();
+                    
                     memc = memcached_create(NULL);
                     
                     if (memc) {
@@ -135,16 +139,14 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                         if (rc == MEMCACHED_SUCCESS) {
                             _realConnectCount++;
                             _idleList.push_back(memc);
-                            
-                            stCoRoutine_t *co = _waitingList.front();
-                            _waitingList.pop_front();
-                            
-                            co_resume(co);
                         } else {
                             memcached_free(memc);
                             memc = NULL;
                         }
                     }
+                    
+                    // 唤醒先前取出的等待协程
+                    co_resume(co);
                     
                     if (!memc) {
                         // 唤醒当前所有等待协程

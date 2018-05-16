@@ -25,65 +25,67 @@
 
 #include <mongoc.h>
 
-using namespace corpc;
-
-class MongodbConnectPool : public thirdparty::ThirdPartyService {
-public:
-    class Proxy {
+namespace corpc {
+    
+    class MongodbConnectPool : public thirdparty::ThirdPartyService {
     public:
-        mongoc_client_t* take();
-        void put(mongoc_client_t* mongoc, bool error);
+        class Proxy {
+        public:
+            mongoc_client_t* take();
+            void put(mongoc_client_t* mongoc, bool error);
+            
+        private:
+            Proxy(MongodbConnectPool *pool);
+            ~Proxy();
+            
+            static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
+            
+        private:
+            thirdparty::ThirdPartyService::Stub *_stub;
+            
+        public:
+            friend class MongodbConnectPool;
+        };
+        
+    public:
+        virtual void take(::google::protobuf::RpcController* controller,
+                          const Void* request,
+                          thirdparty::TakeResponse* response,
+                          ::google::protobuf::Closure* done);
+        virtual void put(::google::protobuf::RpcController* controller,
+                         const thirdparty::PutRequest* request,
+                         Void* response,
+                         ::google::protobuf::Closure* done);
+        
+    public:
+        static MongodbConnectPool* create(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        
+        Proxy* getProxy();
         
     private:
-        Proxy(MongodbConnectPool *pool);
-        ~Proxy();
+        MongodbConnectPool(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        ~MongodbConnectPool() {}
         
-        static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
+        void init();
         
     private:
-        thirdparty::ThirdPartyService::Stub *_stub;
+        static std::mutex _initMutex;
+        static bool _initialized;
         
-    public:
-        friend class MongodbConnectPool;
+    private:
+        std::string _uri;
+        
+        uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
+        uint32_t _maxIdleNum;       // 最大空闲连接数量
+        uint32_t _realConnectCount; // 当前实际建立连接的数量
+        
+        std::list<mongoc_client_t*> _idleList; // 空闲连接表
+        std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
+        
+        InnerRpcServer *_server;
+        std::map<pid_t, Proxy*> _threadProxyMap; // 线程相关代理
     };
-    
-public:
-    virtual void take(::google::protobuf::RpcController* controller,
-                      const Void* request,
-                      thirdparty::TakeResponse* response,
-                      ::google::protobuf::Closure* done);
-    virtual void put(::google::protobuf::RpcController* controller,
-                     const thirdparty::PutRequest* request,
-                     Void* response,
-                     ::google::protobuf::Closure* done);
-    
-public:
-    static MongodbConnectPool* create(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum);
-    
-    Proxy* getProxy();
-    
-private:
-    MongodbConnectPool(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum);
-    ~MongodbConnectPool() {}
-    
-    void init();
-    
-private:
-    static std::mutex _initMutex;
-    static bool _initialized;
-    
-private:
-    std::string _uri;
-    
-    uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
-    uint32_t _maxIdleNum;       // 最大空闲连接数量
-    uint32_t _realConnectCount; // 当前实际建立连接的数量
-    
-    std::list<mongoc_client_t*> _idleList; // 空闲连接表
-    std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
-    
-    InnerRpcServer *_server;
-    std::map<pid_t, Proxy*> _threadProxyMap; // 线程相关代理
-};
+
+}
 
 #endif /* corpc_mongodb_h */
