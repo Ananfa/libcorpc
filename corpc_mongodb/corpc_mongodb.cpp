@@ -1,5 +1,5 @@
 /*
- * Created by Xianke Liu on 2018/5/14.
+ * Created by Xianke Liu on 2018/5/15.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-#include "corpc_memcached.h"
+#include "corpc_mongodb.h"
 
 using namespace corpc;
 
-MemcachedConnectPool::Proxy::Proxy(MemcachedConnectPool *pool) {
+std::mutex MongodbConnectPool::_initMutex;
+bool MongodbConnectPool::_initialized = false;
+
+MongodbConnectPool::Proxy::Proxy(MongodbConnectPool *pool) {
     InnerRpcClient *client = InnerRpcClient::instance();
     
     InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
@@ -26,16 +29,16 @@ MemcachedConnectPool::Proxy::Proxy(MemcachedConnectPool *pool) {
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
-MemcachedConnectPool::Proxy::~Proxy() {
+MongodbConnectPool::Proxy::~Proxy() {
     delete _stub;
 }
 
-void MemcachedConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
+void MongodbConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
     delete controller;
     delete request;
 }
 
-memcached_st* MemcachedConnectPool::Proxy::take() {
+mongoc_client_t* MongodbConnectPool::Proxy::take() {
     Void *request = new Void();
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
     Controller *controller = new Controller();
@@ -47,20 +50,20 @@ memcached_st* MemcachedConnectPool::Proxy::take() {
         return NULL;
     }
     
-    memcached_st* memc = (memcached_st*)response->handle();
+    mongoc_client_t* mongoc = (mongoc_client_t*)response->handle();
     
     delete controller;
     delete response;
     delete request;
     
-    return memc;
+    return mongoc;
 }
 
-void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
+void MongodbConnectPool::Proxy::put(mongoc_client_t* mongoc, bool error) {
     thirdparty::PutRequest *request = new thirdparty::PutRequest();
     Controller *controller = new Controller();
     
-    request->set_handle((intptr_t)memc);
+    request->set_handle((intptr_t)mongoc);
     if (error) {
         request->set_error(error);
     }
@@ -68,14 +71,14 @@ void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MongodbConnectPool::MongodbConnectPool(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum): _uri(uri), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
     
 }
 
-void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
-                            const Void* request,
-                            thirdparty::TakeResponse* response,
-                            ::google::protobuf::Closure* done) {
+void MongodbConnectPool::take(::google::protobuf::RpcController* controller,
+                                const Void* request,
+                                thirdparty::TakeResponse* response,
+                                ::google::protobuf::Closure* done) {
     if (_idleList.size() > 0) {
         intptr_t handle = (intptr_t)_idleList.front();
         _idleList.pop_front();
@@ -83,17 +86,14 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
-        memcached_st *memc = memcached_create(NULL);
-        memcached_return rc = memcached_server_push(memc, _memcServers);
+        mongoc_client_t *mongoc = mongoc_client_new(_uri.c_str());
         
-        if (rc == MEMCACHED_SUCCESS) {
-            response->set_handle((intptr_t)memc);
+        if (mongoc) {
+            response->set_handle((intptr_t)mongoc);
             _realConnectCount++;
         } else {
-            fprintf(stderr, "Couldn't add server: %s\n", memcached_strerror(memc, rc));
-            memcached_free(memc);
-            // memcached_st对象创建失败
-            controller->SetFailed("Couldn't add memcached server");
+            // mongoc_client_t对象创建失败
+            controller->SetFailed("new mongoc client fail");
         }
     } else {
         // 等待空闲连接
@@ -101,7 +101,7 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         co_yield_ct();
         
         if (_idleList.size() == 0) {
-            controller->SetFailed("can't connect to memcached server");
+            controller->SetFailed("can't connect to mongodb server");
         } else {
             intptr_t handle = (intptr_t)_idleList.front();
             _idleList.pop_front();
@@ -111,42 +111,33 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
     }
 }
 
-void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
-                           const thirdparty::PutRequest* request,
-                           Void* response,
-                           ::google::protobuf::Closure* done) {
-    memcached_st *memc = (memcached_st *)request->handle();
+void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
+                               const thirdparty::PutRequest* request,
+                               Void* response,
+                               ::google::protobuf::Closure* done) {
+    mongoc_client_t *mongoc = (mongoc_client_t *)request->handle();
     
     if (_idleList.size() < _maxIdleNum) {
         if (request->error()) {
             _realConnectCount--;
-            memcached_free(memc);
+            mongoc_client_destroy(mongoc);
             
             // 若有等待协程，尝试重连
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 0);
                 
                 if (_realConnectCount < _maxConnectNum) {
-                    memc = memcached_create(NULL);
+                    mongoc = mongoc_client_new(_uri.c_str());
                     
-                    if (memc) {
-                        memcached_return rc = memcached_server_push(memc, _memcServers);
+                    if (mongoc) {
+                        _realConnectCount++;
+                        _idleList.push_back(mongoc);
                         
-                        if (rc == MEMCACHED_SUCCESS) {
-                            _realConnectCount++;
-                            _idleList.push_back(memc);
-                            
-                            stCoRoutine_t *co = _waitingList.front();
-                            _waitingList.pop_front();
-                            
-                            co_resume(co);
-                        } else {
-                            memcached_free(memc);
-                            memc = NULL;
-                        }
-                    }
-                    
-                    if (!memc) {
+                        stCoRoutine_t *co = _waitingList.front();
+                        _waitingList.pop_front();
+                        
+                        co_resume(co);
+                    } else {
                         // 唤醒当前所有等待协程
                         while (!_waitingList.empty()) {
                             stCoRoutine_t *co = _waitingList.front();
@@ -158,7 +149,7 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(memc);
+            _idleList.push_back(mongoc);
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -171,23 +162,32 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
     } else {
         assert(_waitingList.size() == 0);
         _realConnectCount--;
-        memcached_free(memc);
+        mongoc_client_destroy(mongoc);
     }
 }
 
-MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    MemcachedConnectPool *pool = new MemcachedConnectPool(memcServers, maxConnectNum, maxIdleNum);
+MongodbConnectPool* MongodbConnectPool::create(std::string &uri, uint32_t maxConnectNum, uint32_t maxIdleNum) {
+    if (!_initialized) {
+        std::unique_lock<std::mutex> lock( _initMutex );
+        
+        if (!_initialized) {
+            mongoc_init();
+            _initialized = true;
+        }
+    }
+    
+    MongodbConnectPool *pool = new MongodbConnectPool(uri, maxConnectNum, maxIdleNum);
     pool->init();
     
     return pool;
 }
 
-void MemcachedConnectPool::init() {
+void MongodbConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
 }
 
-MemcachedConnectPool::Proxy* MemcachedConnectPool::getProxy() {
+MongodbConnectPool::Proxy* MongodbConnectPool::getProxy() {
     pid_t pid = GetPid();
     
     auto iter = _threadProxyMap.find(pid);

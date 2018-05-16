@@ -7,160 +7,144 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D5D6EE020510A5E0000CD28 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D5D6EDA20510A5E0000CD28 /* foo.pb.cc */; };
-		2D5D6EE120510A5E0000CD28 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D5D6EDC20510A5E0000CD28 /* bar.pb.cc */; };
-		2D5D6EE220510A5E0000CD28 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D5D6EDD20510A5E0000CD28 /* baz.pb.cc */; };
-		2DC30041204E342B0002F91F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3003D204E342A0002F91F /* main.cpp */; };
-		2DC30048204E36D40002F91F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DC3004A204E36D40002F91F /* libco.dylib */; };
-		2DC30049204E36D40002F91F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DC3004B204E36D40002F91F /* libcorpc.dylib */; };
+		2DE7AA7320AAEE5100C16383 /* corpc_mongodb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */; };
+		2DE7AA7420AAEE5100C16383 /* corpc_mongodb.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */; };
+		2DE7AA7620ABC4C700C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA7820ABC4C700C16383 /* libco.dylib */; };
+		2DE7AA7720ABC4C700C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA7920ABC4C700C16383 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		2DB2B2B1204905DF00114392 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		2D5D6EDA20510A5E0000CD28 /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../proto/foo.pb.cc; sourceTree = "<group>"; };
-		2D5D6EDB20510A5E0000CD28 /* baz.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baz.pb.h; path = ../proto/baz.pb.h; sourceTree = "<group>"; };
-		2D5D6EDC20510A5E0000CD28 /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bar.pb.cc; path = ../proto/bar.pb.cc; sourceTree = "<group>"; };
-		2D5D6EDD20510A5E0000CD28 /* baz.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baz.pb.cc; path = ../proto/baz.pb.cc; sourceTree = "<group>"; };
-		2D5D6EDE20510A5E0000CD28 /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = bar.pb.h; path = ../proto/bar.pb.h; sourceTree = "<group>"; };
-		2D5D6EDF20510A5E0000CD28 /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../proto/foo.pb.h; sourceTree = "<group>"; };
-		2DB2B2B3204905DF00114392 /* innerRpc */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = innerRpc; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DC3003D204E342A0002F91F /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = SOURCE_ROOT; };
-		2DC3004A204E36D40002F91F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DC3004B204E36D40002F91F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DE7AA6920AAEDD400C16383 /* libcorpc_mongodb.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_mongodb.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mongodb.cpp; sourceTree = "<group>"; };
+		2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_mongodb.h; sourceTree = "<group>"; };
+		2DE7AA7820ABC4C700C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DE7AA7920ABC4C700C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		2DB2B2B0204905DF00114392 /* Frameworks */ = {
+		2DE7AA6620AAEDD400C16383 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DC30048204E36D40002F91F /* libco.dylib in Frameworks */,
-				2DC30049204E36D40002F91F /* libcorpc.dylib in Frameworks */,
+				2DE7AA7620ABC4C700C16383 /* libco.dylib in Frameworks */,
+				2DE7AA7720ABC4C700C16383 /* libcorpc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2DB2B2AA204905DF00114392 = {
+		2DE7AA6020AAEDD400C16383 = {
 			isa = PBXGroup;
 			children = (
-				2DC3004C204E6ACB0002F91F /* src */,
-				2DB2B2B4204905DF00114392 /* Products */,
-				2DC30047204E36D40002F91F /* Frameworks */,
+				2DE7AA7020AAEE3200C16383 /* src */,
+				2DE7AA6A20AAEDD400C16383 /* Products */,
+				2DE7AA7520ABC4C700C16383 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		2DB2B2B4204905DF00114392 /* Products */ = {
+		2DE7AA6A20AAEDD400C16383 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2DB2B2B3204905DF00114392 /* innerRpc */,
+				2DE7AA6920AAEDD400C16383 /* libcorpc_mongodb.dylib */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2DC30047204E36D40002F91F /* Frameworks */ = {
+		2DE7AA7020AAEE3200C16383 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				2DC3004A204E36D40002F91F /* libco.dylib */,
-				2DC3004B204E36D40002F91F /* libcorpc.dylib */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		2DC3004C204E6ACB0002F91F /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2D5D6EDC20510A5E0000CD28 /* bar.pb.cc */,
-				2D5D6EDE20510A5E0000CD28 /* bar.pb.h */,
-				2D5D6EDD20510A5E0000CD28 /* baz.pb.cc */,
-				2D5D6EDB20510A5E0000CD28 /* baz.pb.h */,
-				2D5D6EDA20510A5E0000CD28 /* foo.pb.cc */,
-				2D5D6EDF20510A5E0000CD28 /* foo.pb.h */,
-				2DC3003D204E342A0002F91F /* main.cpp */,
+				2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */,
+				2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */,
 			);
 			name = src;
 			sourceTree = "<group>";
 		};
+		2DE7AA7520ABC4C700C16383 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2DE7AA7820ABC4C700C16383 /* libco.dylib */,
+				2DE7AA7920ABC4C700C16383 /* libcorpc.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
+/* Begin PBXHeadersBuildPhase section */
+		2DE7AA6720AAEDD400C16383 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2DE7AA7420AAEE5100C16383 /* corpc_mongodb.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
 /* Begin PBXNativeTarget section */
-		2DB2B2B2204905DF00114392 /* innerRpc */ = {
+		2DE7AA6820AAEDD400C16383 /* corpc_mongodb */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2DB2B2BA204905DF00114392 /* Build configuration list for PBXNativeTarget "innerRpc" */;
+			buildConfigurationList = 2DE7AA6D20AAEDD400C16383 /* Build configuration list for PBXNativeTarget "corpc_mongodb" */;
 			buildPhases = (
-				2DB2B2AF204905DF00114392 /* Sources */,
-				2DB2B2B0204905DF00114392 /* Frameworks */,
-				2DB2B2B1204905DF00114392 /* CopyFiles */,
+				2DE7AA6520AAEDD400C16383 /* Sources */,
+				2DE7AA6620AAEDD400C16383 /* Frameworks */,
+				2DE7AA6720AAEDD400C16383 /* Headers */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = innerRpc;
-			productName = testInnerRpc;
-			productReference = 2DB2B2B3204905DF00114392 /* innerRpc */;
-			productType = "com.apple.product-type.tool";
+			name = corpc_mongodb;
+			productName = corpc_mongodb;
+			productReference = 2DE7AA6920AAEDD400C16383 /* libcorpc_mongodb.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2DB2B2AB204905DF00114392 /* Project object */ = {
+		2DE7AA6120AAEDD400C16383 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0920;
 				ORGANIZATIONNAME = Dena;
 				TargetAttributes = {
-					2DB2B2B2204905DF00114392 = {
+					2DE7AA6820AAEDD400C16383 = {
 						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 2DB2B2AE204905DF00114392 /* Build configuration list for PBXProject "example_innerRpc" */;
+			buildConfigurationList = 2DE7AA6420AAEDD400C16383 /* Build configuration list for PBXProject "corpc_mongodb" */;
 			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 			);
-			mainGroup = 2DB2B2AA204905DF00114392;
-			productRefGroup = 2DB2B2B4204905DF00114392 /* Products */;
+			mainGroup = 2DE7AA6020AAEDD400C16383;
+			productRefGroup = 2DE7AA6A20AAEDD400C16383 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2DB2B2B2204905DF00114392 /* innerRpc */,
+				2DE7AA6820AAEDD400C16383 /* corpc_mongodb */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		2DB2B2AF204905DF00114392 /* Sources */ = {
+		2DE7AA6520AAEDD400C16383 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D5D6EE120510A5E0000CD28 /* bar.pb.cc in Sources */,
-				2DC30041204E342B0002F91F /* main.cpp in Sources */,
-				2D5D6EE220510A5E0000CD28 /* baz.pb.cc in Sources */,
-				2D5D6EE020510A5E0000CD28 /* foo.pb.cc in Sources */,
+				2DE7AA7320AAEE5100C16383 /* corpc_mongodb.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		2DB2B2B8204905DF00114392 /* Debug */ = {
+		2DE7AA6B20AAEDD400C16383 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -215,7 +199,7 @@
 			};
 			name = Debug;
 		};
-		2DB2B2B9204905DF00114392 /* Release */ = {
+		2DE7AA6C20AAEDD400C16383 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -263,32 +247,52 @@
 			};
 			name = Release;
 		};
-		2DB2B2BB204905DF00114392 /* Debug */ = {
+		2DE7AA6E20AAEDD400C16383 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
+					"/usr/local/include/libmongoc-1.0",
+					"/usr/local/include/libbson-1.0",
+					../co,
+					../corpc,
+					../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
+				OTHER_LDFLAGS = (
+					"-lprotobuf",
+					"-lbson-1.0",
+					"-lmongoc-1.0",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
 		};
-		2DB2B2BC204905DF00114392 /* Release */ = {
+		2DE7AA6F20AAEDD400C16383 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
+					"/usr/local/include/libmongoc-1.0",
+					"/usr/local/include/libbson-1.0",
+					../co,
+					../corpc,
+					../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
-				OTHER_LDFLAGS = "-lprotobuf";
+				OTHER_LDFLAGS = (
+					"-lprotobuf",
+					"-lbson-1.0",
+					"-lmongoc-1.0",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -296,25 +300,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2DB2B2AE204905DF00114392 /* Build configuration list for PBXProject "example_innerRpc" */ = {
+		2DE7AA6420AAEDD400C16383 /* Build configuration list for PBXProject "corpc_mongodb" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2DB2B2B8204905DF00114392 /* Debug */,
-				2DB2B2B9204905DF00114392 /* Release */,
+				2DE7AA6B20AAEDD400C16383 /* Debug */,
+				2DE7AA6C20AAEDD400C16383 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2DB2B2BA204905DF00114392 /* Build configuration list for PBXNativeTarget "innerRpc" */ = {
+		2DE7AA6D20AAEDD400C16383 /* Build configuration list for PBXNativeTarget "corpc_mongodb" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2DB2B2BB204905DF00114392 /* Debug */,
-				2DB2B2BC204905DF00114392 /* Release */,
+				2DE7AA6E20AAEDD400C16383 /* Debug */,
+				2DE7AA6F20AAEDD400C16383 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2DB2B2AB204905DF00114392 /* Project object */;
+	rootObject = 2DE7AA6120AAEDD400C16383 /* Project object */;
 }

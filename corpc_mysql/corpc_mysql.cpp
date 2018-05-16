@@ -143,16 +143,11 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                             co_resume(co);
                         } else {
                             mysql_close(con);
-                            
-                            // 唤醒当前所有等待协程
-                            while (!_waitingList.empty()) {
-                                stCoRoutine_t *co = _waitingList.front();
-                                _waitingList.pop_front();
-                                
-                                co_resume(co);
-                            }
+                            con = NULL;
                         }
-                    } else {
+                    }
+                    
+                    if (!con) {
                         // 唤醒当前所有等待协程
                         while (!_waitingList.empty()) {
                             stCoRoutine_t *co = _waitingList.front();

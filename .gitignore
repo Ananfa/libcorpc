@@ -6,12 +6,16 @@ co/co.xcodeproj/xcuserdata
 corpc/corpc.xcodeproj/xcuserdata
 corpc_mysql/corpc_mysql.xcodeproj/xcuserdata
 corpc_memcached/corpc_memcached.xcodeproj/xcuserdata
+corpc_mongodb/corpc_mongodb.xcodeproj/xcuserdata
+corpc_redis/corpc_redis.xcodeproj/xcuserdata
 example/example_interRpc/example_interRpc.xcodeproj/xcuserdata
 example/example_innerRpc/example_innerRpc.xcodeproj/xcuserdata
 example/example_echoTcp/example_echoTcp.xcodeproj/xcuserdata
 example/example_echoUdp/example_echoUdp.xcodeproj/xcuserdata
 example/example_mysql/example_mysql.xcodeproj/xcuserdata
 example/example_memcached/example_memcached.xcodeproj/xcuserdata
+example/example_mongodb/example_mongodb.xcodeproj/xcuserdata
+example/example_redis/example_redis.xcodeproj/xcuserdata
 tutorial/tutorial1/tutorial1.xcodeproj/xcuserdata
 tutorial/tutorial2/tutorial2.xcodeproj/xcuserdata
 tutorial/tutorial3/tutorial3.xcodeproj/xcuserdata

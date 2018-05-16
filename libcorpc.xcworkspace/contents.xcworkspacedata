@@ -14,6 +14,9 @@
       location = "group:corpc_memcached/corpc_memcached.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:corpc_mongodb/corpc_mongodb.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:example/example_interRpc/example_interRpc.xcodeproj">
    </FileRef>
    <FileRef
@@ -30,6 +33,9 @@
    </FileRef>
    <FileRef
       location = "group:example/example_memcached/example_memcached.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:example/example_mongodb/example_mongodb.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:tutorial/tutorial5/tutorial5.xcodeproj">

@@ -1,6 +1,6 @@
 //
 //  main.cpp
-//  example_mysql
+//  example_memcached
 //
 //  Created by Xianke Liu on 2018/5/15.
 //  Copyright © 2018年 Dena. All rights reserved.
@@ -70,7 +70,7 @@ static void *memc_routine( void *arg )
         memcached_st *memc = proxy->take();
         
         if (!memc) {
-            fprintf(stderr, "cant take memcached handle\n");
+            fprintf(stderr, "can't take memcached handle\n");
             return NULL;
         }
         

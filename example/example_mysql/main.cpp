@@ -64,7 +64,7 @@ static void *mysql_routine( void *arg )
         MYSQL* con = proxy->take();
         
         if (!con) {
-            fprintf(stderr, "cant connect to database\n");
+            fprintf(stderr, "can't connect to database\n");
             return NULL;
         }
         
