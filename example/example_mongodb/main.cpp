@@ -119,7 +119,7 @@ void *timerTask(void * arg) {
 
 void clientThread(MongodbConnectPool *mongodbPool) {
     // 开多个个协程
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<20; i++) {
         RoutineEnvironment::startCoroutine(mongodb_routine, mongodbPool);
     }
     
