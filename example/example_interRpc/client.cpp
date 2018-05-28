@@ -209,6 +209,15 @@ static void *test_routine( void *arg )
     return NULL;
 }
 
+void clientThread() {
+    RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
+    
+    printf("thread %d running...\n", GetPid());
+    
+    RoutineEnvironment::runEventLoop(100);
+}
+
+
 int main(int argc, char *argv[]) {
     co_start_hook();
     
@@ -235,10 +244,20 @@ int main(int argc, char *argv[]) {
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
     
-    RoutineEnvironment::startCoroutine(log_routine, NULL);
+    // 在主线程中直接开test_routine协程
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
-    printf("running...\n");
+    // 新开一线程，并在其中开test_routine协程
+    std::thread t1 = std::thread(clientThread);
+    
+    // 再开一线程
+    //std::thread t2 = std::thread(clientThread);
+    
+    // 注意：线程开多了，性能反而下降了。在具体项目中应根据CPU核心数来调整线程数量
+    
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
+    
+    printf("thread %d running...\n", GetPid());
     
     RoutineEnvironment::runEventLoop(100);
 }
