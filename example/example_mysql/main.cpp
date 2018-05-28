@@ -76,7 +76,7 @@ static void *mysql_routine( void *arg )
             return NULL;
         }
         
-        if (mysql_query(con, "SELECT bindata FROM scenedb_account WHERE field1='72057594037927957'"))
+        if (mysql_query(con, "SELECT bindata FROM scenedb_account WHERE field1='71057594037927957'"))
         {
             fprintf(stderr, "%s\n", mysql_error(con));
             // 出错返回处理
@@ -103,6 +103,8 @@ static void *mysql_routine( void *arg )
             if (lengths == NULL) {
                 fprintf(stderr, "%s\n", mysql_error(con));
                 // 出错返回处理
+                mysql_free_result(result);
+                
                 proxy->put(con, true);
                 return NULL;
             }

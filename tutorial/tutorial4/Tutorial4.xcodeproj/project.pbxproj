@@ -200,6 +200,7 @@
 					/usr/local/include,
 					../../co,
 					../../corpc,
+					../../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
@@ -256,6 +257,7 @@
 					/usr/local/include,
 					../../co,
 					../../corpc,
+					../../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;

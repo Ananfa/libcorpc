@@ -71,7 +71,10 @@ namespace corpc {
             return nullptr;
         }
         
-        return task->rpcTask->co;
+        // 注意：在这直接进行跨线程协程唤醒，而不是返回后再处理
+        RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
+        
+        return nullptr;
     }
     
     bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
@@ -173,6 +176,7 @@ namespace corpc {
         std::shared_ptr<ClientTask> clientTask(new ClientTask);
         clientTask->channel = this;
         clientTask->rpcTask = std::make_shared<RpcTask>();
+        clientTask->rpcTask->pid = GetPid();
         clientTask->rpcTask->co = co_self();
         clientTask->rpcTask->request = request;
         
@@ -198,7 +202,7 @@ namespace corpc {
     }
     
     RpcClient::RpcClient(IO *io): _io(io) {
-        _pipelineFactory = new TcpPipelineFactory(this, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
     }
     
     RpcClient* RpcClient::create(IO *io) {
@@ -219,7 +223,7 @@ namespace corpc {
     }
     
     void RpcClient::start() {
-        CoroutineWorker::start();
+        //CoroutineWorker::start();
         
         _t = std::thread(threadEntry, this);
     }
@@ -283,7 +287,7 @@ namespace corpc {
                                 
                                 task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
                                 
-                                self->addMessage(task->rpcTask->co);
+                                RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
                             }
                         }
                         
@@ -381,7 +385,7 @@ namespace corpc {
                                 
                                 task->rpcTask->controller->SetFailed("Connect fail");
                                 if (task->rpcTask->response) {
-                                    self->addMessage(task->rpcTask->co);
+                                    RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
                                 } else {
                                     // not_care_response类型的rpc需要在这里触发回调清理request
                                     assert(task->rpcTask->done);
@@ -483,7 +487,7 @@ namespace corpc {
                     sender->send(ioConn, task->rpcTask);
                 }
                 
-                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，这里在处理一段时间后让出一下
                 gettimeofday(&t2, NULL);
                 if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
                     msleep(1);
@@ -496,11 +500,5 @@ namespace corpc {
         }
         
         return NULL;
-    }
-    
-    // 从Worker继承的方法实现
-    void RpcClient::handleMessage(void *msg) {
-        stCoRoutine_t *co = (stCoRoutine_t *)msg;
-        co_resume(co);
     }
 }

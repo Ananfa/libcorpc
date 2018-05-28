@@ -34,13 +34,21 @@ namespace corpc {
         static const unsigned int SHARE_STACK_COUNT = 50;
         static const unsigned int SHARE_STACK_SIZE = 128 * 1024;
         
+#ifdef USE_NO_LOCK_QUEUE
+        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> WaitResumeQueue;
+#else
+        typedef CoSyncQueue<stCoRoutine_t*> WaitResumeQueue;
+#endif
+        
     public:
         void destroy(); // 清理当前线程协程环境
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
+        static void resumeCoroutine( pid_t pid, stCoRoutine_t *co ); // 用于跨线程唤醒协程
         static void runEventLoop( int max_wait_ms = 1000 ); // 事件循环
         
         static RoutineEnvironment *getEnv();    // 获取线程相关的协程环境
         stCoRoutineAttr_t *getAttr() { return _attr; }
+        
         
     private:
         RoutineEnvironment();
@@ -50,16 +58,19 @@ namespace corpc {
         
         static void *routineEntry( void *arg ); // 协程入口
         
-        static void *deamonRoutine( void *arg ); // 守护协程（定期清理结束的协程，并启动等待的任务）
+        static void *cleanRoutine( void *arg ); // 协程清理协程
         
+        static void *resumeRoutine( void *arg ); // 协程唤醒协程
         
         void addEndedCoroutine( stCoRoutine_t *co ); // 协程结束
         
     private:
         stCoRoutineAttr_t *_attr;
         
-        PipeType _endPipe; // 用于通知deamonRoutine“有已结束协程”
+        PipeType _endPipe; // 用于通知cleanRoutine“有已结束协程”
         std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）
+        
+        WaitResumeQueue _waitResumeQueue; // 用于跨线程唤醒协程
         
 #ifdef MONITOR_ROUTINE
         // 监控状态

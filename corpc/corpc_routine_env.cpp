@@ -15,6 +15,7 @@
  */
 
 #include "corpc_routine_env.h"
+#include "corpc_utils.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -72,8 +73,12 @@ namespace corpc {
         co_resume( co );
 #endif
         
-        // 启动deamon协程
-        co_create( &co, env->_attr, deamonRoutine, env);
+        // 启动clean协程
+        co_create( &co, env->_attr, cleanRoutine, env);
+        co_resume( co );
+        
+        // 启动resume协程
+        co_create( &co, env->_attr, resumeRoutine, env);
         co_resume( co );
         
         return env;
@@ -109,6 +114,13 @@ namespace corpc {
         return co;
     }
     
+    void RoutineEnvironment::resumeCoroutine( pid_t pid, stCoRoutine_t *co ) {
+        RoutineEnvironment *env = g_routineEnvPerThread[pid];
+        assert(env);
+        
+        env->_waitResumeQueue.push(co);
+    }
+    
     void RoutineEnvironment::runEventLoop( int max_wait_ms ) {
         co_eventloop( co_get_epoll_ct(),0,0,max_wait_ms );
     }
@@ -139,7 +151,7 @@ namespace corpc {
         return NULL;
     }
     
-    void *RoutineEnvironment::deamonRoutine( void *arg ) {
+    void *RoutineEnvironment::cleanRoutine( void *arg ) {
         co_enable_hook_sys();
         
         RoutineEnvironment *curenv = (RoutineEnvironment *)arg;
@@ -152,19 +164,19 @@ namespace corpc {
         std::vector<char> buf(1024);
         while (true) {
             // 等待处理信号
-            ret = read(pReadFd, &buf[0], 1024);
+            ret = (int)read(pReadFd, &buf[0], 1024);
             assert(ret != 0);
             if (ret < 0) {
                 if (errno == EAGAIN) {
                     continue;
                 } else {
                     // 管道出错
-                    printf("Error: RoutineEnvironment::deamonRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                    printf("Error: RoutineEnvironment::cleanRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            pReadFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
                     // sleep 10 milisecond
-                    usleep(10000);
+                    msleep(10);
                 }
             }
             
@@ -178,6 +190,46 @@ namespace corpc {
 #ifdef MONITOR_ROUTINE
                 curenv->_routineNum--;
 #endif
+            }
+        }
+        
+        return NULL;
+    }
+    
+    void *RoutineEnvironment::resumeRoutine( void *arg ) {
+        co_enable_hook_sys();
+        
+        RoutineEnvironment *curenv = (RoutineEnvironment *)arg;
+        
+        int readFd = curenv->_waitResumeQueue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
+        
+        int ret;
+        std::vector<char> buf(1024);
+        while (true) {
+            // 等待处理信号
+            ret = (int)read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    // 管道出错
+                    printf("Error: RoutineEnvironment::resumeRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                           readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    msleep(10);
+                }
+            }
+            
+            stCoRoutine_t *co = curenv->_waitResumeQueue.pop();
+            while (co) {
+                co_resume(co);
+                
+                co = curenv->_waitResumeQueue.pop();
             }
         }
         

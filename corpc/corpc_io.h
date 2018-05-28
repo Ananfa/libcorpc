@@ -235,8 +235,8 @@ namespace corpc {
     protected:
         IO *_io;
         int _fd; // connect fd
-        bool _routineHang; // deamon协程是否挂起
-        stCoRoutine_t* _routine; // deamon协程
+        bool _routineHang; // 协程是否挂起
+        stCoRoutine_t* _routine; // 协程
         
         int _sendThreadIndex; // 分配到sender的线程下标
         int _recvThreadIndex; // 分配到receiver的线程下标
@@ -526,8 +526,8 @@ namespace corpc {
         
         std::list<HeartbeatItem> _heartbeatList;
         
-        bool _heartbeatRoutineHang; // deamon协程是否挂起
-        stCoRoutine_t* _heartbeatRoutine; // deamon协程
+        bool _heartbeatRoutineHang; // 心跳协程是否挂起
+        stCoRoutine_t* _heartbeatRoutine; // 心跳协程
         
     };
     

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// deprecated
+
 #include "corpc_routine_env.h"
 #include "corpc_rpc_client.h"
 #include "corpc_rpc_server.h"

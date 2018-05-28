@@ -32,9 +32,10 @@
 namespace corpc {
     
     // 注意：RpcClient的实现不考虑运行时的关闭销毁，只能通过关闭程序来关闭
-    class RpcClient: public CoroutineWorker {
+    class RpcClient {
         
         struct RpcTask {
+            pid_t pid;
             stCoRoutine_t *co;
             const google::protobuf::Message* request;
             google::protobuf::Message* response;
@@ -145,10 +146,7 @@ namespace corpc {
         
         static void *taskHandleRoutine(void * arg);   // 负责将rpc调用请求通过connection交由sender发出
         
-        void start();
-        
-    protected:
-        virtual void handleMessage(void *msg);
+        virtual void start();
         
     private:
         IO *_io;

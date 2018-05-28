@@ -74,7 +74,7 @@ namespace corpc {
             while (msg) {
                 self->handleMessage(msg);
                 
-                // 防止其他协程（如：RoutineEnvironment::deamonRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，这里在处理一段时间后让出一下
                 gettimeofday(&t2, NULL);
                 if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
                     msleep(1);

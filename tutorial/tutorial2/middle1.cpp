@@ -58,8 +58,8 @@ int main(int argc, const char * argv[]) {
     RpcClient *client = RpcClient::create(io);
     RpcClient::Channel *channel = new RpcClient::Channel(client, sip, sport, 1);
     
-    RpcServer *server = RpcServer::create(io, 0, ip, port);
-    //Server *server = Server::create(io, 1, ip, port); // this will error
+    //RpcServer *server = RpcServer::create(io, 0, ip, port);
+    RpcServer *server = RpcServer::create(io, 1, ip, port);
     
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl(new HelloWorldService::Stub(channel));
     server->registerService(helloWorldService);

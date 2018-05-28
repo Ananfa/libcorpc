@@ -271,6 +271,7 @@
 					/usr/local/include,
 					../../co,
 					../../corpc,
+					../../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = "-lprotobuf";
@@ -286,6 +287,7 @@
 					/usr/local/include,
 					../../co,
 					../../corpc,
+					../../proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = "-lprotobuf";

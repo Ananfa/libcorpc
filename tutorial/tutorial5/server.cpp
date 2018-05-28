@@ -22,46 +22,13 @@
 
 using namespace corpc;
 
-class ThreadSpecialResource {
-public:
-    static ThreadSpecialResource& Instance() {
-        static ThreadSpecialResource inst;
-        return inst;
-    }
-    
-    void setIO(IO *io) { _io = io; }
-    
-    RpcClient *get_client();
-    
-private:
-    ThreadSpecialResource() {}
-    ThreadSpecialResource(ThreadSpecialResource const&);
-    ThreadSpecialResource& operator=(ThreadSpecialResource const&);
-    ~ThreadSpecialResource() {}
-    
-private:
-    IO *_io;
-    
-    static __thread RpcClient *_client;
-};
-
-__thread RpcClient *ThreadSpecialResource::_client(nullptr);
-
-RpcClient *ThreadSpecialResource::get_client() {
-    if (!_client) {
-        _client = RpcClient::create(_io);
-    }
-    
-    return _client;
-}
-
 class FactorialServiceImpl : public FactorialService {
 public:
-    FactorialServiceImpl(const std::string& sip, uint32_t sport): _sip(sip), _sport(sport) {}
+    FactorialServiceImpl(IO *io, const std::string& sip, uint32_t sport): _io(io), _sip(sip), _sport(sport), _factorial_clt(NULL) {}
     virtual void factorial(::google::protobuf::RpcController* controller,
-                     const ::FactorialRequest* request,
-                     ::FactorialResponse* response,
-                     ::google::protobuf::Closure* done) {
+                           const ::FactorialRequest* request,
+                           ::FactorialResponse* response,
+                           ::google::protobuf::Closure* done) {
         uint32_t n = request->n();
         printf("FactorialServiceImpl::factorial is called for n: %d\n", n);
         if (n > 20) { // 数太大，无法表示
@@ -81,24 +48,23 @@ public:
     }
     
 private:
-    std::string _sip;
-    uint32_t _sport;
     FactorialService::Stub *get_factorial_clt();
     
 private:
-    static __thread FactorialService::Stub *_factorial_clt;
+    IO *_io;
+    std::string _sip;
+    uint32_t _sport;
+    FactorialService::Stub *_factorial_clt;
 };
-
-__thread FactorialService::Stub *FactorialServiceImpl::_factorial_clt(nullptr);
 
 FactorialService::Stub *FactorialServiceImpl::get_factorial_clt() {
     if (!_factorial_clt) {
-        RpcClient *client = ThreadSpecialResource::Instance().get_client();
-        if (client) {
-            RpcClient::Channel *channel = new RpcClient::Channel(client, _sip, _sport, 1);
+        RpcClient *client = RpcClient::create(_io);
+
+        RpcClient::Channel *channel = new RpcClient::Channel(client, _sip, _sport, 1);
             
-            _factorial_clt= new FactorialService::Stub(channel, ::google::protobuf::Service::STUB_OWNS_CHANNEL);
-        }
+        _factorial_clt= new FactorialService::Stub(channel, ::google::protobuf::Service::STUB_OWNS_CHANNEL);
+
     }
     
     return _factorial_clt;
@@ -121,11 +87,11 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     IO *io = IO::create(1, 1);
     
-    ThreadSpecialResource::Instance().setIO(io);
+    //ThreadSpecialResource::Instance().setIO(io);
     
     RpcServer *server = RpcServer::create(io, 1, ip, port);
     
-    FactorialServiceImpl *factorialService = new FactorialServiceImpl(sip, sport);
+    FactorialServiceImpl *factorialService = new FactorialServiceImpl(io, sip, sport);
     server->registerService(factorialService);
     
     RoutineEnvironment::runEventLoop();
