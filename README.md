@@ -5,7 +5,8 @@ libcorpc
 - libcorpc使用protobuf定义rpc服务和方法
 - libcorpc支持进程间和进程内的rpc
 - libcorpc结合了协程和rpc的特点，进行rpc调用时不用担心阻塞线程执行，提升线程使用效率
-- libcorpc的IO层可支持其他非rpc的数据传输，需要继承IO::Connection实现相关Connection
+- libcorpc中还为非rpc数据传输提供了Tcp/Udp消息服务：TcpMessageServer和UdpMessageServer
+- libcorpc中的RpcClient和InnerRpcClient实现是线程安全的，可在主线程创建，多个线程中并发使用
 
 ***
 
@@ -83,10 +84,21 @@ service HelloWorldService {
 
 ### benchmark
 - 测试环境：MacBook Pro, macOS 10.12.6, cpu: 2.6GHz i5, 一台机器
-- 进程间rpc调用benchmark程序：服务器test/rpcsvr、客户端test/rpccli，在一台机器中测试，平均每秒7到8万次rpc
-- 进程内rpc调用benchmark程序：test/innerRpc，平均每秒30万+次
+- 进程间rpc调用benchmark程序：example/example_interRpc，在一台机器中测试，平均每秒8万+次rpc
+- 进程内rpc调用benchmark程序：example/example_innerRpc，平均每秒30万+次
 
 ***
 
 ### build
 - 需要GCC 4.8.3以上版本
+
+***
+
+### 使用libcorpc开发一些要注意的地方
+- socket族IO操作、某些第三方库函数（如：mysqlclient）、sleep方法、co_yield_ct方法等会产生协程切换
+- 协程的切换实际是掌握在程序员手中
+- 一个线程中的多个协程对线程资源的访问和修改不需要对资源上锁
+- 如果一协程中有死循环并且循环中没有能产生协程切换的方法调用，其他协程将不会被调度执行
+- socket族IO操作会有fd在epoll中进行事件监听，而sleep没有fd在epoll中监听，如果一段时间内没有fd事件发生，需要等epoll超时之后sleep协程才会被唤醒，因此epoll超时值需要根据实际情况进行设置，超时值太小会消耗性能，太大则sleep唤醒延迟大
+- 在使用第三方库时（如：mysqlclient），需要在启动程序时加上“LD_PRELOAD=<path of libco>”（如果在mac OS中加“DYLD_INSERT_LIBRARIES=<HOOK了系统接口的动态库> DYLD_FORCE_FLAT_NAMESPACE=y”）
+
