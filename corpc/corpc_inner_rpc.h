@@ -31,6 +31,7 @@ namespace corpc {
     struct InnerRpcRequest {
         InnerRpcClient *client; // 发起调用的Client，用于在rpc处理完成后返回结果给发起者
         InnerRpcServer *server;
+        pid_t pid;
         stCoRoutine_t *co;
         const google::protobuf::Message* request;
         google::protobuf::Message* response;
@@ -42,10 +43,10 @@ namespace corpc {
     
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-    typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> InnerRpcResponseQueue;
+    //typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> InnerRpcResponseQueue;
 #else
     typedef CoSyncQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-    typedef CoSyncQueue<stCoRoutine_t*> InnerRpcResponseQueue;
+    //typedef CoSyncQueue<stCoRoutine_t*> InnerRpcResponseQueue;
 #endif
     
     class InnerRpcClient {
@@ -73,12 +74,12 @@ namespace corpc {
         InnerRpcClient() {}
         ~InnerRpcClient() {}
         
-        void start();
+        //void start();
         
-        static void *responseQueueRoutine( void * arg );
+        //static void *responseQueueRoutine( void * arg );
         
     private:
-        InnerRpcResponseQueue _queue;
+        //InnerRpcResponseQueue _queue;
         
         static __thread InnerRpcClient *_instance;
         

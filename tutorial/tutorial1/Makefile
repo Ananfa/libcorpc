@@ -18,7 +18,7 @@ v=debug
 
 DIR_SRC = ./ ../proto/
 DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
-DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_INC = ./ ../proto/ ../../co/ ../../corpc/ ../../proto/
 DIR_OBJ = ./${v}/obj/
 DIR_BIN = ./${v}/bin/
 

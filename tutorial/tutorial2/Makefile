@@ -18,16 +18,15 @@ v=debug
 
 DIR_SRC = ./ ../proto/
 DIR_LIB = ../../co/lib/ ../../corpc/lib/ /usr/local/lib/
-DIR_INC = ./ ../proto/ ../../co/ ../../corpc/
+DIR_INC = ./ ../proto/ ../../co/ ../../corpc/ ../../proto/
 DIR_OBJ = ./${v}/obj/
 DIR_BIN = ./${v}/bin/
 
 PROTO_OBJS = helloworld.pb.o
 SERVER_OBJS = ${PROTO_OBJS} server.o
-MIDDLE1_OBJS = ${PROTO_OBJS} middle1.o
-MIDDLE2_OBJS = ${PROTO_OBJS} middle2.o
+MIDDLE_OBJS = ${PROTO_OBJS} middle.o
 CLIENT_OBJS = ${PROTO_OBJS} client.o
-ALL_OBJS = ${PROTO_OBJS} server.o middle1.o middle2.o client.o
+ALL_OBJS = ${PROTO_OBJS} server.o middle.o client.o
 ALL_OBJS_WITH_PATH = ${foreach n,${ALL_OBJS},${DIR_OBJ}${n}}
 
 empty =  
@@ -80,9 +79,7 @@ all: directories ${PROGS}
 
 server: ${SERVER_OBJS:.o=.d} ${SERVER_OBJS}
 	${BUILDEXE}
-middle1: ${MIDDLE1_OBJS:.o=.d} $(MIDDLE1_OBJS)
-	${BUILDEXE}
-middle2: ${MIDDLE2_OBJS:.o=.d} $(MIDDLE2_OBJS)
+middle: ${MIDDLE_OBJS:.o=.d} $(MIDDLE_OBJS)
 	${BUILDEXE}
 client: ${CLIENT_OBJS:.o=.d} $(CLIENT_OBJS)
 	${BUILDEXE}

@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
     // 再开一线程
     //std::thread t2 = std::thread(clientThread);
     
-    // 注意：线程开多了，性能反而下降了。在具体项目中应根据CPU核心数来调整线程数量
+    // 注意：线程开多了性能不一定会增加，也可能降低，因此在具体项目中需要根据CPU核心数来调整线程数量
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     

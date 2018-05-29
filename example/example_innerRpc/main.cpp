@@ -232,16 +232,9 @@ static void *rpc_routine( void *arg )
     return NULL;
 }
 
-static void clientEntry( InnerRpcServer *server ) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
-    
-    g_stubs.foo_clt = new FooService::Stub(channel);
-    g_stubs.bar_clt = new BarService::Stub(channel);
-    g_stubs.baz_clt = new BazService::Stub(channel);
-    
-    for (int i=0; i<500; i++) {
+int g_routineNum = 100;
+static void clientEntry() {
+    for (int i=0; i<g_routineNum; i++) {
         RoutineEnvironment::startCoroutine(rpc_routine, &g_stubs);
     }
     
@@ -258,11 +251,30 @@ int main(int argc, const char * argv[]) {
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
     
+    InnerRpcClient *client = InnerRpcClient::instance();
+    
+    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
+    
+    g_stubs.foo_clt = new FooService::Stub(channel);
+    g_stubs.bar_clt = new BarService::Stub(channel);
+    g_stubs.baz_clt = new BazService::Stub(channel);
+    
+    // 在主线程中直接开一组rpc_routine协程
+    for (int i=0; i<g_routineNum; i++) {
+        RoutineEnvironment::startCoroutine(rpc_routine, &g_stubs);
+    }
+    
+    // 新开一线程，并在其中开一组rpc_routine协程
+    std::thread t1 = std::thread(clientEntry);
+    
+    // 再开一线程，并在其中开一组rpc_routine协程
+    std::thread t2 = std::thread(clientEntry);
+    
+    // 注意：线程开多了性能不一定会增加，也可能降低，因此在具体项目中需要根据CPU核心数来调整线程数量
+    
     RoutineEnvironment::startCoroutine(log_routine, NULL);
-    std::thread t = std::thread(clientEntry, server);
     
     RoutineEnvironment::runEventLoop();
     
     return 0;
 }
-

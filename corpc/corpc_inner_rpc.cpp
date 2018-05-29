@@ -34,6 +34,7 @@ namespace corpc {
         InnerRpcRequest *req = new InnerRpcRequest;
         req->client = _client;
         req->server = _server;
+        req->pid = GetPid();
         req->co = co_self();
         req->request = request;
         
@@ -60,16 +61,16 @@ namespace corpc {
     InnerRpcClient* InnerRpcClient::instance() {
         if (!_instance) {
             _instance = new InnerRpcClient();
-            _instance->start();
+            //_instance->start();
         }
         
         return _instance;
     }
     
-    void InnerRpcClient::start() {
-        RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
-    }
-    
+    //void InnerRpcClient::start() {
+    //    RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
+    //}
+    /*
     void *InnerRpcClient::responseQueueRoutine( void * arg ) {
         InnerRpcClient *client = (InnerRpcClient*)arg;
         InnerRpcResponseQueue& queue = client->_queue;
@@ -121,6 +122,7 @@ namespace corpc {
         
         return NULL;
     }
+    */
     
     InnerRpcServer* InnerRpcServer::create() {
         InnerRpcServer *server = new InnerRpcServer();
@@ -227,8 +229,8 @@ namespace corpc {
                     server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
                     
                     if (request->response) {
-                        // 处理结果发回给Client
-                        request->client->_queue.push(request->co);
+                        // 唤醒协程处理结果
+                        RoutineEnvironment::resumeCoroutine(request->pid, request->co);
                     } else {
                         // not_care_response类型的rpc需要在这里触发回调清理request
                         assert(request->done);
@@ -262,8 +264,8 @@ namespace corpc {
         server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
         
         if (request->response) {
-            // 处理结果发回给Client
-            request->client->_queue.push(request->co);
+            // 唤醒协程处理结果
+            RoutineEnvironment::resumeCoroutine(request->pid, request->co);
         } else {
             // not_care_response类型的rpc需要在这里触发回调清理request
             assert(request->done);

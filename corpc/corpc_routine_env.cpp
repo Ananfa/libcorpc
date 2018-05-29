@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <vector>
+#include <sys/time.h>
 
 namespace corpc {
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
@@ -225,9 +226,20 @@ namespace corpc {
                 }
             }
             
+            struct timeval t1,t2;
+            gettimeofday(&t1, NULL);
+            
             stCoRoutine_t *co = curenv->_waitResumeQueue.pop();
             while (co) {
                 co_resume(co);
+                
+                // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，这里在处理一段时间后让出一下
+                gettimeofday(&t2, NULL);
+                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
+                    msleep(1);
+                    
+                    gettimeofday(&t1, NULL);
+                }
                 
                 co = curenv->_waitResumeQueue.pop();
             }
