@@ -27,9 +27,6 @@
 
 namespace corpc {
     
-    //Decoder::~Decoder() {}
-    
-    
     Worker::Worker::~Worker() {
         
     }
@@ -121,8 +118,6 @@ namespace corpc {
     void CoroutineWorker::addMessage(void *msg) {
         _queueContext._queue.push(msg);
     }
-    
-    //Encoder::~Encoder() {}
     
     Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _connection(connection), _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
         _headBuf = (uint8_t *)_head.data();

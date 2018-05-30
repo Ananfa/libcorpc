@@ -61,68 +61,10 @@ namespace corpc {
     InnerRpcClient* InnerRpcClient::instance() {
         if (!_instance) {
             _instance = new InnerRpcClient();
-            //_instance->start();
         }
         
         return _instance;
     }
-    
-    //void InnerRpcClient::start() {
-    //    RoutineEnvironment::startCoroutine(responseQueueRoutine, this);
-    //}
-    /*
-    void *InnerRpcClient::responseQueueRoutine( void * arg ) {
-        InnerRpcClient *client = (InnerRpcClient*)arg;
-        InnerRpcResponseQueue& queue = client->_queue;
-        
-        // 初始化pipe readfd
-        int readFd = queue.getReadFd();
-        co_register_fd(readFd);
-        co_set_timeout(readFd, -1, 1000);
-        
-        int ret;
-        std::vector<char> buf(1024);
-        while (true) {
-            // 等待处理信号
-            ret = read(readFd, &buf[0], 1024);
-            assert(ret != 0);
-            if (ret < 0) {
-                if (errno == EAGAIN) {
-                    continue;
-                } else {
-                    // 管道出错
-                    printf("ERROR: InnerServer::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
-                           readFd, ret, errno, strerror(errno));
-                    
-                    // TODO: 如何处理？退出协程？
-                    // sleep 10 milisecond
-                    msleep(10);
-                }
-            }
-            
-            struct timeval t1,t2;
-            gettimeofday(&t1, NULL);
-            
-            // 处理任务队列
-            stCoRoutine_t *co = queue.pop();
-            while (co) {
-                co_resume(co);
-                
-                // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，这里在处理一段时间后让出一下
-                gettimeofday(&t2, NULL);
-                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
-                    msleep(1);
-                    
-                    gettimeofday(&t1, NULL);
-                }
-                
-                co = queue.pop();
-            }
-        }
-        
-        return NULL;
-    }
-    */
     
     InnerRpcServer* InnerRpcServer::create() {
         InnerRpcServer *server = new InnerRpcServer();

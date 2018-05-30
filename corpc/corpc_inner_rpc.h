@@ -43,10 +43,8 @@ namespace corpc {
     
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-    //typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> InnerRpcResponseQueue;
 #else
     typedef CoSyncQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-    //typedef CoSyncQueue<stCoRoutine_t*> InnerRpcResponseQueue;
 #endif
     
     class InnerRpcClient {
@@ -74,13 +72,7 @@ namespace corpc {
         InnerRpcClient() {}
         ~InnerRpcClient() {}
         
-        //void start();
-        
-        //static void *responseQueueRoutine( void * arg );
-        
     private:
-        //InnerRpcResponseQueue _queue;
-        
         static __thread InnerRpcClient *_instance;
         
     public:
