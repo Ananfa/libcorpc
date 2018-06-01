@@ -83,17 +83,35 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
+        _realConnectCount++;
         memcached_st *memc = memcached_create(NULL);
-        memcached_return rc = memcached_server_push(memc, _memcServers);
         
-        if (rc == MEMCACHED_SUCCESS) {
-            response->set_handle((intptr_t)memc);
-            _realConnectCount++;
-        } else {
-            fprintf(stderr, "Couldn't add server: %s\n", memcached_strerror(memc, rc));
-            memcached_free(memc);
+        if (memc) {
+            memcached_return rc = memcached_server_push(memc, _memcServers);
             
-            controller->SetFailed("Couldn't add memcached server");
+            if (rc == MEMCACHED_SUCCESS) {
+                response->set_handle((intptr_t)memc);
+            } else {
+                fprintf(stderr, "Couldn't add server: %s\n", memcached_strerror(memc, rc));
+                memcached_free(memc);
+                memc = NULL;
+                
+                controller->SetFailed("Couldn't add memcached server");
+            }
+        } else {
+            controller->SetFailed("Couldn't create memcached");
+        }
+        
+        if (!memc) {
+            // 唤醒所有等待协程
+            _realConnectCount--;
+            
+            while (!_waitingList.empty()) {
+                stCoRoutine_t *co = _waitingList.front();
+                _waitingList.pop_front();
+                
+                co_resume(co);
+            }
         }
     } else {
         // 等待空闲连接
@@ -131,18 +149,22 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                     stCoRoutine_t *co = _waitingList.front();
                     _waitingList.pop_front();
                     
+                    _realConnectCount++;
                     memc = memcached_create(NULL);
                     
                     if (memc) {
                         memcached_return rc = memcached_server_push(memc, _memcServers);
                         
                         if (rc == MEMCACHED_SUCCESS) {
-                            _realConnectCount++;
                             _idleList.push_back(memc);
                         } else {
                             memcached_free(memc);
                             memc = NULL;
                         }
+                    }
+                    
+                    if (!memc) {
+                        _realConnectCount--;
                     }
                     
                     // 唤醒先前取出的等待协程

@@ -1,12 +1,14 @@
 libcorpc
 ========
-- libcorpc是在腾讯开源项目libco基础上开发的RPC库，拥有libco的特性
-- libcorpc开发过程中对libco做了少量修改，在项目的co目录中
-- libcorpc使用protobuf定义rpc服务和方法
-- libcorpc支持进程间和进程内的rpc
-- libcorpc结合了协程和rpc的特点，进行rpc调用时不用担心阻塞线程执行，提升线程使用效率
-- libcorpc中还为非rpc数据传输提供了Tcp/Udp消息服务：TcpMessageServer和UdpMessageServer
-- libcorpc中的RpcClient和InnerRpcClient实现是线程安全的，可在主线程创建，多个线程中并发使用
+- 在腾讯开源项目libco基础上开发，拥有libco的特性
+- 开发过程中对libco做了少量修改，在项目的co目录中
+- 使用protobuf定义rpc服务和方法
+- 支持进程间和进程内的rpc
+- 结合了协程和rpc的特点，进行rpc调用时不用担心阻塞线程执行，提升线程使用效率
+- 为非rpc数据传输提供了Tcp/Udp消息服务：TcpMessageServer和UdpMessageServer
+- RpcClient和InnerRpcClient实现是线程安全的，可在主线程创建对象然后在多个线程中并发调用rpc
+- 全双工模式的RPC框架，比连接池实现方式效率更高且需要连接数更少
+- 目前支持macOS和linux系统
 
 ***
 

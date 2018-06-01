@@ -40,7 +40,7 @@ namespace corpc {
         respSize = be32toh(respSize);
         uint64_t callId = *(uint64_t *)(head + 4);
         callId = be64toh(callId);
-        
+        assert(respSize == size);
         std::shared_ptr<ClientTask> task;
         // 注意: _waitResultCoMap需进行线程同步
         {
@@ -223,8 +223,6 @@ namespace corpc {
     }
     
     void RpcClient::start() {
-        //CoroutineWorker::start();
-        
         _t = std::thread(threadEntry, this);
     }
     

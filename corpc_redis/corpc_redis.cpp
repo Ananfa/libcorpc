@@ -83,18 +83,34 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
+        _realConnectCount++;
+        
         struct timeval timeout = { 1, 500000 }; // 1.5 seconds
         redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
         
         if (redis && !redis->err) {
             response->set_handle((intptr_t)redis);
-            _realConnectCount++;
         } else if (redis) {
             redisFree(redis);
+            redis = NULL;
+            
             controller->SetFailed("can't connect to redis server");
         } else {
             controller->SetFailed("can't allocate redis context");
         }
+        
+        if (!redis) {
+            // 唤醒所有等待协程
+            _realConnectCount--;
+            
+            while (!_waitingList.empty()) {
+                stCoRoutine_t *co = _waitingList.front();
+                _waitingList.pop_front();
+                
+                co_resume(co);
+            }
+        }
+        
     } else {
         // 等待空闲连接
         _waitingList.push_back(co_self());
@@ -131,15 +147,19 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
                     stCoRoutine_t *co = _waitingList.front();
                     _waitingList.pop_front();
                     
+                    _realConnectCount++;
                     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
                     redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
                     
                     if (redis && !redis->err) {
-                        _realConnectCount++;
                         _idleList.push_back(redis);
                     } else if (redis) {
                         redisFree(redis);
                         redis = NULL;
+                    }
+                    
+                    if (!redis) {
+                        _realConnectCount--;
                     }
                     
                     // 先唤醒先前取出的等待协程

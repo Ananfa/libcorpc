@@ -83,20 +83,34 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
-        // 注意：由于mysql_real_connect中的io操作会产生协程切换，当多个mysql连接同时正在建立时，有可能导致_realConnectCount值超出_maxConnectNum，因此_maxConnectNum不是硬性限制
+        _realConnectCount++;
         MYSQL *con = mysql_init(NULL);
         
         if (con) {
             if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
                 response->set_handle((intptr_t)con);
-                _realConnectCount++;
             } else {
                 mysql_close(con);
+                con = NULL;
+                
                 controller->SetFailed("can't connect to mysql server");
             }
         } else {
             controller->SetFailed("can't create MYSQL object probably because not enough memory");
         }
+        
+        if (!con) {
+            // 唤醒所有等待协程
+            _realConnectCount--;
+            
+            while (!_waitingList.empty()) {
+                stCoRoutine_t *co = _waitingList.front();
+                _waitingList.pop_front();
+                
+                co_resume(co);
+            }
+        }
+        
     } else {
         // 等待空闲连接
         _waitingList.push_back(co_self());
@@ -133,16 +147,20 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                     stCoRoutine_t *co = _waitingList.front();
                     _waitingList.pop_front();
                     
+                    _realConnectCount++;
                     MYSQL *con = mysql_init(NULL);
                     
                     if (con) {
                         if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
-                            _realConnectCount++;
                             _idleList.push_back(con);
                         } else {
                             mysql_close(con);
                             con = NULL;
                         }
+                    }
+                    
+                    if (!con) {
+                        _realConnectCount--;
                     }
                     
                     // 唤醒先前取出的等待协程

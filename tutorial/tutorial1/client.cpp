@@ -32,9 +32,7 @@ static void *helloworld_routine( void *arg )
     
     printf("rpc_routine begin\n");
     
-    RpcClient::Channel *channel = (RpcClient::Channel*)arg;
-    
-    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
+    HelloWorldService::Stub *helloworld_clt = (HelloWorldService::Stub *)arg;
     
     FooRequest *request = new FooRequest();
     FooResponse *response = new FooResponse();
@@ -44,7 +42,7 @@ static void *helloworld_routine( void *arg )
     request->set_msg2("World");
     
     helloworld_clt->foo(controller, request, response, NULL);
-        
+    
     if (controller->Failed()) {
         printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
     } else {
@@ -55,22 +53,21 @@ static void *helloworld_routine( void *arg )
     delete response;
     delete request;
     
-    delete helloworld_clt;
-    
     return NULL;
 }
 
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    if(argc<3){
+    if(argc<4){
         printf("Usage:\n"
-               "Tutorial1Client [IP] [PORT]\n");
+               "Tutorial1Client [IP] [PORT] [NUM]\n");
         return -1;
     }
     
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
+    uint32_t num = atoi(argv[3]);
     
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
@@ -80,8 +77,11 @@ int main(int argc, const char * argv[]) {
     
     RpcClient *client = RpcClient::create(io);
     RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 1);
+    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
     
-    RoutineEnvironment::startCoroutine(helloworld_routine, channel);
+    for (int i = 0; i < num; i++) {
+        RoutineEnvironment::startCoroutine(helloworld_routine, helloworld_clt);
+    }
     
     printf("running...\n");
     

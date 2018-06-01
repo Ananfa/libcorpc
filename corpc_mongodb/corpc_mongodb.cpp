@@ -86,13 +86,23 @@ void MongodbConnectPool::take(::google::protobuf::RpcController* controller,
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
         // 建立新连接
+        _realConnectCount++;
         mongoc_client_t *mongoc = mongoc_client_new(_uri.c_str());
         
         if (mongoc) {
             response->set_handle((intptr_t)mongoc);
-            _realConnectCount++;
         } else {
             controller->SetFailed("new mongoc client fail");
+            
+            // 唤醒所有等待协程
+            _realConnectCount--;
+            
+            while (!_waitingList.empty()) {
+                stCoRoutine_t *co = _waitingList.front();
+                _waitingList.pop_front();
+                
+                co_resume(co);
+            }
         }
     } else {
         // 等待空闲连接
@@ -130,11 +140,13 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
                     stCoRoutine_t *co = _waitingList.front();
                     _waitingList.pop_front();
                     
+                    _realConnectCount++;
                     mongoc = mongoc_client_new(_uri.c_str());
                     
                     if (mongoc) {
-                        _realConnectCount++;
                         _idleList.push_back(mongoc);
+                    } else {
+                        _realConnectCount--;
                     }
                     
                     // 唤醒先前取出的等待协程

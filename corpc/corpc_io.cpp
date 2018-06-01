@@ -163,7 +163,7 @@ namespace corpc {
             // 先解析头部
             if (_headNum < _headSize) {
                 int needNum = _headSize - _headNum;
-                if (size - offset > needNum) {
+                if (size - offset >= needNum) {
                     memcpy(_headBuf + _headNum, buf + offset, needNum);
                     _headNum = _headSize;
                     
