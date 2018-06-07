@@ -86,6 +86,7 @@ namespace corpc {
             msgSize = rpcTask->request->ByteSize();
         }
         
+        // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
         if (msgSize + CORPC_REQUEST_HEAD_SIZE >= space) {
             return true;
         }
@@ -202,7 +203,7 @@ namespace corpc {
     }
     
     RpcClient::RpcClient(IO *io): _io(io) {
-        _pipelineFactory = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
     }
     
     RpcClient* RpcClient::create(IO *io) {

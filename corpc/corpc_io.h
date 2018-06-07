@@ -118,16 +118,32 @@ namespace corpc {
     
     class Pipeline {
     public:
-        enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
-        
-    public:
-        Pipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
+        Pipeline(std::shared_ptr<Connection> &connection, Worker *worker);
         virtual ~Pipeline() = 0;
         
         virtual bool upflow(uint8_t *buf, int size) = 0;
-        bool downflow(uint8_t *buf, int space, int &size);
+        virtual bool downflow(uint8_t *buf, int space, int &size) = 0;
         
     protected:
+        Worker *_worker;
+        
+        std::weak_ptr<Connection> _connection;
+    };
+    
+    class MessagePipeline: public Pipeline {
+    public:
+        enum SIZE_TYPE { TWO_BYTES, FOUR_BYTES };
+        
+    public:
+        MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
+        virtual ~MessagePipeline() = 0;
+        
+        virtual bool downflow(uint8_t *buf, int space, int &size) override final;
+        
+    protected:
+        DecodeFunction _decodeFun;
+        EncodeFunction _encodeFun;
+        
         uint _headSize;
         uint _maxBodySize;
         
@@ -137,15 +153,9 @@ namespace corpc {
         std::string _body;
         uint8_t *_bodyBuf;
         uint _bodySize;
-        
-        DecodeFunction _decodeFun;
-        Worker *_worker;
-        EncodeFunction _encodeFun;
-        
-        std::weak_ptr<Connection> _connection;
     };
     
-    class TcpPipeline: public Pipeline {
+    class TcpPipeline: public MessagePipeline {
     public:
         TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~TcpPipeline() {}
@@ -160,7 +170,7 @@ namespace corpc {
         SIZE_TYPE _bodySizeType;
     };
     
-    class UdpPipeline: public Pipeline {
+    class UdpPipeline: public MessagePipeline {
     public:
         UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
         virtual ~UdpPipeline() {}
@@ -170,13 +180,23 @@ namespace corpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
+        PipelineFactory(corpc::Worker *worker): _worker(worker) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
         Worker *_worker;
+    };
+    
+    class MessagePipelineFactory: public PipelineFactory {
+    public:
+        MessagePipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
+        virtual ~MessagePipelineFactory() = 0;
+        
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
+        
+    protected:
         DecodeFunction _decodeFun;
         EncodeFunction _encodeFun;
         
@@ -184,21 +204,21 @@ namespace corpc {
         uint _maxBodySize;
     };
     
-    class TcpPipelineFactory: public PipelineFactory {
+    class TcpPipelineFactory: public MessagePipelineFactory {
     public:
-        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, Pipeline::SIZE_TYPE bodySizeType): PipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
+        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
         ~TcpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
         
     public:
         uint _bodySizeOffset;
-        Pipeline::SIZE_TYPE _bodySizeType;
+        MessagePipeline::SIZE_TYPE _bodySizeType;
     };
     
-    class UdpPipelineFactory: public PipelineFactory {
+    class UdpPipelineFactory: public MessagePipelineFactory {
     public:
-        UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize) {}
+        UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize) {}
         ~UdpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
@@ -232,6 +252,11 @@ namespace corpc {
         void send(std::shared_ptr<void> data);
         
         void close();
+        
+        size_t getDataSize() { return _datas.size(); }
+        std::shared_ptr<void>& getFrontData() { return _datas.front(); }
+        void popFrontData() { _datas.pop_front(); }
+        
     protected:
         IO *_io;
         int _fd; // connect fd
@@ -253,7 +278,6 @@ namespace corpc {
         std::atomic<bool> _canClose; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
         
     public:
-        friend class Pipeline;
         friend class Receiver;
         friend class Sender;
         friend class Heartbeater;

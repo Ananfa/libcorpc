@@ -119,21 +119,26 @@ namespace corpc {
         _queueContext._queue.push(msg);
     }
     
-    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): _connection(connection), _worker(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
-        _headBuf = (uint8_t *)_head.data();
-        _bodyBuf = (uint8_t *)_body.data();
+    Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker): _connection(connection), _worker(worker) {
     }
     
     Pipeline::~Pipeline() {}
     
-    bool Pipeline::downflow(uint8_t *buf, int space, int &size) {
+    MessagePipeline::MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
+        _headBuf = (uint8_t *)_head.data();
+        _bodyBuf = (uint8_t *)_body.data();
+    }
+    
+    MessagePipeline::~MessagePipeline() {}
+    
+    bool MessagePipeline::downflow(uint8_t *buf, int space, int &size) {
         std::shared_ptr<Connection> connection = _connection.lock();
         assert(connection);
         
         size = 0;
-        while (connection->_datas.size() > 0) {
+        while (connection->getDataSize() > 0) {
             int tmp = 0;
-            if (!_encodeFun(connection, connection->_datas.front(), buf + size, space - size, tmp)) {
+            if (!_encodeFun(connection, connection->getFrontData(), buf + size, space - size, tmp)) {
                 // 编码失败
                 return false;
             }
@@ -144,13 +149,13 @@ namespace corpc {
             
             size += tmp;
             
-            connection->_datas.pop_front();
+            connection->popFrontData();
         }
         
         return true;
     }
     
-    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+    TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
     }
     
     bool TcpPipeline::upflow(uint8_t *buf, int size) {
@@ -229,7 +234,7 @@ namespace corpc {
         return true;
     }
     
-    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize) {
+    UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize) {
         
     }
     
@@ -265,6 +270,8 @@ namespace corpc {
     }
     
     PipelineFactory::~PipelineFactory() {}
+    
+    MessagePipelineFactory::~MessagePipelineFactory() {}
     
     std::shared_ptr<corpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
         return std::shared_ptr<corpc::Pipeline>( new corpc::TcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
@@ -828,10 +835,6 @@ namespace corpc {
         
         // 若无数据可以发送则挂起，否则整理发送数据并发送
         while (true) {
-            if (connection->_isClosing) {
-                break;
-            }
-            
             int tmp = 0;
             if (!connection->getPipeline()->downflow(buf + endIndex, CORPC_MAX_BUFFER_SIZE - endIndex, tmp)) {
                 break;
@@ -842,6 +845,10 @@ namespace corpc {
             int dataSize = endIndex - startIndex;
             if (dataSize == 0) {
                 assert(startIndex == 0);
+                // 等数据发完再关
+                if (connection->_isClosing) {
+                    break;
+                }
                 
                 // 挂起
                 connection->_routineHang = true;

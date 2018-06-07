@@ -173,6 +173,7 @@ namespace corpc {
         if (msgInfo->isRaw) {
             std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(msgInfo->msg);
             
+            // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
             msgSize = msg?msg->size():0;
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE >= space) {
                 return true;
@@ -185,6 +186,7 @@ namespace corpc {
         } else {
             std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(msgInfo->msg);
             
+            // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
             msgSize = msg->GetCachedSize();
             if (msgSize == 0) {
                 msgSize = msg->ByteSize();
@@ -207,7 +209,7 @@ namespace corpc {
     TcpMessageServer::TcpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
         _acceptor = new TcpAcceptor(this, ip, port);
         
-        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::Pipeline::FOUR_BYTES);
+        _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
     }
     
     TcpMessageServer::~TcpMessageServer() {}
