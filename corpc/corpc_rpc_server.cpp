@@ -204,23 +204,40 @@ namespace corpc {
         }
     }
     
-    bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
         uint32_t msgSize = rpcTask->response->GetCachedSize();
         if (msgSize == 0) {
             msgSize = rpcTask->response->ByteSize();
         }
         
-        // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
-        if (msgSize + CORPC_RESPONSE_HEAD_SIZE >= space) {
+        // 若空间不足容纳消息头部则等待下次
+        if (CORPC_RESPONSE_HEAD_SIZE > space) {
             return true;
         }
         
         *(uint32_t *)buf = htobe32(msgSize);
         *(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
         
-        rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
-        size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
+        int spaceleft = space - CORPC_RESPONSE_HEAD_SIZE;
+        if (spaceleft >= msgSize) {
+            if (msgSize > 0) {
+                rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
+            }
+            
+            size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
+        } else {
+            downflowBuf.assign(msgSize, 0);
+            uint8_t *dbuf = (uint8_t*)downflowBuf.data();
+            rpcTask->response->SerializeWithCachedSizesToArray(dbuf);
+            
+            if (spaceleft > 0) {
+                memcpy(buf + CORPC_RESPONSE_HEAD_SIZE, dbuf, spaceleft);
+                downflowBufSentNum = spaceleft;
+            }
+            
+            size = space;
+        }
         
         return true;
     }

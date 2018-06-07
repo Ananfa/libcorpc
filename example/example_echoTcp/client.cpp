@@ -430,7 +430,7 @@ void testThread(std::string ip, uint16_t port, bool needHB) {
         // send FooRequest
         FooRequest *request = new FooRequest;
         request->set_text("hello world!");
-        request->set_times(2);
+        request->set_times(10);
         
         client.send(1, request);
         

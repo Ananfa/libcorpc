@@ -40,7 +40,7 @@ namespace corpc {
     //   1.编码器链：根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
     
     typedef std::function<void* (std::shared_ptr<Connection>&, uint8_t*, uint8_t*, int)> DecodeFunction;
-    typedef std::function<bool (std::shared_ptr<Connection>&, std::shared_ptr<void>&, uint8_t*, int, int&)> EncodeFunction;
+    typedef std::function<bool (std::shared_ptr<Connection>&, std::shared_ptr<void>&, uint8_t*, int, int&, std::string&, uint32_t&)> EncodeFunction;
     
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<void*> WorkerMessageQueue;
@@ -153,6 +153,10 @@ namespace corpc {
         std::string _body;
         uint8_t *_bodyBuf;
         uint _bodySize;
+        
+    private:
+        std::string _downflowBuf; // 在downflow过程中写不进buf的数据将记录到_downflowBuf中
+        uint32_t _downflowBufSentNum; // 已发送的数据量
     };
     
     class TcpPipeline: public MessagePipeline {

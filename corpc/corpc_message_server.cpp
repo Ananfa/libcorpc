@@ -167,41 +167,70 @@ namespace corpc {
         return task;
     }
     
-    bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
         std::shared_ptr<SendMessageInfo> msgInfo = std::static_pointer_cast<SendMessageInfo>(data);
+        
+        // 若空间不足容纳消息头部则等待下次
+        if (CORPC_MESSAGE_HEAD_SIZE > space) {
+            return true;
+        }
+        
         uint32_t msgSize;
         if (msgInfo->isRaw) {
             std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(msgInfo->msg);
             
-            // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
             msgSize = msg?msg->size():0;
-            if (msgSize + CORPC_MESSAGE_HEAD_SIZE >= space) {
-                return true;
-            }
             
-            if (msgSize) {
-                uint8_t * msgBuf = (uint8_t *)msg->data();
-                memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+            int spaceleft = space - CORPC_MESSAGE_HEAD_SIZE;
+            if (spaceleft >= msgSize) {
+                if (msgSize > 0) {
+                    uint8_t * msgBuf = (uint8_t *)msg->data();
+                    memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, msgBuf, msgSize);
+                }
+                
+                size = CORPC_MESSAGE_HEAD_SIZE + msgSize;
+            } else {
+                downflowBuf = *msg;
+                uint8_t *dbuf = (uint8_t*)downflowBuf.data();
+                
+                if (spaceleft > 0) {
+                    memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, dbuf, spaceleft);
+                    downflowBufSentNum = spaceleft;
+                }
+                
+                size = space;
             }
         } else {
             std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(msgInfo->msg);
             
-            // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
             msgSize = msg->GetCachedSize();
             if (msgSize == 0) {
                 msgSize = msg->ByteSize();
             }
             
-            if (msgSize + CORPC_MESSAGE_HEAD_SIZE >= space) {
-                return true;
+            int spaceleft = space - CORPC_MESSAGE_HEAD_SIZE;
+            if (spaceleft >= msgSize) {
+                if (msgSize > 0) {
+                    msg->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
+                }
+                
+                size = CORPC_MESSAGE_HEAD_SIZE + msgSize;
+            } else {
+                downflowBuf.assign(msgSize, 0);
+                uint8_t *dbuf = (uint8_t*)downflowBuf.data();
+                msg->SerializeWithCachedSizesToArray(dbuf);
+                
+                if (spaceleft > 0) {
+                    memcpy(buf + CORPC_MESSAGE_HEAD_SIZE, dbuf, spaceleft);
+                    downflowBufSentNum = spaceleft;
+                }
+                
+                size = space;
             }
-            
-            msg->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
         }
         
         *(uint32_t *)buf = htobe32(msgSize);
         *(uint32_t *)(buf + 4) = htobe32(msgInfo->type);
-        size = CORPC_MESSAGE_HEAD_SIZE + msgSize;
         
         return true;
     }

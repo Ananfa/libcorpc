@@ -124,7 +124,7 @@ namespace corpc {
     
     Pipeline::~Pipeline() {}
     
-    MessagePipeline::MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0) {
+    MessagePipeline::MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0), _downflowBufSentNum(0) {
         _headBuf = (uint8_t *)_head.data();
         _bodyBuf = (uint8_t *)_body.data();
     }
@@ -136,9 +136,34 @@ namespace corpc {
         assert(connection);
         
         size = 0;
+        
+        size_t dlen = _downflowBuf.length();
+        if (dlen > 0) {
+            assert(dlen > _downflowBufSentNum);
+            uint8_t *_dbuf = (uint8_t *)_downflowBuf.data();
+            
+            if (space >= dlen - _downflowBufSentNum) {
+                memcpy(buf, _dbuf + _downflowBufSentNum, dlen - _downflowBufSentNum);
+                
+                size = int(dlen - _downflowBufSentNum);
+                
+                _downflowBuf.clear();
+                _downflowBufSentNum = 0;
+            } else {
+                memcpy(buf, _dbuf + _downflowBufSentNum, space);
+                
+                size = space;
+                _downflowBufSentNum += space;
+            }
+            
+            if (space == size) {
+                return true;
+            }
+        }
+        
         while (connection->getDataSize() > 0) {
             int tmp = 0;
-            if (!_encodeFun(connection, connection->getFrontData(), buf + size, space - size, tmp)) {
+            if (!_encodeFun(connection, connection->getFrontData(), buf + size, space - size, tmp, _downflowBuf, _downflowBufSentNum)) {
                 // 编码失败
                 return false;
             }
@@ -866,6 +891,8 @@ namespace corpc {
                 
                 break;
             }
+            
+            assert(ret == dataSize);
             
             startIndex += ret;
             if (startIndex == endIndex) {

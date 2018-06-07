@@ -77,7 +77,7 @@ namespace corpc {
         return nullptr;
     }
     
-    bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size) {
+    bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
         std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
@@ -86,8 +86,8 @@ namespace corpc {
             msgSize = rpcTask->request->ByteSize();
         }
         
-        // TODO: 当前实现是将消息包作为一个整体写入buf中，需优化为可按buf空间部分写入数据（目的：使buf空间不需要开得太大都可以支持大包数据发送）
-        if (msgSize + CORPC_REQUEST_HEAD_SIZE >= space) {
+        // 若空间不足容纳消息头部则等待下次
+        if (CORPC_REQUEST_HEAD_SIZE > space) {
             return true;
         }
         
@@ -97,8 +97,25 @@ namespace corpc {
         uint64_t callId = uint64_t(rpcTask->co);
         *(uint64_t *)(buf + 12) = htobe64(callId);
         
-        rpcTask->request->SerializeWithCachedSizesToArray(buf + CORPC_REQUEST_HEAD_SIZE);
-        size = CORPC_REQUEST_HEAD_SIZE + msgSize;
+        int spaceleft = space - CORPC_REQUEST_HEAD_SIZE;
+        if (spaceleft >= msgSize) {
+            if (msgSize > 0) {
+                rpcTask->request->SerializeWithCachedSizesToArray(buf + CORPC_REQUEST_HEAD_SIZE);
+            }
+            
+            size = CORPC_REQUEST_HEAD_SIZE + msgSize;
+        } else {
+            downflowBuf.assign(msgSize, 0);
+            uint8_t *dbuf = (uint8_t*)downflowBuf.data();
+            rpcTask->request->SerializeWithCachedSizesToArray(dbuf);
+            
+            if (spaceleft > 0) {
+                memcpy(buf + CORPC_REQUEST_HEAD_SIZE, dbuf, spaceleft);
+                downflowBufSentNum = spaceleft;
+            }
+            
+            size = space;
+        }
         
         if (!rpcTask->response) {
             // 对于not_care_response类型的rpc调用，这里需要触发回调来清理request对象
