@@ -87,6 +87,9 @@ namespace corpc {
             Channel(RpcClient *client, const std::string& ip, uint32_t port, uint32_t connectNum = 1);
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
             
+            const std::string& getIp() const { return _ip; }
+            uint32_t getPort() const { return _port; }
+            
         private:
             virtual ~Channel();
             
