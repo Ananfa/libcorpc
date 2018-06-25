@@ -10,14 +10,14 @@
 		2D161D582064AC3E0062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5A2064AC3E0062BA35 /* libco.dylib */; };
 		2D161D5C2064AC430062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5A2064AC3E0062BA35 /* libco.dylib */; };
 		2D161D5D2064AC430062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */; };
-		2D161D602064AC570062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D5E2064AC570062BA35 /* server.cpp */; };
-		2D161D682064AC660062BA35 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D622064AC650062BA35 /* foo.pb.cc */; };
-		2D161D692064AC660062BA35 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D642064AC650062BA35 /* bar.pb.cc */; };
-		2D161D6A2064AC660062BA35 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D652064AC650062BA35 /* baz.pb.cc */; };
-		2D161D6B2064AC6A0062BA35 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D642064AC650062BA35 /* bar.pb.cc */; };
-		2D161D6C2064AC6D0062BA35 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D652064AC650062BA35 /* baz.pb.cc */; };
-		2D161D6D2064AC6F0062BA35 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D622064AC650062BA35 /* foo.pb.cc */; };
-		2D161D6E2064AC730062BA35 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D5F2064AC570062BA35 /* client.cpp */; };
+		2D4BC1B620E0954D00BA4F26 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1B420E0954D00BA4F26 /* server.cpp */; };
+		2D4BC1B720E0955300BA4F26 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1B320E0954D00BA4F26 /* client.cpp */; };
+		2D4BC1BE20E0956800BA4F26 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1B820E0956700BA4F26 /* foo.pb.cc */; };
+		2D4BC1BF20E0956800BA4F26 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1BC20E0956800BA4F26 /* bar.pb.cc */; };
+		2D4BC1C020E0956800BA4F26 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1BD20E0956800BA4F26 /* baz.pb.cc */; };
+		2D4BC1C120E0957000BA4F26 /* bar.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1BC20E0956800BA4F26 /* bar.pb.cc */; };
+		2D4BC1C220E0957800BA4F26 /* baz.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1BD20E0956800BA4F26 /* baz.pb.cc */; };
+		2D4BC1C320E0957A00BA4F26 /* foo.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1B820E0956700BA4F26 /* foo.pb.cc */; };
 		2DEA99772080645F0095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
@@ -47,14 +47,14 @@
 		2D161D502064ABE40062BA35 /* interRpcClt */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = interRpcClt; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161D5A2064AC3E0062BA35 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D161D5E2064AC570062BA35 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
-		2D161D5F2064AC570062BA35 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
-		2D161D622064AC650062BA35 /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../proto/foo.pb.cc; sourceTree = "<group>"; };
-		2D161D632064AC650062BA35 /* baz.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baz.pb.h; path = ../proto/baz.pb.h; sourceTree = "<group>"; };
-		2D161D642064AC650062BA35 /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bar.pb.cc; path = ../proto/bar.pb.cc; sourceTree = "<group>"; };
-		2D161D652064AC650062BA35 /* baz.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baz.pb.cc; path = ../proto/baz.pb.cc; sourceTree = "<group>"; };
-		2D161D662064AC650062BA35 /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = bar.pb.h; path = ../proto/bar.pb.h; sourceTree = "<group>"; };
-		2D161D672064AC660062BA35 /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../proto/foo.pb.h; sourceTree = "<group>"; };
+		2D4BC1B320E0954D00BA4F26 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
+		2D4BC1B420E0954D00BA4F26 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
+		2D4BC1B820E0956700BA4F26 /* foo.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = foo.pb.cc; path = ../../proto/foo.pb.cc; sourceTree = "<group>"; };
+		2D4BC1B920E0956800BA4F26 /* bar.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = bar.pb.h; path = ../../proto/bar.pb.h; sourceTree = "<group>"; };
+		2D4BC1BA20E0956800BA4F26 /* baz.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = baz.pb.h; path = ../../proto/baz.pb.h; sourceTree = "<group>"; };
+		2D4BC1BB20E0956800BA4F26 /* foo.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = foo.pb.h; path = ../../proto/foo.pb.h; sourceTree = "<group>"; };
+		2D4BC1BC20E0956800BA4F26 /* bar.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = bar.pb.cc; path = ../../proto/bar.pb.cc; sourceTree = "<group>"; };
+		2D4BC1BD20E0956800BA4F26 /* baz.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = baz.pb.cc; path = ../../proto/baz.pb.cc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,14 +82,7 @@
 		2D161D392064AB310062BA35 = {
 			isa = PBXGroup;
 			children = (
-				2D161D642064AC650062BA35 /* bar.pb.cc */,
-				2D161D662064AC650062BA35 /* bar.pb.h */,
-				2D161D652064AC650062BA35 /* baz.pb.cc */,
-				2D161D632064AC650062BA35 /* baz.pb.h */,
-				2D161D622064AC650062BA35 /* foo.pb.cc */,
-				2D161D672064AC660062BA35 /* foo.pb.h */,
-				2D161D5F2064AC570062BA35 /* client.cpp */,
-				2D161D5E2064AC570062BA35 /* server.cpp */,
+				2D4BC1B220E0954D00BA4F26 /* src */,
 				2D161D432064AB310062BA35 /* Products */,
 				2D161D572064AC3E0062BA35 /* Frameworks */,
 			);
@@ -111,6 +104,21 @@
 				2D161D5B2064AC3E0062BA35 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D4BC1B220E0954D00BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC1BC20E0956800BA4F26 /* bar.pb.cc */,
+				2D4BC1B920E0956800BA4F26 /* bar.pb.h */,
+				2D4BC1BD20E0956800BA4F26 /* baz.pb.cc */,
+				2D4BC1BA20E0956800BA4F26 /* baz.pb.h */,
+				2D4BC1B820E0956700BA4F26 /* foo.pb.cc */,
+				2D4BC1BB20E0956800BA4F26 /* foo.pb.h */,
+				2D4BC1B320E0954D00BA4F26 /* client.cpp */,
+				2D4BC1B420E0954D00BA4F26 /* server.cpp */,
+			);
+			path = src;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -192,10 +200,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161D682064AC660062BA35 /* foo.pb.cc in Sources */,
-				2D161D692064AC660062BA35 /* bar.pb.cc in Sources */,
-				2D161D6A2064AC660062BA35 /* baz.pb.cc in Sources */,
-				2D161D602064AC570062BA35 /* server.cpp in Sources */,
+				2D4BC1BF20E0956800BA4F26 /* bar.pb.cc in Sources */,
+				2D4BC1B620E0954D00BA4F26 /* server.cpp in Sources */,
+				2D4BC1C020E0956800BA4F26 /* baz.pb.cc in Sources */,
+				2D4BC1BE20E0956800BA4F26 /* foo.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,10 +211,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161D6D2064AC6F0062BA35 /* foo.pb.cc in Sources */,
-				2D161D6C2064AC6D0062BA35 /* baz.pb.cc in Sources */,
-				2D161D6E2064AC730062BA35 /* client.cpp in Sources */,
-				2D161D6B2064AC6A0062BA35 /* bar.pb.cc in Sources */,
+				2D4BC1C220E0957800BA4F26 /* baz.pb.cc in Sources */,
+				2D4BC1C320E0957A00BA4F26 /* foo.pb.cc in Sources */,
+				2D4BC1C120E0957000BA4F26 /* bar.pb.cc in Sources */,
+				2D4BC1B720E0955300BA4F26 /* client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,9 +271,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
@@ -320,9 +328,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;

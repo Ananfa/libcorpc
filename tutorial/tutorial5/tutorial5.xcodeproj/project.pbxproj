@@ -7,18 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D161D1D2063666D0062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1B2063666D0062BA35 /* server.cpp */; };
-		2D161D202063667B0062BA35 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1E2063667A0062BA35 /* factorial.pb.cc */; };
-		2D161D21206366840062BA35 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1E2063667A0062BA35 /* factorial.pb.cc */; };
-		2D161D22206366870062BA35 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1A2063666D0062BA35 /* client.cpp */; };
 		2D161D24206366B20062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D26206366B20062BA35 /* libco.dylib */; };
 		2D161D25206366B20062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D27206366B20062BA35 /* libcorpc.dylib */; };
 		2D161D28206366B80062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D26206366B20062BA35 /* libco.dylib */; };
 		2D161D29206366B80062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D27206366B20062BA35 /* libcorpc.dylib */; };
 		2D161D35206367570062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D26206366B20062BA35 /* libco.dylib */; };
 		2D161D36206367570062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161D27206366B20062BA35 /* libcorpc.dylib */; };
-		2D161D372063675B0062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1B2063666D0062BA35 /* server.cpp */; };
-		2D161D382063675E0062BA35 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161D1E2063667A0062BA35 /* factorial.pb.cc */; };
+		2D4BC20120E0C27A00BA4F26 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1FF20E0C27900BA4F26 /* server.cpp */; };
+		2D4BC20420E0C28600BA4F26 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC20220E0C28500BA4F26 /* factorial.pb.cc */; };
+		2D4BC20520E0C2A200BA4F26 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1FF20E0C27900BA4F26 /* server.cpp */; };
+		2D4BC20620E0C2A800BA4F26 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1FE20E0C27900BA4F26 /* client.cpp */; };
+		2D4BC20720E0C2AC00BA4F26 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC20220E0C28500BA4F26 /* factorial.pb.cc */; };
+		2D4BC20820E0C2AC00BA4F26 /* factorial.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC20220E0C28500BA4F26 /* factorial.pb.cc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -54,13 +54,13 @@
 /* Begin PBXFileReference section */
 		2D161D04206363730062BA35 /* tutorial5svr1 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial5svr1; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161D13206366550062BA35 /* tutorial5clt */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial5clt; sourceTree = BUILT_PRODUCTS_DIR; };
-		2D161D1A2063666D0062BA35 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
-		2D161D1B2063666D0062BA35 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
-		2D161D1E2063667A0062BA35 /* factorial.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = factorial.pb.cc; path = ../proto/factorial.pb.cc; sourceTree = "<group>"; };
-		2D161D1F2063667A0062BA35 /* factorial.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = factorial.pb.h; path = ../proto/factorial.pb.h; sourceTree = "<group>"; };
 		2D161D26206366B20062BA35 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161D27206366B20062BA35 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161D2E2063674C0062BA35 /* tutorial5svr2 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial5svr2; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D4BC1FE20E0C27900BA4F26 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
+		2D4BC1FF20E0C27900BA4F26 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
+		2D4BC20220E0C28500BA4F26 /* factorial.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = factorial.pb.cc; path = ../../proto/factorial.pb.cc; sourceTree = "<group>"; };
+		2D4BC20320E0C28500BA4F26 /* factorial.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = factorial.pb.h; path = ../../proto/factorial.pb.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,7 +97,7 @@
 		2D161CFB206363730062BA35 = {
 			isa = PBXGroup;
 			children = (
-				2D161D0E206366210062BA35 /* src */,
+				2D4BC1FD20E0C27900BA4F26 /* src */,
 				2D161D05206363730062BA35 /* Products */,
 				2D161D23206366B20062BA35 /* Frameworks */,
 			);
@@ -113,17 +113,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2D161D0E206366210062BA35 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2D161D1E2063667A0062BA35 /* factorial.pb.cc */,
-				2D161D1F2063667A0062BA35 /* factorial.pb.h */,
-				2D161D1A2063666D0062BA35 /* client.cpp */,
-				2D161D1B2063666D0062BA35 /* server.cpp */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
 		2D161D23206366B20062BA35 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -131,6 +120,17 @@
 				2D161D27206366B20062BA35 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D4BC1FD20E0C27900BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC20220E0C28500BA4F26 /* factorial.pb.cc */,
+				2D4BC20320E0C28500BA4F26 /* factorial.pb.h */,
+				2D4BC1FE20E0C27900BA4F26 /* client.cpp */,
+				2D4BC1FF20E0C27900BA4F26 /* server.cpp */,
+			);
+			path = src;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -234,8 +234,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161D1D2063666D0062BA35 /* server.cpp in Sources */,
-				2D161D202063667B0062BA35 /* factorial.pb.cc in Sources */,
+				2D4BC20120E0C27A00BA4F26 /* server.cpp in Sources */,
+				2D4BC20420E0C28600BA4F26 /* factorial.pb.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,8 +243,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161D22206366870062BA35 /* client.cpp in Sources */,
-				2D161D21206366840062BA35 /* factorial.pb.cc in Sources */,
+				2D4BC20820E0C2AC00BA4F26 /* factorial.pb.cc in Sources */,
+				2D4BC20620E0C2A800BA4F26 /* client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,8 +252,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161D372063675B0062BA35 /* server.cpp in Sources */,
-				2D161D382063675E0062BA35 /* factorial.pb.cc in Sources */,
+				2D4BC20720E0C2AC00BA4F26 /* factorial.pb.cc in Sources */,
+				2D4BC20520E0C2A200BA4F26 /* server.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -310,9 +310,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
@@ -367,9 +367,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;

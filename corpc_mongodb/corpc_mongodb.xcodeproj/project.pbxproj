@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DE7AA7320AAEE5100C16383 /* corpc_mongodb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */; };
-		2DE7AA7420AAEE5100C16383 /* corpc_mongodb.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */; };
+		2D4BC19620DCE52700BA4F26 /* corpc_mongodb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC19420DCE52700BA4F26 /* corpc_mongodb.cpp */; };
+		2D4BC19720DCE52700BA4F26 /* corpc_mongodb.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D4BC19520DCE52700BA4F26 /* corpc_mongodb.h */; };
 		2DE7AA7620ABC4C700C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA7820ABC4C700C16383 /* libco.dylib */; };
 		2DE7AA7720ABC4C700C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA7920ABC4C700C16383 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D4BC19420DCE52700BA4F26 /* corpc_mongodb.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mongodb.cpp; sourceTree = "<group>"; };
+		2D4BC19520DCE52700BA4F26 /* corpc_mongodb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_mongodb.h; sourceTree = "<group>"; };
 		2DE7AA6920AAEDD400C16383 /* libcorpc_mongodb.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_mongodb.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mongodb.cpp; sourceTree = "<group>"; };
-		2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_mongodb.h; sourceTree = "<group>"; };
 		2DE7AA7820ABC4C700C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE7AA7920ABC4C700C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -34,10 +34,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC19320DCE52700BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC19420DCE52700BA4F26 /* corpc_mongodb.cpp */,
+				2D4BC19520DCE52700BA4F26 /* corpc_mongodb.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DE7AA6020AAEDD400C16383 = {
 			isa = PBXGroup;
 			children = (
-				2DE7AA7020AAEE3200C16383 /* src */,
+				2D4BC19320DCE52700BA4F26 /* src */,
 				2DE7AA6A20AAEDD400C16383 /* Products */,
 				2DE7AA7520ABC4C700C16383 /* Frameworks */,
 			);
@@ -49,15 +58,6 @@
 				2DE7AA6920AAEDD400C16383 /* libcorpc_mongodb.dylib */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		2DE7AA7020AAEE3200C16383 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DE7AA7120AAEE5100C16383 /* corpc_mongodb.cpp */,
-				2DE7AA7220AAEE5100C16383 /* corpc_mongodb.h */,
-			);
-			name = src;
 			sourceTree = "<group>";
 		};
 		2DE7AA7520ABC4C700C16383 /* Frameworks */ = {
@@ -76,7 +76,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE7AA7420AAEE5100C16383 /* corpc_mongodb.h in Headers */,
+				2D4BC19720DCE52700BA4F26 /* corpc_mongodb.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +137,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE7AA7320AAEE5100C16383 /* corpc_mongodb.cpp in Sources */,
+				2D4BC19620DCE52700BA4F26 /* corpc_mongodb.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,9 +258,9 @@
 					/usr/local/include,
 					"/usr/local/include/libmongoc-1.0",
 					"/usr/local/include/libbson-1.0",
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -283,9 +283,9 @@
 					/usr/local/include,
 					"/usr/local/include/libmongoc-1.0",
 					"/usr/local/include/libbson-1.0",
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (

@@ -7,14 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D161C6A206350DB0062BA35 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2020634D0D0062BA35 /* server.cpp */; };
-		2D161C6B206350DE0062BA35 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2420634D1C0062BA35 /* helloworld.pb.cc */; };
-		2D161C77206350F60062BA35 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C2420634D1C0062BA35 /* helloworld.pb.cc */; };
-		2D161C78206350F90062BA35 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D161C1F20634D0D0062BA35 /* client.cpp */; };
 		2D161C792063512C0062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3620634E1B0062BA35 /* libco.dylib */; };
 		2D161C7A2063512C0062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3720634E1B0062BA35 /* libcorpc.dylib */; };
 		2D161C7B206351320062BA35 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3620634E1B0062BA35 /* libco.dylib */; };
 		2D161C7C206351320062BA35 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D161C3720634E1B0062BA35 /* libcorpc.dylib */; };
+		2D4BC1D520E0B4C400BA4F26 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1D320E0B4C400BA4F26 /* server.cpp */; };
+		2D4BC1D820E0B4D300BA4F26 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1D720E0B4D300BA4F26 /* helloworld.pb.cc */; };
+		2D4BC1E320E0BFD600BA4F26 /* client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1D220E0B4C400BA4F26 /* client.cpp */; };
+		2D4BC1E820E0BFEE00BA4F26 /* helloworld.pb.cc in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1D720E0B4D300BA4F26 /* helloworld.pb.cc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,14 +39,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2D161C1F20634D0D0062BA35 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
-		2D161C2020634D0D0062BA35 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
-		2D161C2320634D1C0062BA35 /* helloworld.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = helloworld.pb.h; path = ../proto/helloworld.pb.h; sourceTree = "<group>"; };
-		2D161C2420634D1C0062BA35 /* helloworld.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = helloworld.pb.cc; path = ../proto/helloworld.pb.cc; sourceTree = "<group>"; };
 		2D161C3620634E1B0062BA35 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161C3720634E1B0062BA35 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161C63206350CA0062BA35 /* tutorial1svr */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial1svr; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D161C70206350EF0062BA35 /* tutorial1clt */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = tutorial1clt; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D4BC1D220E0B4C400BA4F26 /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
+		2D4BC1D320E0B4C400BA4F26 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
+		2D4BC1D620E0B4D300BA4F26 /* helloworld.pb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = helloworld.pb.h; path = ../../proto/helloworld.pb.h; sourceTree = "<group>"; };
+		2D4BC1D720E0B4D300BA4F26 /* helloworld.pb.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = helloworld.pb.cc; path = ../../proto/helloworld.pb.cc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,7 +74,7 @@
 		2D161C0B20634CBF0062BA35 = {
 			isa = PBXGroup;
 			children = (
-				2D161C1E20634CF70062BA35 /* src */,
+				2D4BC1D120E0B4C400BA4F26 /* src */,
 				2D161C1520634CBF0062BA35 /* Products */,
 				2D161C3320634E1B0062BA35 /* Frameworks */,
 			);
@@ -89,17 +89,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2D161C1E20634CF70062BA35 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2D161C2420634D1C0062BA35 /* helloworld.pb.cc */,
-				2D161C2320634D1C0062BA35 /* helloworld.pb.h */,
-				2D161C1F20634D0D0062BA35 /* client.cpp */,
-				2D161C2020634D0D0062BA35 /* server.cpp */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
 		2D161C3320634E1B0062BA35 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -107,6 +96,17 @@
 				2D161C3720634E1B0062BA35 /* libcorpc.dylib */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D4BC1D120E0B4C400BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC1D720E0B4D300BA4F26 /* helloworld.pb.cc */,
+				2D4BC1D620E0B4D300BA4F26 /* helloworld.pb.h */,
+				2D4BC1D220E0B4C400BA4F26 /* client.cpp */,
+				2D4BC1D320E0B4C400BA4F26 /* server.cpp */,
+			);
+			path = src;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -188,8 +188,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161C6B206350DE0062BA35 /* helloworld.pb.cc in Sources */,
-				2D161C6A206350DB0062BA35 /* server.cpp in Sources */,
+				2D4BC1D820E0B4D300BA4F26 /* helloworld.pb.cc in Sources */,
+				2D4BC1D520E0B4C400BA4F26 /* server.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,8 +197,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D161C77206350F60062BA35 /* helloworld.pb.cc in Sources */,
-				2D161C78206350F90062BA35 /* client.cpp in Sources */,
+				2D4BC1E820E0BFEE00BA4F26 /* helloworld.pb.cc in Sources */,
+				2D4BC1E320E0BFD600BA4F26 /* client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,9 +255,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;
@@ -312,9 +312,9 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.12;

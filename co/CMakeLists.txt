@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 project(libco)
 
+# Use c and asm
+enable_language(CXX ASM)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 # This for mac osx only
 set(CMAKE_MACOSX_RPATH 0)
 
@@ -8,26 +13,27 @@ set(CMAKE_MACOSX_RPATH 0)
 set(LIBCO_VERSION   0.5)
 
 # Set cflags
-set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} -g -fno-strict-aliasing -O2 -Wall -export-dynamic -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64)
+#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-arch x86_64 -std=gnu++14 -stdlib=libc++ -fPIC -Wall -pthread")
+#set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -DDEBUG=1 ${CMAKE_CXX_FLAGS}")
+#set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 ${CMAKE_CXX_FLAGS}")
 
-# Use c and asm
-enable_language(C ASM)
+include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Add source files
 set(SOURCE_FILES
-        co_epoll.cpp
-        co_hook_sys_call.cpp
-        co_routine.cpp
-        coctx.cpp
-        coctx_swap.S)
+        src/co_epoll.cpp
+        src/co_hook_sys_call.cpp
+        src/co_routine.cpp
+        src/coctx.cpp
+        src/coctx_swap.S)
 
 # Add static and shared library target
 add_library(colib_static STATIC ${SOURCE_FILES})
 add_library(colib_shared SHARED ${SOURCE_FILES})
 
 # Set library output name
-set_target_properties(colib_static PROPERTIES OUTPUT_NAME colib)
-set_target_properties(colib_shared PROPERTIES OUTPUT_NAME colib)
+set_target_properties(colib_static PROPERTIES OUTPUT_NAME co)
+set_target_properties(colib_shared PROPERTIES OUTPUT_NAME co)
 
 set_target_properties(colib_static PROPERTIES CLEAN_DIRECT_OUTPUT 1)
 set_target_properties(colib_shared PROPERTIES CLEAN_DIRECT_OUTPUT 1)
@@ -40,7 +46,7 @@ set_target_properties(colib_shared PROPERTIES VERSION ${LIBCO_VERSION} SOVERSION
 
 # Macro for add example target
 macro(add_example_target EXAMPLE_TARGET)
-    add_executable("example_${EXAMPLE_TARGET}" "example_${EXAMPLE_TARGET}.cpp")
+    add_executable("example_${EXAMPLE_TARGET}" "src/example_${EXAMPLE_TARGET}.cpp")
     target_link_libraries("example_${EXAMPLE_TARGET}" colib_static pthread dl)
 endmacro(add_example_target)
 
@@ -53,3 +59,6 @@ add_example_target(poll)
 add_example_target(setenv)
 add_example_target(specific)
 add_example_target(thread)
+
+install(TARGETS colib_shared LIBRARY DESTINATION "lib" ARCHIVE DESTINATION "lib")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/ DESTINATION "include/co" FILES_MATCHING PATTERN "*.h")

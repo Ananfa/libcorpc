@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DEA9A8220A197270095C62F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A8120A197270095C62F /* main.cpp */; };
+		2D4BC1CD20E0A0DD00BA4F26 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1CC20E0A0DD00BA4F26 /* main.cpp */; };
 		2DEA9A8420A1974D0095C62F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A8720A1974D0095C62F /* libco.dylib */; };
 		2DEA9A8520A1974D0095C62F /* libcorpc_mysql.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A8820A1974D0095C62F /* libcorpc_mysql.dylib */; };
 		2DEA9A8620A1974D0095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A8920A1974D0095C62F /* libcorpc.dylib */; };
@@ -26,8 +26,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D4BC1CC20E0A0DD00BA4F26 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		2DEA9A7620A196E70095C62F /* example_mysql */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = example_mysql; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9A8120A197270095C62F /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		2DEA9A8720A1974D0095C62F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA9A8820A1974D0095C62F /* libcorpc_mysql.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc_mysql.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA9A8920A1974D0095C62F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -47,10 +47,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC1CB20E0A0DD00BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC1CC20E0A0DD00BA4F26 /* main.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DEA9A6D20A196E70095C62F = {
 			isa = PBXGroup;
 			children = (
-				2DEA9A8020A1971C0095C62F /* src */,
+				2D4BC1CB20E0A0DD00BA4F26 /* src */,
 				2DEA9A7720A196E70095C62F /* Products */,
 				2DEA9A8320A1974D0095C62F /* Frameworks */,
 			);
@@ -62,14 +70,6 @@
 				2DEA9A7620A196E70095C62F /* example_mysql */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		2DEA9A8020A1971C0095C62F /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DEA9A8120A197270095C62F /* main.cpp */,
-			);
-			name = src;
 			sourceTree = "<group>";
 		};
 		2DEA9A8320A1974D0095C62F /* Frameworks */ = {
@@ -139,7 +139,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A8220A197270095C62F /* main.cpp in Sources */,
+				2D4BC1CD20E0A0DD00BA4F26 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,10 +256,10 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/mysql/include,
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
-					../../corpc_mysql,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
+					../../corpc_mysql/src,
 				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/mysql/lib,
@@ -280,10 +280,10 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/mysql/include,
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
-					../../corpc_mysql,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
+					../../corpc_mysql/src,
 				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/mysql/lib,

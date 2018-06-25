@@ -7,18 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D4BC18C20DCE44B00BA4F26 /* corpc_mysql.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC18A20DCE44B00BA4F26 /* corpc_mysql.cpp */; };
+		2D4BC18D20DCE44B00BA4F26 /* corpc_mysql.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D4BC18B20DCE44B00BA4F26 /* corpc_mysql.h */; };
 		2DEA9A5C20A143140095C62F /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A5E20A143140095C62F /* libco.dylib */; };
 		2DEA9A5D20A143140095C62F /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DEA9A5F20A143140095C62F /* libcorpc.dylib */; };
-		2DEA9A6320A145A60095C62F /* corpc_mysql.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */; };
-		2DEA9A6420A145A60095C62F /* corpc_mysql.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9A6220A145A60095C62F /* corpc_mysql.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D4BC18A20DCE44B00BA4F26 /* corpc_mysql.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mysql.cpp; sourceTree = "<group>"; };
+		2D4BC18B20DCE44B00BA4F26 /* corpc_mysql.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_mysql.h; sourceTree = "<group>"; };
 		2DEA9A5420A142CD0095C62F /* libcorpc_mysql.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_mysql.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA9A5E20A143140095C62F /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA9A5F20A143140095C62F /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_mysql.cpp; sourceTree = "<group>"; };
-		2DEA9A6220A145A60095C62F /* corpc_mysql.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_mysql.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -34,10 +34,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC18920DCE44B00BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC18A20DCE44B00BA4F26 /* corpc_mysql.cpp */,
+				2D4BC18B20DCE44B00BA4F26 /* corpc_mysql.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DEA9A4B20A142CD0095C62F = {
 			isa = PBXGroup;
 			children = (
-				2DEA9A6020A145670095C62F /* src */,
+				2D4BC18920DCE44B00BA4F26 /* src */,
 				2DEA9A5520A142CD0095C62F /* Products */,
 				2DEA9A5B20A143140095C62F /* Frameworks */,
 			);
@@ -60,15 +69,6 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		2DEA9A6020A145670095C62F /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DEA9A6120A145A60095C62F /* corpc_mysql.cpp */,
-				2DEA9A6220A145A60095C62F /* corpc_mysql.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -76,7 +76,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A6420A145A60095C62F /* corpc_mysql.h in Headers */,
+				2D4BC18D20DCE44B00BA4F26 /* corpc_mysql.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +137,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9A6320A145A60095C62F /* corpc_mysql.cpp in Sources */,
+				2D4BC18C20DCE44B00BA4F26 /* corpc_mysql.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,9 +257,9 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/mysql/include,
 					/usr/local/include,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/mysql/lib,
@@ -283,9 +283,9 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/mysql/include,
 					/usr/local/include,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/mysql/lib,

@@ -7,18 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D4BC19120DCE4D400BA4F26 /* corpc_memcached.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC18F20DCE4D400BA4F26 /* corpc_memcached.cpp */; };
+		2D4BC19220DCE4D400BA4F26 /* corpc_memcached.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D4BC19020DCE4D400BA4F26 /* corpc_memcached.h */; };
 		2DE7AA0620AA7B0800C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA0820AA7B0800C16383 /* libco.dylib */; };
 		2DE7AA0720AA7B0800C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA0920AA7B0800C16383 /* libcorpc.dylib */; };
-		2DEA9AA920A992090095C62F /* corpc_memcached.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DEA9AA720A992090095C62F /* corpc_memcached.cpp */; };
-		2DEA9AAA20A992090095C62F /* corpc_memcached.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DEA9AA820A992090095C62F /* corpc_memcached.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D4BC18F20DCE4D400BA4F26 /* corpc_memcached.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_memcached.cpp; sourceTree = "<group>"; };
+		2D4BC19020DCE4D400BA4F26 /* corpc_memcached.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_memcached.h; sourceTree = "<group>"; };
 		2DE7AA0820AA7B0800C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE7AA0920AA7B0800C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DEA9A9F20A991AA0095C62F /* libcorpc_memcached.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_memcached.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DEA9AA720A992090095C62F /* corpc_memcached.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_memcached.cpp; sourceTree = "<group>"; };
-		2DEA9AA820A992090095C62F /* corpc_memcached.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_memcached.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -34,6 +34,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC18E20DCE4D400BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC18F20DCE4D400BA4F26 /* corpc_memcached.cpp */,
+				2D4BC19020DCE4D400BA4F26 /* corpc_memcached.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DE7AA0520AA7B0800C16383 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -46,7 +55,7 @@
 		2DEA9A9620A991AA0095C62F = {
 			isa = PBXGroup;
 			children = (
-				2DEA9AA620A991CD0095C62F /* src */,
+				2D4BC18E20DCE4D400BA4F26 /* src */,
 				2DEA9AA020A991AA0095C62F /* Products */,
 				2DE7AA0520AA7B0800C16383 /* Frameworks */,
 			);
@@ -60,15 +69,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		2DEA9AA620A991CD0095C62F /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DEA9AA720A992090095C62F /* corpc_memcached.cpp */,
-				2DEA9AA820A992090095C62F /* corpc_memcached.h */,
-			);
-			name = src;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -76,7 +76,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9AAA20A992090095C62F /* corpc_memcached.h in Headers */,
+				2D4BC19220DCE4D400BA4F26 /* corpc_memcached.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +137,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DEA9AA920A992090095C62F /* corpc_memcached.cpp in Sources */,
+				2D4BC19120DCE4D400BA4F26 /* corpc_memcached.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,9 +256,9 @@
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -278,9 +278,9 @@
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (

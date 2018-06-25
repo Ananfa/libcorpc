@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DE7AA1F20AA7C2A00C16383 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DE7AA1E20AA7C2A00C16383 /* main.cpp */; };
+		2D4BC1C720E09B7800BA4F26 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC1C620E09B7800BA4F26 /* main.cpp */; };
 		2DE7AA2120AA800C00C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA2420AA800C00C16383 /* libco.dylib */; };
 		2DE7AA2220AA800C00C16383 /* libcorpc_memcached.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA2520AA800C00C16383 /* libcorpc_memcached.dylib */; };
 		2DE7AA2320AA800C00C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AA2620AA800C00C16383 /* libcorpc.dylib */; };
@@ -26,8 +26,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D4BC1C620E09B7800BA4F26 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		2DE7AA1320AA7BCC00C16383 /* example_memcached */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = example_memcached; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DE7AA1E20AA7C2A00C16383 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		2DE7AA2420AA800C00C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE7AA2520AA800C00C16383 /* libcorpc_memcached.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc_memcached.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE7AA2620AA800C00C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -47,10 +47,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC1C520E09B7800BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC1C620E09B7800BA4F26 /* main.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DE7AA0A20AA7BCC00C16383 = {
 			isa = PBXGroup;
 			children = (
-				2DE7AA1D20AA7BFB00C16383 /* src */,
+				2D4BC1C520E09B7800BA4F26 /* src */,
 				2DE7AA1420AA7BCC00C16383 /* Products */,
 				2DE7AA2020AA800C00C16383 /* Frameworks */,
 			);
@@ -62,14 +70,6 @@
 				2DE7AA1320AA7BCC00C16383 /* example_memcached */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		2DE7AA1D20AA7BFB00C16383 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DE7AA1E20AA7C2A00C16383 /* main.cpp */,
-			);
-			name = src;
 			sourceTree = "<group>";
 		};
 		2DE7AA2020AA800C00C16383 /* Frameworks */ = {
@@ -139,7 +139,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE7AA1F20AA7C2A00C16383 /* main.cpp in Sources */,
+				2D4BC1C720E09B7800BA4F26 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,10 +255,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
-					../../corpc_memcached,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
+					../../corpc_memcached/src,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -275,10 +275,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
-					../../co,
-					../../corpc,
-					../../proto,
-					../../corpc_memcached,
+					../../co/src,
+					../../corpc/src,
+					../../corpc/src/proto,
+					../../corpc_memcached/src,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (

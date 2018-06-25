@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2DE7AAB220AC2E3A00C16383 /* corpc_redis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2DE7AAB020AC2E3A00C16383 /* corpc_redis.cpp */; };
-		2DE7AAB320AC2E3A00C16383 /* corpc_redis.h in Headers */ = {isa = PBXBuildFile; fileRef = 2DE7AAB120AC2E3A00C16383 /* corpc_redis.h */; };
+		2D4BC19B20DCE56700BA4F26 /* corpc_redis.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2D4BC19920DCE56700BA4F26 /* corpc_redis.cpp */; };
+		2D4BC19C20DCE56700BA4F26 /* corpc_redis.h in Headers */ = {isa = PBXBuildFile; fileRef = 2D4BC19A20DCE56700BA4F26 /* corpc_redis.h */; };
 		2DE7AAB520AC31DA00C16383 /* libco.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AAB720AC31DA00C16383 /* libco.dylib */; };
 		2DE7AAB620AC31DA00C16383 /* libcorpc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DE7AAB820AC31DA00C16383 /* libcorpc.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D4BC19920DCE56700BA4F26 /* corpc_redis.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_redis.cpp; sourceTree = "<group>"; };
+		2D4BC19A20DCE56700BA4F26 /* corpc_redis.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = corpc_redis.h; sourceTree = "<group>"; };
 		2DE7AAA820AC2DEC00C16383 /* libcorpc_redis.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libcorpc_redis.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		2DE7AAB020AC2E3A00C16383 /* corpc_redis.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = corpc_redis.cpp; sourceTree = "<group>"; };
-		2DE7AAB120AC2E3A00C16383 /* corpc_redis.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = corpc_redis.h; sourceTree = "<group>"; };
 		2DE7AAB720AC31DA00C16383 /* libco.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libco.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE7AAB820AC31DA00C16383 /* libcorpc.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libcorpc.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -34,10 +34,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2D4BC19820DCE56700BA4F26 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				2D4BC19920DCE56700BA4F26 /* corpc_redis.cpp */,
+				2D4BC19A20DCE56700BA4F26 /* corpc_redis.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 		2DE7AA9F20AC2DEC00C16383 = {
 			isa = PBXGroup;
 			children = (
-				2DE7AAAF20AC2E2400C16383 /* src */,
+				2D4BC19820DCE56700BA4F26 /* src */,
 				2DE7AAA920AC2DEC00C16383 /* Products */,
 				2DE7AAB420AC31DA00C16383 /* Frameworks */,
 			);
@@ -49,15 +58,6 @@
 				2DE7AAA820AC2DEC00C16383 /* libcorpc_redis.dylib */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		2DE7AAAF20AC2E2400C16383 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				2DE7AAB020AC2E3A00C16383 /* corpc_redis.cpp */,
-				2DE7AAB120AC2E3A00C16383 /* corpc_redis.h */,
-			);
-			name = src;
 			sourceTree = "<group>";
 		};
 		2DE7AAB420AC31DA00C16383 /* Frameworks */ = {
@@ -76,7 +76,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE7AAB320AC2E3A00C16383 /* corpc_redis.h in Headers */,
+				2D4BC19C20DCE56700BA4F26 /* corpc_redis.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,7 +137,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE7AAB220AC2E3A00C16383 /* corpc_redis.cpp in Sources */,
+				2D4BC19B20DCE56700BA4F26 /* corpc_redis.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,9 +257,9 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
 					/usr/local/include/hiredis,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
@@ -280,9 +280,9 @@
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
 					/usr/local/include/hiredis,
-					../co,
-					../corpc,
-					../proto,
+					../co/src,
+					../corpc/src,
+					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				OTHER_LDFLAGS = (
