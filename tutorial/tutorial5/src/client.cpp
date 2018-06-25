@@ -64,11 +64,11 @@ int main(int argc, const char * argv[]) {
     
     if(argc<3){
         printf("Usage:\n"
-               "Tutorial2Client [IP] [PORT]\n");
+               "Tutorial2Client [HOST] [PORT]\n");
         return -1;
     }
     
-    std::string ip = argv[1];
+    std::string host = argv[1];
     unsigned short int port = atoi(argv[2]);
     
     struct sigaction sa;
@@ -78,7 +78,7 @@ int main(int argc, const char * argv[]) {
     IO* io = IO::create(1, 1);
     
     RpcClient *client = RpcClient::create(io);
-    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 1);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, host, port, 1);
     
     RoutineEnvironment::startCoroutine(rpc_routine, channel);
     

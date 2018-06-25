@@ -80,7 +80,7 @@ class TcpClient {
     };
     
 public:
-    TcpClient(const std::string& ip, uint16_t port, bool needHB): _ip(ip), _port(port), _needHB(needHB), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    TcpClient(const std::string& host, uint16_t port, bool needHB): _host(host), _port(port), _needHB(needHB), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~TcpClient() {}
     
     bool start();
@@ -97,7 +97,7 @@ private:
     static void threadEntry( TcpClient *self ); // 数据收发线程
     
 private:
-    std::string _ip;
+    std::string _host;
     uint16_t _port;
     
     bool _needHB;
@@ -124,7 +124,7 @@ bool TcpClient::start() {
     bzero(&addr,sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(_port);
-    int nIP = inet_addr(_ip.c_str());
+    int nIP = inet_addr(_host.c_str());
     addr.sin_addr.s_addr = nIP;
     
     if (connect(_s, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
@@ -419,8 +419,8 @@ bool TcpClient::registerMessage(int type, google::protobuf::Message *proto) {
     return false;
 }
 
-void testThread(std::string ip, uint16_t port, bool needHB) {
-    TcpClient client(ip, port, needHB);
+void testThread(std::string host, uint16_t port, bool needHB) {
+    TcpClient client(host, port, needHB);
     client.registerMessage(1, new FooResponse);
     
     client.start();
@@ -452,18 +452,18 @@ int main(int argc, const char * argv[])
 {
     if(argc<3){
         printf("Usage:\n"
-               "echoUdpclt [IP] [PORT]\n");
+               "echoUdpclt [HOST] [PORT]\n");
         return -1;
     }
     
-    std::string ip = argv[1];
+    std::string host = argv[1];
     uint16_t port = atoi(argv[2]);
     
     // 启动多个线程创建client
     int clientNum = 20;
     std::vector<std::thread> threads;
     for (int i = 0; i < clientNum; i++) {
-        threads.push_back(std::thread(testThread, ip, port, false));
+        threads.push_back(std::thread(testThread, host, port, false));
     }
     
     for (int i = 0; i < clientNum; i++) {

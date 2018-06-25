@@ -147,8 +147,8 @@ namespace corpc {
         }
     }
     
-    RpcClient::Channel::Channel(RpcClient *client, const std::string& ip, uint32_t port, uint32_t connectNum)
-    : _client(client), _ip(ip), _port(port), _conIndex(0), _connectDelay(false) {
+    RpcClient::Channel::Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum)
+    : _client(client), _host(host), _port(port), _conIndex(0), _connectDelay(false) {
         if (connectNum == 0) {
             connectNum = 1;
         }
@@ -339,13 +339,13 @@ namespace corpc {
                         addr.sin_family = AF_INET;
                         addr.sin_port = htons(channel->_port);
                         int nIP = 0;
-                        if (channel->_ip.empty() ||
-                            channel->_ip.compare("0") == 0 ||
-                            channel->_ip.compare("0.0.0.0") == 0 ||
-                            channel->_ip.compare("*") == 0) {
+                        if (channel->_host.empty() ||
+                            channel->_host.compare("0") == 0 ||
+                            channel->_host.compare("0.0.0.0") == 0 ||
+                            channel->_host.compare("*") == 0) {
                             nIP = htonl(INADDR_ANY);
                         } else {
-                            nIP = inet_addr(channel->_ip.c_str());
+                            nIP = inet_addr(channel->_host.c_str());
                         }
                         
                         addr.sin_addr.s_addr = nIP;

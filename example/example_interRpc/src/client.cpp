@@ -223,11 +223,11 @@ int main(int argc, char *argv[]) {
     
     if(argc<4){
         printf("Usage:\n"
-               "rpccli [IP] [PORT] [TEST_ROUTINE_COUNT]\n");
+               "rpccli [HOST] [PORT] [TEST_ROUTINE_COUNT]\n");
         return -1;
     }
     
-    std::string ip = argv[1];
+    std::string host = argv[1];
     unsigned short int port = atoi(argv[2]);
     test_routine_count = atoi( argv[3] );
     
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
     IO *io = IO::create(0, 1);
     
     RpcClient *client = RpcClient::create(io);
-    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 1);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, host, port, 1);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);

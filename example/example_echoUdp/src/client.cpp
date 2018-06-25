@@ -93,7 +93,7 @@ class UdpClient {
     };
 
 public:
-    UdpClient(const std::string& ip, uint16_t port, uint16_t local_port): _ip(ip), _port(port), _local_port(local_port), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    UdpClient(const std::string& host, uint16_t port, uint16_t local_port): _host(host), _port(port), _local_port(local_port), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~UdpClient() {}
     
     bool start();
@@ -110,7 +110,7 @@ private:
     static void threadEntry( UdpClient *self ); // 数据收发线程
     
 private:
-    std::string _ip;
+    std::string _host;
     uint16_t _port;
     uint16_t _local_port;
     
@@ -156,7 +156,7 @@ bool UdpClient::start() {
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(_port);
-    int nIP = inet_addr(_ip.c_str());
+    int nIP = inet_addr(_host.c_str());
     si_other.sin_addr.s_addr = nIP;
     
     if(connect(_s, (struct sockaddr *)&si_other, slen) == -1) {
@@ -410,8 +410,8 @@ bool UdpClient::registerMessage(int type, google::protobuf::Message *proto) {
     return false;
 }
 
-void testThread(std::string ip, uint16_t port, uint16_t local_port) {
-    UdpClient client(ip, port, local_port);
+void testThread(std::string host, uint16_t port, uint16_t local_port) {
+    UdpClient client(host, port, local_port);
     client.registerMessage(1, new FooResponse);
     
     client.start();
@@ -443,18 +443,18 @@ int main(int argc, const char * argv[])
 {
     if(argc<3){
         printf("Usage:\n"
-               "echoUdpclt [IP] [PORT]\n");
+               "echoUdpclt [HOST] [PORT]\n");
         return -1;
     }
     
-    std::string ip = argv[1];
+    std::string host = argv[1];
     uint16_t port = atoi(argv[2]);
     
     // 启动多个线程创建client
     int clientNum = 20;
     std::vector<std::thread> threads;
     for (int i = 0; i < clientNum; i++) {
-        threads.push_back(std::thread(testThread, ip, port, LOCAL_PORT+i));
+        threads.push_back(std::thread(testThread, host, port, LOCAL_PORT+i));
     }
     
     for (int i = 0; i < clientNum; i++) {

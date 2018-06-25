@@ -43,20 +43,20 @@ int main(int argc, const char * argv[]) {
     
     if(argc<5){
         printf("Usage:\n"
-               "Tutorial2Middle [IP] [PORT] [ServerIP] [ServerPort] \n");
+               "Tutorial2Middle [IP] [PORT] [HOST] [ServerPort] \n");
         return -1;
     }
     
     std::string ip = argv[1];
     unsigned short int port = atoi(argv[2]);
-    std::string sip = argv[3];
+    std::string host = argv[3];
     unsigned short int sport = atoi(argv[4]);
     
     // 注册服务
     IO *io = IO::create(1, 1);
     
     RpcClient *client = RpcClient::create(io);
-    RpcClient::Channel *channel = new RpcClient::Channel(client, sip, sport, 1);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, host, sport, 1);
     
     //RpcServer *server = RpcServer::create(io, 0, ip, port);
     RpcServer *server = RpcServer::create(io, 1, ip, port);

@@ -61,11 +61,11 @@ int main(int argc, const char * argv[]) {
     
     if(argc<4){
         printf("Usage:\n"
-               "Tutorial1Client [IP] [PORT] [NUM]\n");
+               "Tutorial1Client [HOST] [PORT] [NUM]\n");
         return -1;
     }
     
-    std::string ip = argv[1];
+    std::string host = argv[1];
     unsigned short int port = atoi(argv[2]);
     uint32_t num = atoi(argv[3]);
     
@@ -76,7 +76,7 @@ int main(int argc, const char * argv[]) {
     IO *io = IO::create(1, 1);
     
     RpcClient *client = RpcClient::create(io);
-    RpcClient::Channel *channel = new RpcClient::Channel(client, ip, port, 1);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, host, port, 1);
     HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
     
     for (int i = 0; i < num; i++) {
