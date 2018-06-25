@@ -43,5 +43,5 @@ include_directories(/usr/local/include/hiredis)
 # Add target
 add_executable(example_redis ${SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lhiredis -lprotobuf -lcorpc_redis -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lhiredis -lprotobuf -lcorpc_redis -lcorpc -lco -ldl)
 target_link_libraries(example_redis ${MY_LINK_LIBRARIES})

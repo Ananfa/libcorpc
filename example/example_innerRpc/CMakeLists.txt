@@ -41,5 +41,5 @@ include_directories(${PROJECT_SOURCE_DIR}/../proto)
 # Add target
 add_executable(innerRpc ${SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
 target_link_libraries(innerRpc ${MY_LINK_LIBRARIES})

@@ -48,6 +48,6 @@ include_directories(${PROJECT_SOURCE_DIR}/../proto)
 add_executable(interRpcS ${SERVER_SOURCE_FILES})
 add_executable(interRpcC ${CLIENT_SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
 target_link_libraries(interRpcS ${MY_LINK_LIBRARIES})
 target_link_libraries(interRpcC ${MY_LINK_LIBRARIES})

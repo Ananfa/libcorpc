@@ -42,5 +42,5 @@ include_directories(/usr/local/include/corpc/proto)
 # Add target
 add_executable(example_memcached ${SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lmemcached -lprotobuf -lcorpc_memcached -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lmemcached -lprotobuf -lcorpc_memcached -lcorpc -lco -ldl)
 target_link_libraries(example_memcached ${MY_LINK_LIBRARIES})

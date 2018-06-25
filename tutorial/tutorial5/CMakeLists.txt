@@ -44,6 +44,6 @@ include_directories(${PROJECT_SOURCE_DIR}/../proto)
 add_executable(tutorial5S ${SERVER_SOURCE_FILES})
 add_executable(tutorial5C ${CLIENT_SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
 target_link_libraries(tutorial5S ${MY_LINK_LIBRARIES})
 target_link_libraries(tutorial5C ${MY_LINK_LIBRARIES})

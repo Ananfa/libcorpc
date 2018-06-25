@@ -45,6 +45,6 @@ include_directories(${PROJECT_SOURCE_DIR}/../proto)
 add_executable(echoUdpS ${SERVER_SOURCE_FILES})
 add_executable(echoUdpC ${CLIENT_SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
 target_link_libraries(echoUdpS ${MY_LINK_LIBRARIES})
 target_link_libraries(echoUdpC ${MY_LINK_LIBRARIES})

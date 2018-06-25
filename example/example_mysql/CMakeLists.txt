@@ -43,5 +43,5 @@ include_directories(/usr/local/mysql/include)
 # Add target
 add_executable(example_mysql ${SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -L/usr/local/mysql/lib -lmysqlclient -lprotobuf -lcorpc_mysql -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -L/usr/local/mysql/lib -lmysqlclient -lprotobuf -lcorpc_mysql -lcorpc -lco -ldl)
 target_link_libraries(example_mysql ${MY_LINK_LIBRARIES})

@@ -49,5 +49,5 @@ include_directories(/usr/local/include/libbson-1.0)
 # Add target
 add_executable(example_mongodb ${SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lmongoc-1.0 -lbson-1.0 -lprotobuf -lcorpc_mongodb -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lmongoc-1.0 -lbson-1.0 -lprotobuf -lcorpc_mongodb -lcorpc -lco -ldl)
 target_link_libraries(example_mongodb ${MY_LINK_LIBRARIES})

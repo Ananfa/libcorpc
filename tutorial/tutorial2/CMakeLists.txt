@@ -49,7 +49,7 @@ add_executable(tutorial2S ${SERVER_SOURCE_FILES})
 add_executable(tutorial2M ${MIDDLE_SOURCE_FILES})
 add_executable(tutorial2C ${CLIENT_SOURCE_FILES})
 
-set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco)
+set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
 target_link_libraries(tutorial2S ${MY_LINK_LIBRARIES})
 target_link_libraries(tutorial2M ${MY_LINK_LIBRARIES})
 target_link_libraries(tutorial2C ${MY_LINK_LIBRARIES})
