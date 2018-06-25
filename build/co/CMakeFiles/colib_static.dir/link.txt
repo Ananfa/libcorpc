@@ -1,2 +1,0 @@
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ar qc libco.a  CMakeFiles/colib_static.dir/src/co_epoll.cpp.o CMakeFiles/colib_static.dir/src/co_hook_sys_call.cpp.o CMakeFiles/colib_static.dir/src/co_routine.cpp.o CMakeFiles/colib_static.dir/src/coctx.cpp.o CMakeFiles/colib_static.dir/src/coctx_swap.S.o
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ranlib libco.a
