@@ -1,6 +1,11 @@
 DerivedData
 test
 build
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles
+install_manifest.txt
+Makefile
 libcorpc_test.xcworkspace
 libcorpc.xcworkspace/xcuserdata
 co/co.xcodeproj/xcuserdata
