@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <stack>
 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
@@ -95,7 +96,7 @@ static int CreateTcpSocket(const unsigned short shPort  = 0 ,const char *pszIP  
 			}
 			struct sockaddr_in addr ;
 			SetAddr(pszIP,shPort,addr);
-			int ret = bind(fd,(struct sockaddr*)&addr,sizeof(addr));
+			int ret = ::bind(fd,(struct sockaddr*)&addr,sizeof(addr));
 			if( ret != 0)
 			{
 				close(fd);
