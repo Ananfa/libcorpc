@@ -20,6 +20,7 @@
 #include <sys/time.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
+#include <sys/select.h>
 
 #include <dlfcn.h>
 #include <poll.h>
@@ -39,6 +40,9 @@
 
 #include <resolv.h>
 #include <netdb.h>
+
+#include <map>
+#include <vector>
 
 #include <time.h>
 #include "co_routine.h"
@@ -82,6 +86,8 @@ typedef size_t (*send_pfn_t)(int socket, const void *buffer, size_t length, int 
 typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t length, int flags);
 
 typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
+typedef int (*select_pfn_t)(int nfds, fd_set *readfds, fd_set *writefds,
+fd_set *exceptfds, struct timeval *timeout);
 typedef int (*setsockopt_pfn_t)(int socket, int level, int option_name,
 			                 const void *option_value, socklen_t option_len);
 
@@ -101,20 +107,21 @@ typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 typedef unsigned int (*sleep_pfn_t)(unsigned int seconds);
 typedef int (*usleep_pfn_t)(useconds_t usec);
 
-static socket_pfn_t g_sys_socket_func 	= (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
+static socket_pfn_t g_sys_socket_func   = (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
 static connect_pfn_t g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
-static close_pfn_t g_sys_close_func 	= (close_pfn_t)dlsym(RTLD_NEXT,"close");
+static close_pfn_t g_sys_close_func     = (close_pfn_t)dlsym(RTLD_NEXT,"close");
 
-static read_pfn_t g_sys_read_func 		= (read_pfn_t)dlsym(RTLD_NEXT,"read");
-static write_pfn_t g_sys_write_func 	= (write_pfn_t)dlsym(RTLD_NEXT,"write");
+static read_pfn_t g_sys_read_func       = (read_pfn_t)dlsym(RTLD_NEXT,"read");
+static write_pfn_t g_sys_write_func     = (write_pfn_t)dlsym(RTLD_NEXT,"write");
 
-static sendto_pfn_t g_sys_sendto_func 	= (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
+static sendto_pfn_t g_sys_sendto_func   = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
 static recvfrom_pfn_t g_sys_recvfrom_func = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
 
-static send_pfn_t g_sys_send_func 		= (send_pfn_t)dlsym(RTLD_NEXT,"send");
-static recv_pfn_t g_sys_recv_func 		= (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
+static send_pfn_t g_sys_send_func       = (send_pfn_t)dlsym(RTLD_NEXT,"send");
+static recv_pfn_t g_sys_recv_func       = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
 
-static poll_pfn_t g_sys_poll_func 		= (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
+static poll_pfn_t g_sys_poll_func 	    = (poll_pfn_t)dlsym(RTLD_NEXT,"poll");
+static select_pfn_t g_sys_select_func   = (select_pfn_t)dlsym(RTLD_NEXT,"select");
 
 static setsockopt_pfn_t g_sys_setsockopt_func = (setsockopt_pfn_t)dlsym(RTLD_NEXT,"setsockopt");
 static fcntl_pfn_t g_sys_fcntl_func 	= (fcntl_pfn_t)dlsym(RTLD_NEXT,"fcntl");
@@ -618,6 +625,109 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
 
+}
+
+/*
+ 注意：此select的hook实现参考了libgo
+ 实现中不建议用select方法，用poll效率更高
+ 这里增加select的hook是因为遇到某些第三方库用了select（如：MacOS下的libcurl）
+*/
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+           fd_set *exceptfds, struct timeval *timeout)
+{
+    HOOK_SYS_FUNC( select );
+    
+    if( !co_is_enable_sys_hook() )
+    {
+        return g_sys_select_func( nfds, readfds, writefds, exceptfds, timeout );
+    }
+    
+    int timeout_ms = timeout ? timeout->tv_sec * 1000 + timeout->tv_usec / 1000 : 0;
+    if (timeout_ms == 0)
+    {
+        return g_sys_select_func( nfds, readfds, writefds, exceptfds, timeout );
+    }
+    
+    // 执行一次非阻塞的select, 检测异常或无效fd
+    fd_set rfs, wfs, efs;
+    FD_ZERO(&rfs);
+    FD_ZERO(&wfs);
+    FD_ZERO(&efs);
+    if (readfds) rfs = *readfds;
+    if (writefds) wfs = *writefds;
+    if (exceptfds) efs = *exceptfds;
+    timeval zero_tv = {0, 0};
+    int n = g_sys_select_func(nfds, (readfds ? &rfs : nullptr),
+                     (writefds ? &wfs : nullptr),
+                     (exceptfds ? &efs : nullptr), &zero_tv);
+    if (n != 0) {
+        if (readfds) *readfds = rfs;
+        if (writefds) *writefds = wfs;
+        if (exceptfds) *exceptfds = efs;
+        return n;
+    }
+    
+    // 下面将select转为poll
+    // convert fd_set to pollfd, and clear 3 fd_set.
+    std::pair<fd_set*, uint32_t> sets[3] = {
+        {readfds, POLLIN},
+        {writefds, POLLOUT},
+        {exceptfds, 0}
+    };
+    
+    std::map<int, int> pfd_map;
+    for (int i = 0; i < 3; ++i) {
+        fd_set* fds = sets[i].first;
+        if (!fds) continue;
+        int event = sets[i].second;
+        for (int fd = 0; fd < nfds; ++fd) {
+            if (FD_ISSET(fd, fds)) {
+                pfd_map[fd] |= event;
+            }
+        }
+        FD_ZERO(fds);
+    }
+    
+    std::vector<pollfd> pfds(pfd_map.size());
+    int i = 0;
+    for (auto &kv : pfd_map) {
+        pollfd &pfd = pfds[i++];
+        pfd.fd = kv.first;
+        pfd.events = kv.second;
+    }
+    
+    // poll
+    n = poll(pfds.data(), pfds.size(), timeout_ms);
+    if (n <= 0)
+        return n;
+    
+    // convert pollfd to fd_set.
+    int ret = 0;
+    for (size_t i = 0; i < pfds.size(); ++i) {
+        pollfd &pfd = pfds[i];
+        if (pfd.events & POLLIN) {
+            if (readfds) {
+                FD_SET(pfd.fd, readfds);
+                ++ret;
+            }
+        }
+        
+        if (pfd.events & POLLOUT) {
+            if (writefds) {
+                FD_SET(pfd.fd, writefds);
+                ++ret;
+            }
+        }
+        
+        if (pfd.events & ~(POLLIN | POLLOUT)) {
+            if (exceptfds) {
+                FD_SET(pfd.fd, exceptfds);
+                ++ret;
+            }
+        }
+    }
+    
+    return ret;
 }
 
 int setsockopt(int fd, int level, int option_name,
