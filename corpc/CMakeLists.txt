@@ -59,4 +59,4 @@ endif()
 set_target_properties(libcorpc_shared PROPERTIES VERSION ${LIB_VERSION} SOVERSION ${LIB_VERSION})
 
 install(TARGETS libcorpc_shared LIBRARY DESTINATION "lib" ARCHIVE DESTINATION "lib")
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/ DESTINATION "include/corpc" FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/ DESTINATION "include/corpc" FILES_MATCHING PATTERN "*.h" PATTERN "*.proto")

@@ -327,8 +327,10 @@ struct stCoEpoll_t
 	co_epoll_res *result; 
 
 };
+
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
 typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
+
 struct stTimeoutItem_t
 {
 
@@ -348,12 +350,14 @@ struct stTimeoutItem_t
 	void *pArg; // routine 
 	bool bTimeout;
 };
+
 struct stTimeoutItemLink_t
 {
 	stTimeoutItem_t *head;
 	stTimeoutItem_t *tail;
 
 };
+
 struct stTimeout_t
 {
 	stTimeoutItemLink_t *pItems;
@@ -362,6 +366,7 @@ struct stTimeout_t
 	unsigned long long ullStart;
 	long long llStartIdx;
 };
+
 stTimeout_t *AllocTimeout( int iSize )
 {
 	stTimeout_t *lp = (stTimeout_t*)calloc( 1,sizeof(stTimeout_t) );	
@@ -374,11 +379,13 @@ stTimeout_t *AllocTimeout( int iSize )
 
 	return lp;
 }
+
 void FreeTimeout( stTimeout_t *apTimeout )
 {
 	free( apTimeout->pItems );
 	free ( apTimeout );
 }
+
 int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long long allNow )
 {
 	if( apTimeout->ullStart == 0 )
@@ -386,13 +393,15 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 		apTimeout->ullStart = allNow;
 		apTimeout->llStartIdx = 0;
 	}
+    
 	if( allNow < apTimeout->ullStart )
 	{
-		co_log_err("CO_ERR: AddTimeout line %d allNow %llu apTimeout->ullStart %llu",
+		co_log_err("CO_ERR: AddTimeout line %d allNow %llu < apTimeout->ullStart %llu",
 					__LINE__,allNow,apTimeout->ullStart);
 
 		return __LINE__;
 	}
+    
 	if( apItem->ullExpireTime < allNow )
 	{
 		co_log_err("CO_ERR: AddTimeout line %d apItem->ullExpireTime %llu allNow %llu apTimeout->ullStart %llu",
@@ -400,6 +409,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
 		return __LINE__;
 	}
+    
 	unsigned long long diff = apItem->ullExpireTime - apTimeout->ullStart;
 
 	if( diff >= (unsigned long long)apTimeout->iItemSize )
@@ -410,10 +420,12 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
 		//return __LINE__;
 	}
+    
 	AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
 
 	return 0;
 }
+
 inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stTimeoutItemLink_t *apResult )
 {
 	if( apTimeout->ullStart == 0 )
@@ -424,27 +436,68 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 
 	if( allNow < apTimeout->ullStart )
 	{
+        co_log_err("CO_ERR: TakeAllTimeout line %d allNow %llu < apTimeout->ullStart %llu",
+                   __LINE__,allNow,apTimeout->ullStart);
+        
 		return ;
 	}
+    
 	int cnt = allNow - apTimeout->ullStart + 1;
 	if( cnt > apTimeout->iItemSize )
 	{
 		cnt = apTimeout->iItemSize;
 	}
+    
 	if( cnt < 0 )
 	{
 		return;
 	}
-	for( int i = 0;i<cnt;i++)
+    
+	for( int i = 0; i<cnt; i++)
 	{
 		int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
 		Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
 	}
+    
 	apTimeout->ullStart = allNow;
 	apTimeout->llStartIdx += cnt - 1;
-
-
 }
+
+inline int GetNextTimeout( stTimeout_t *apTimeout, unsigned long long allNow, int maxTimeout)
+{
+    if( apTimeout->ullStart == 0 )
+    {
+        apTimeout->ullStart = allNow;
+        apTimeout->llStartIdx = 0;
+    }
+    
+    if( allNow < apTimeout->ullStart )
+    {
+        co_log_err("CO_ERR: GetNextTimeout line %d allNow %llu < apTimeout->ullStart %llu",
+                   __LINE__,allNow,apTimeout->ullStart);
+        
+        return maxTimeout;
+    }
+    
+    int cnt = maxTimeout;
+    if( cnt > apTimeout->iItemSize )
+    {
+        cnt = apTimeout->iItemSize;
+    }
+    
+    int i = 0;
+    for ( ; i<cnt; i++ )
+    {
+        int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
+        
+        if ((apTimeout->pItems + idx)->head) {
+            break;
+        }
+    }
+    
+    return i;
+}
+
 static int CoRoutineFunc( stCoRoutine_t *co,void * )
 {
 	if( co->pfn )
@@ -459,8 +512,6 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 
 	return 0;
 }
-
-
 
 struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAttr_t* attr,
 		pfn_co_routine_t pfn,void *arg )
@@ -554,6 +605,7 @@ void co_free( stCoRoutine_t *co )
     }
     free( co );
 }
+
 void co_release( stCoRoutine_t *co )
 {
     co_free( co );
@@ -682,9 +734,8 @@ struct stPoll_t : public stTimeoutItem_t
 	int iEpollFd;
 
 	int iRaiseCnt;
-
-
 };
+
 struct stPollItem_t : public stTimeoutItem_t
 {
 	struct pollfd *pSelf;
@@ -692,6 +743,7 @@ struct stPollItem_t : public stTimeoutItem_t
 
 	struct epoll_event stEvent;
 };
+
 /*
  *   EPOLLPRI 		POLLPRI    // There is urgent data to read.  
  *   EPOLLMSG 		POLLMSG
@@ -712,6 +764,7 @@ static uint32_t PollEvent2Epoll( short events )
 	if( events & POLLWRNORM ) e |= EPOLLWRNORM;
 	return e;
 }
+
 static short EpollEvent2Poll( uint32_t events )
 {
 	short e = 0;	
@@ -745,6 +798,7 @@ void co_init_curr_thread_env()
 	stCoEpoll_t *ev = AllocEpoll();
 	SetEpoll( env,ev );
 }
+
 stCoRoutineEnv_t *co_get_curr_thread_env()
 {
 	return g_arrCoEnvPerThread[ GetPid() ];
@@ -792,6 +846,10 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
 
 	for(;;)
 	{
+        // 由于co_epoll_wait的系统消耗比较大，应尽量减少调用频率，可以根据下一超时时间点来设置waittime
+        // 但由于超时链数据结构限制，需要遍历数组来找到下一超时事件，最坏情况下（链空的时候）需要遍历整个数组（60*1000个）元素
+        // 方案：只遍历最近的N个元素（N毫秒），若找不到超时事件则等待时间设置为N毫秒。缺点：每次IO事件发生都会导致一次找下一超时的遍历，在IO事件频繁的情况下，遍历造成性能浪费，因此N不能太大
+
         if (!somethingHappen) {
             if (waittime < max_wait_ms) {
                 unsigned long long t1 = GetTickMS();
@@ -810,10 +868,13 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
                 }
             }
         } else {
-            waittime = 8; // 最小超时时间8ms
+            t0 = GetTickMS();
+            waittime = GetNextTimeout(ctx->pTimeout, t0, 128);
+            if (waittime < 8) {
+                waittime = 8; // 最小超时时间8ms
+            }
             duration = 2000; // 2秒
             somethingHappen = false;
-            t0 = GetTickMS();
         }
         
 		int ret = co_epoll_wait( ctx->iEpollFd,result,stCoEpoll_t::_EPOLL_SIZE, waittime );
@@ -885,12 +946,12 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
 
 	}
 }
+
 void OnCoroutineEvent( stTimeoutItem_t * ap )
 {
 	stCoRoutine_t *co = (stCoRoutine_t*)ap->pArg;
 	co_resume( co );
 }
-
 
 stCoEpoll_t *AllocEpoll()
 {
@@ -923,6 +984,7 @@ stCoRoutine_t *GetCurrCo( stCoRoutineEnv_t *env )
 {
 	return env->pCallStack[ env->iCallStackSize - 1 ];
 }
+
 stCoRoutine_t *GetCurrThreadCo( )
 {
 	stCoRoutineEnv_t *env = co_get_curr_thread_env();
@@ -1059,6 +1121,7 @@ void SetEpoll( stCoRoutineEnv_t *env,stCoEpoll_t *ev )
 {
 	env->pEpoll = ev;
 }
+
 stCoEpoll_t *co_get_epoll_ct()
 {
 	if( !co_get_curr_thread_env() )
@@ -1067,6 +1130,7 @@ stCoEpoll_t *co_get_epoll_ct()
 	}
 	return co_get_curr_thread_env()->pEpoll;
 }
+
 struct stHookPThreadSpec_t
 {
 	stCoRoutine_t *co;
@@ -1077,6 +1141,7 @@ struct stHookPThreadSpec_t
 		size = 1024
 	};
 };
+
 void *co_getspecific(pthread_key_t key)
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
@@ -1086,6 +1151,7 @@ void *co_getspecific(pthread_key_t key)
 	}
 	return co->aSpec[ key ].value;
 }
+
 int co_setspecific(pthread_key_t key, const void *value)
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
@@ -1096,8 +1162,6 @@ int co_setspecific(pthread_key_t key, const void *value)
 	co->aSpec[ key ].value = (void*)value;
 	return 0;
 }
-
-
 
 void co_disable_hook_sys()
 {
@@ -1164,6 +1228,7 @@ int co_cond_signal( stCoCond_t *si )
 
 	return 0;
 }
+
 int co_cond_broadcast( stCoCond_t *si )
 {
 	for(;;)
@@ -1178,7 +1243,6 @@ int co_cond_broadcast( stCoCond_t *si )
 
 	return 0;
 }
-
 
 int co_cond_timedwait( stCoCond_t *link,int ms )
 {
@@ -1202,22 +1266,22 @@ int co_cond_timedwait( stCoCond_t *link,int ms )
 
 	co_yield_ct();
 
-
 	RemoveFromLink<stCoCondItem_t,stCoCond_t>( psi );
 	free(psi);
 
 	return 0;
 }
+
 stCoCond_t *co_cond_alloc()
 {
 	return (stCoCond_t*)calloc( 1,sizeof(stCoCond_t) );
 }
+
 int co_cond_free( stCoCond_t * cc )
 {
 	free( cc );
 	return 0;
 }
-
 
 stCoCondItem_t *co_cond_pop( stCoCond_t *link )
 {
