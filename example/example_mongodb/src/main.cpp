@@ -128,7 +128,7 @@ void clientThread(MongodbConnectPool *mongodbPool) {
     corpc::RoutineEnvironment::startCoroutine(timerTask, NULL);
     //corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     
-    RoutineEnvironment::runEventLoop(100);
+    RoutineEnvironment::runEventLoop();
 }
 
 

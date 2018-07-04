@@ -44,7 +44,7 @@ namespace corpc {
         void destroy(); // 清理当前线程协程环境
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
         static void resumeCoroutine( pid_t pid, stCoRoutine_t *co ); // 用于跨线程唤醒协程
-        static void runEventLoop( int max_wait_ms = 1000 ); // 事件循环
+        static void runEventLoop(); // 事件循环
         
         static RoutineEnvironment *getEnv();    // 获取线程相关的协程环境
         stCoRoutineAttr_t *getAttr() { return _attr; }

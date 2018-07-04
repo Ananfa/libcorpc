@@ -122,8 +122,8 @@ namespace corpc {
         env->_waitResumeQueue.push(co);
     }
     
-    void RoutineEnvironment::runEventLoop( int max_wait_ms ) {
-        co_eventloop( co_get_epoll_ct(),0,0,max_wait_ms );
+    void RoutineEnvironment::runEventLoop() {
+        co_eventloop( co_get_epoll_ct(),0,0 );
     }
     
     void *RoutineEnvironment::routineEntry( void *arg ) {

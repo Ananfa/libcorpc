@@ -189,7 +189,7 @@ static void *rpc_routine( void *arg )
                 break;
         }
         
-        total--;
+        //total--;
     }
     
     return NULL;
@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
     // 新开一线程，并在其中开test_routine协程
-    std::thread t1 = std::thread(clientThread);
+    //std::thread t1 = std::thread(clientThread);
     
     // 再开一线程
     //std::thread t2 = std::thread(clientThread);

@@ -58,7 +58,7 @@ stCoRoutine_t *co_self();
 int		co_poll( stCoEpoll_t *ctx, struct pollfd fds[], nfds_t nfds, int timeout_ms );
 
 // change by lxk here
-void 	co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_wait_ms = 1000 );
+void 	co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg );
 
 //3.specific
 

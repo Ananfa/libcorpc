@@ -241,10 +241,10 @@ template <class TNode,class TLink>
 void inline Join( TLink*apLink,TLink *apOther )
 {
 	//printf("apOther %p\n",apOther);
-	if( !apOther->head )
-	{
-		return ;
-	}
+	//if( !apOther->head )
+	//{
+	//	return ;
+	//}
 	TNode *lp = apOther->head;
 	while( lp )
 	{
@@ -360,11 +360,12 @@ struct stTimeoutItemLink_t
 
 struct stTimeout_t
 {
-	stTimeoutItemLink_t *pItems;
-	int iItemSize;
-
-	unsigned long long ullStart;
-	long long llStartIdx;
+    stTimeoutItemLink_t *pItems;
+    int iItemSize;
+    uint64_t *pFlags;
+    int iFlagSize;
+    unsigned long long ullStart;
+    long long llStartIdx;
 };
 
 stTimeout_t *AllocTimeout( int iSize )
@@ -373,7 +374,8 @@ stTimeout_t *AllocTimeout( int iSize )
 
 	lp->iItemSize = iSize;
 	lp->pItems = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) * lp->iItemSize );
-
+    lp->iFlagSize = (iSize + 63) >> 6;
+    lp->pFlags = (uint64_t*)calloc( 1, 8 * lp->iFlagSize);
 	lp->ullStart = GetTickMS();
 	lp->llStartIdx = 0;
 
@@ -421,13 +423,18 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 		//return __LINE__;
 	}
     
-	AddTail( apTimeout->pItems + ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize , apItem );
+    int idx = ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize;
+	AddTail( apTimeout->pItems + idx , apItem );
+    
+    // set flag
+    apTimeout->pFlags[idx >> 6] |= uint64_t(1) << (idx & 63);
 
 	return 0;
 }
 
-inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stTimeoutItemLink_t *apResult )
+inline void TakeAllTimeout( stCoEpoll_t *ctx,unsigned long long allNow,stTimeoutItemLink_t *apResult )
 {
+    stTimeout_t *apTimeout = ctx->pTimeout;
 	if( apTimeout->ullStart == 0 )
 	{
 		apTimeout->ullStart = allNow;
@@ -456,15 +463,22 @@ inline void TakeAllTimeout( stTimeout_t *apTimeout,unsigned long long allNow,stT
 	for( int i = 0; i<cnt; i++)
 	{
 		int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
-		Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
+        
+        if ((apTimeout->pItems + idx)->head) {
+            // 清flag
+            apTimeout->pFlags[idx >> 6] &= ~(uint64_t(1) << (idx & 63));
+            
+            Join<stTimeoutItem_t,stTimeoutItemLink_t>( apResult,apTimeout->pItems + idx  );
+        }
 	}
     
 	apTimeout->ullStart = allNow;
-	apTimeout->llStartIdx += cnt - 1;
+	apTimeout->llStartIdx = (apTimeout->llStartIdx + cnt - 1) % apTimeout->iItemSize;
 }
 
-inline int GetNextTimeout( stTimeout_t *apTimeout, unsigned long long allNow, int maxTimeout)
+inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long allNow)
 {
+    // 以8毫秒为粒度来判断（刚好是一字节）
     if( apTimeout->ullStart == 0 )
     {
         apTimeout->ullStart = allNow;
@@ -476,26 +490,97 @@ inline int GetNextTimeout( stTimeout_t *apTimeout, unsigned long long allNow, in
         co_log_err("CO_ERR: GetNextTimeout line %d allNow %llu < apTimeout->ullStart %llu",
                    __LINE__,allNow,apTimeout->ullStart);
         
-        return maxTimeout;
+        return 1024;
     }
     
-    int cnt = maxTimeout;
-    if( cnt > apTimeout->iItemSize )
-    {
-        cnt = apTimeout->iItemSize;
-    }
-    
-    int i = 0;
-    for ( ; i<cnt; i++ )
-    {
-        int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
-        
-        if ((apTimeout->pItems + idx)->head) {
-            break;
+    uint64_t startIdx = apTimeout->llStartIdx >> 6;
+    int startFlagIdx = apTimeout->llStartIdx & 63;
+    int shiftRightCnt = startFlagIdx & 0xFFFFFFF8; // 8对齐
+    uint64_t startMask = int64_t(0x8000000000000000) >> (63 - startFlagIdx);
+    uint64_t startFlag = (apTimeout->pFlags[startIdx] & startMask) >> shiftRightCnt;
+    if (startFlag) {
+        // 再按字节判断
+        if (startFlag & int64_t(0x00000000000000FF)) {
+            return 8;
+        } else if (startFlag & int64_t(0x000000000000FF00)) {
+            return 16;
+        } else if (startFlag & int64_t(0x0000000000FF0000)) {
+            return 24;
+        } else if (startFlag & int64_t(0x00000000FF000000)) {
+            return 32;
+        } else if (startFlag & int64_t(0x000000FF00000000)) {
+            return 40;
+        } else if (startFlag & int64_t(0x0000FF0000000000)) {
+            return 48;
+        } else if (startFlag & int64_t(0x00FF000000000000)) {
+            return 56;
+        } else {
+            return 64;
         }
     }
     
-    return i;
+    int ret = shiftRightCnt + 8;
+    assert(ret <= 64);
+    // 注意：这里假定数组表示的时间远大于1秒，endIdx不会追上startIdx
+    long long llendIdx = (apTimeout->llStartIdx + 1000) % apTimeout->iItemSize;
+    int64_t endIdx = llendIdx >> 6;
+    assert(endIdx < apTimeout->iFlagSize);
+    for (int i = (startIdx + 1) % apTimeout->iFlagSize; i != endIdx; i = (i + 1) % apTimeout->iFlagSize) {
+        uint64_t flag = apTimeout->pFlags[i];
+        
+        if (flag) {
+            if (flag & int64_t(0x00000000000000FF)) {
+                ret += 8;
+            } else if (flag & int64_t(0x000000000000FF00)) {
+                ret += 16;
+            } else if (flag & int64_t(0x0000000000FF0000)) {
+                ret += 24;
+            } else if (flag & int64_t(0x00000000FF000000)) {
+                ret += 32;
+            } else if (flag & int64_t(0x000000FF00000000)) {
+                ret += 40;
+            } else if (flag & int64_t(0x0000FF0000000000)) {
+                ret += 48;
+            } else if (flag & int64_t(0x00FF000000000000)) {
+                ret += 56;
+            } else {
+                ret += 64;
+            }
+            assert(ret <= 1128);
+            return ret;
+        }
+        
+        assert(ret <= 1064);
+        
+        ret += 64;
+    }
+    
+    int endFlagIdx = llendIdx & 63;
+    uint64_t endMask = (uint64_t(0x1) << (endFlagIdx + 1)) - 1; //~(int64_t(0x8000000000000000) >> (63 - endFlagIdx));
+    uint64_t endFlag = apTimeout->pFlags[endIdx] & endMask;
+    if (endFlag) {
+        if (endFlag & int64_t(0x00000000000000FF)) {
+            ret += 8;
+        } else if (endFlag & int64_t(0x000000000000FF00)) {
+            ret += 16;
+        } else if (endFlag & int64_t(0x0000000000FF0000)) {
+            ret += 24;
+        } else if (endFlag & int64_t(0x00000000FF000000)) {
+            ret += 32;
+        } else if (endFlag & int64_t(0x000000FF00000000)) {
+            ret += 40;
+        } else if (endFlag & int64_t(0x0000FF0000000000)) {
+            ret += 48;
+        } else if (endFlag & int64_t(0x00FF000000000000)) {
+            ret += 56;
+        } else {
+            ret += 64;
+        }
+    }
+    
+    assert(ret <= 1128);
+    
+    return ret;
 }
 
 static int CoRoutineFunc( stCoRoutine_t *co,void * )
@@ -717,8 +802,6 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	}
 }
 
-
-
 //int poll(struct pollfd fds[], nfds_t nfds, int timeout);
 // { fd,events,revents }
 struct stPollItem_t ;
@@ -831,7 +914,7 @@ void OnPollPreparePfn( stTimeoutItem_t * ap,struct epoll_event &e,stTimeoutItemL
 }
 
 // change by lxk here
-void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_wait_ms )
+void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg )
 {
 	if( !ctx->result )
 	{
@@ -839,50 +922,16 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
 	}
 	co_epoll_res *result = ctx->result;
 
-    unsigned long long t0 = GetTickMS();
-    int waittime = max_wait_ms;
-    int duration = 30000;
-    bool somethingHappen = false;
-
 	for(;;)
 	{
         // 由于co_epoll_wait的系统消耗比较大，应尽量减少调用频率，可以根据下一超时时间点来设置waittime
         // 但由于超时链数据结构限制，需要遍历数组来找到下一超时事件，最坏情况下（链空的时候）需要遍历整个数组（60*1000个）元素
-        // 方案：只遍历最近的N个元素（N毫秒），若找不到超时事件则等待时间设置为N毫秒。缺点：每次IO事件发生都会导致一次找下一超时的遍历，在IO事件频繁的情况下，遍历造成性能浪费，因此N不能太大
-
-        if (!somethingHappen) {
-            if (waittime < max_wait_ms) {
-                unsigned long long t1 = GetTickMS();
-                if ( t1 - t0 >= duration ) { // 规定时间内无事件发生就延长事件等待时间
-                    waittime <<= 1;
-                    
-                    if ( waittime > max_wait_ms ) {
-                        waittime = max_wait_ms;
-                    }
-                    
-                    if ( duration < 30000 ) { // 实际duration最多32秒
-                        duration <<= 1;
-                    }
-                    
-                    t0 = t1;
-                }
-            }
-        } else {
-            t0 = GetTickMS();
-            waittime = GetNextTimeout(ctx->pTimeout, t0, 128);
-            if (waittime < 8) {
-                waittime = 8; // 最小超时时间8ms
-            }
-            duration = 2000; // 2秒
-            somethingHappen = false;
-        }
+        // 方案：只查最近的1秒内的超时事件，增加超时位图数据结构来提高查找效率，而且以8毫秒为粒度（刚好是位图中的一字节数据）
+        int waittime = GetNextTimeoutInASecond(ctx->pTimeout, GetTickMS());
+        assert(waittime <= 1128);
         
 		int ret = co_epoll_wait( ctx->iEpollFd,result,stCoEpoll_t::_EPOLL_SIZE, waittime );
         
-        if (ret > 0) {
-            somethingHappen = true;
-        }
-
 		stTimeoutItemLink_t *active = (ctx->pstActiveList);
 		stTimeoutItemLink_t *timeout = (ctx->pstTimeoutList);
 
@@ -902,7 +951,7 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
 		}
 
 		unsigned long long now = GetTickMS();
-		TakeAllTimeout( ctx->pTimeout,now,timeout );
+		TakeAllTimeout( ctx,now,timeout );
 
 		stTimeoutItem_t *lp = timeout->head;
         
@@ -913,7 +962,9 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg, int max_
 			lp = lp->pNext;
 		}
 
-		Join<stTimeoutItem_t,stTimeoutItemLink_t>( active,timeout );
+        if (timeout->head) {
+            Join<stTimeoutItem_t,stTimeoutItemLink_t>( active,timeout );
+        }
 
 		lp = active->head;
 		while( lp )
@@ -1086,8 +1137,10 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
     }
 
     {
+        assert(arg.pLink == NULL);
 		//clear epoll status and memory
 		RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+        
 		for(nfds_t i = 0;i < nfds;i++)
 		{
 			int fd = fds[i].fd;
