@@ -138,6 +138,5 @@ $ cd example/example_redis && mkdir build && cd build && cmake .. && make && cd 
 - 协程的切换实际是掌握在程序员手中
 - 一个线程中的多个协程对线程资源的访问和修改不需要对资源上锁
 - 如果一协程中有死循环并且循环中没有能产生协程切换的方法调用，其他协程将不会被调度执行
-- socket族IO操作会有fd在epoll中进行事件监听，而sleep没有fd在epoll中监听，如果一段时间内没有fd事件发生，需要等epoll超时之后sleep协程才会被唤醒，因此epoll超时值需要根据实际情况进行设置，超时值太小会消耗性能，太大则sleep唤醒延迟大
 - 在使用第三方库时（如：mysqlclient），需要在启动程序时加上“LD_PRELOAD=<path of libco>”（如果在mac OS中加“DYLD_INSERT_LIBRARIES=<HOOK了系统接口的动态库> DYLD_FORCE_FLAT_NAMESPACE=y”）
 
