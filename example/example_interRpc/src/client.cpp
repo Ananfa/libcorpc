@@ -214,7 +214,7 @@ void clientThread() {
     
     printf("thread %d running...\n", GetPid());
     
-    RoutineEnvironment::runEventLoop(100);
+    RoutineEnvironment::runEventLoop();
 }
 
 
@@ -259,5 +259,5 @@ int main(int argc, char *argv[]) {
     
     printf("thread %d running...\n", GetPid());
     
-    RoutineEnvironment::runEventLoop(100);
+    RoutineEnvironment::runEventLoop();
 }

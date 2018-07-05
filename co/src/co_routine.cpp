@@ -333,11 +333,6 @@ typedef void (*OnProcessPfn_t)( stTimeoutItem_t *);
 
 struct stTimeoutItem_t
 {
-
-	enum
-	{
-		eMaxTimeout = 40 * 1000 //40s
-	};
 	stTimeoutItem_t *pPrev;
 	stTimeoutItem_t *pNext;
 	stTimeoutItemLink_t *pLink;
@@ -355,7 +350,6 @@ struct stTimeoutItemLink_t
 {
 	stTimeoutItem_t *head;
 	stTimeoutItem_t *tail;
-
 };
 
 struct stTimeout_t
@@ -370,11 +364,20 @@ struct stTimeout_t
 
 stTimeout_t *AllocTimeout( int iSize )
 {
+    assert((iSize & (iSize-1))==0);
+    if (iSize & (iSize-1)) {
+        co_log_err("CO_ERR: AllocTimeout line %d iSize is not power of 2", __LINE__);
+        return NULL;
+    } else if (iSize < 1024) {
+        co_log_err("CO_ERR: AllocTimeout line %d iSize is too small", __LINE__);
+        return NULL;
+    }
+    
 	stTimeout_t *lp = (stTimeout_t*)calloc( 1,sizeof(stTimeout_t) );	
 
 	lp->iItemSize = iSize;
 	lp->pItems = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) * lp->iItemSize );
-    lp->iFlagSize = (iSize + 63) >> 6;
+    lp->iFlagSize = iSize >> 6;
     lp->pFlags = (uint64_t*)calloc( 1, 8 * lp->iFlagSize);
 	lp->ullStart = GetTickMS();
 	lp->llStartIdx = 0;
@@ -423,7 +426,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 		//return __LINE__;
 	}
     
-    int idx = ( apTimeout->llStartIdx + diff ) % apTimeout->iItemSize;
+    int idx = ( apTimeout->llStartIdx + diff ) & (apTimeout->iItemSize - 1);
 	AddTail( apTimeout->pItems + idx , apItem );
     
     // set flag
@@ -462,7 +465,7 @@ inline void TakeAllTimeout( stCoEpoll_t *ctx,unsigned long long allNow,stTimeout
     
 	for( int i = 0; i<cnt; i++)
 	{
-		int idx = ( apTimeout->llStartIdx + i) % apTimeout->iItemSize;
+		int idx = ( apTimeout->llStartIdx + i) & (apTimeout->iItemSize - 1);
         
         if ((apTimeout->pItems + idx)->head) {
             // 清flag
@@ -473,7 +476,7 @@ inline void TakeAllTimeout( stCoEpoll_t *ctx,unsigned long long allNow,stTimeout
 	}
     
 	apTimeout->ullStart = allNow;
-	apTimeout->llStartIdx = (apTimeout->llStartIdx + cnt - 1) % apTimeout->iItemSize;
+	apTimeout->llStartIdx = (apTimeout->llStartIdx + cnt - 1) & (apTimeout->iItemSize - 1);
 }
 
 inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long allNow)
@@ -519,13 +522,12 @@ inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long a
         }
     }
     
-    int ret = shiftRightCnt + 8;
-    assert(ret <= 64);
+    int ret = 64 - shiftRightCnt;
     // 注意：这里假定数组表示的时间远大于1秒，endIdx不会追上startIdx
-    long long llendIdx = (apTimeout->llStartIdx + 1000) % apTimeout->iItemSize;
+    long long llendIdx = (apTimeout->llStartIdx + 1000) & (apTimeout->iItemSize - 1);
     int64_t endIdx = llendIdx >> 6;
-    assert(endIdx < apTimeout->iFlagSize);
-    for (int i = (startIdx + 1) % apTimeout->iFlagSize; i != endIdx; i = (i + 1) % apTimeout->iFlagSize) {
+    int moldMask = apTimeout->iFlagSize - 1; // 因为apTimeout->iFlagSize是2的n次方
+    for (int i = (startIdx + 1) & moldMask; i != endIdx; i = (i + 1) & moldMask) {
         uint64_t flag = apTimeout->pFlags[i];
         
         if (flag) {
@@ -546,11 +548,8 @@ inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long a
             } else {
                 ret += 64;
             }
-            assert(ret <= 1128);
             return ret;
         }
-        
-        assert(ret <= 1064);
         
         ret += 64;
     }
@@ -577,8 +576,6 @@ inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long a
             ret += 64;
         }
     }
-    
-    assert(ret <= 1128);
     
     return ret;
 }
@@ -928,7 +925,6 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg )
         // 但由于超时链数据结构限制，需要遍历数组来找到下一超时事件，最坏情况下（链空的时候）需要遍历整个数组（60*1000个）元素
         // 方案：只查最近的1秒内的超时事件，增加超时位图数据结构来提高查找效率，而且以8毫秒为粒度（刚好是位图中的一字节数据）
         int waittime = GetNextTimeoutInASecond(ctx->pTimeout, GetTickMS());
-        assert(waittime <= 1128);
         
 		int ret = co_epoll_wait( ctx->iEpollFd,result,stCoEpoll_t::_EPOLL_SIZE, waittime );
         
@@ -1009,7 +1005,7 @@ stCoEpoll_t *AllocEpoll()
 	stCoEpoll_t *ctx = (stCoEpoll_t*)calloc( 1,sizeof(stCoEpoll_t) );
 
 	ctx->iEpollFd = co_epoll_create( stCoEpoll_t::_EPOLL_SIZE );
-	ctx->pTimeout = AllocTimeout( 60 * 1000 );
+	ctx->pTimeout = AllocTimeout( 0x10000 ); // 方便用位操作代替乘除法和去模操作
 	
 	ctx->pstActiveList = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) );
 	ctx->pstTimeoutList = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) );
