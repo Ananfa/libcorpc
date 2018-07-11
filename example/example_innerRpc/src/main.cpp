@@ -240,7 +240,7 @@ static void clientEntry() {
     
     printf("running...\n");
     
-    RoutineEnvironment::runEventLoop(100);
+    RoutineEnvironment::runEventLoop();
 }
 
 int main(int argc, const char * argv[]) {

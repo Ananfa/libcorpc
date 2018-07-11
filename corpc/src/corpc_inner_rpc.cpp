@@ -66,9 +66,9 @@ namespace corpc {
         return _instance;
     }
     
-    InnerRpcServer* InnerRpcServer::create() {
+    InnerRpcServer* InnerRpcServer::create(bool startInNewThread) {
         InnerRpcServer *server = new InnerRpcServer();
-        server->start();
+        server->start(startInNewThread);
         return server;
     }
     
@@ -119,8 +119,19 @@ namespace corpc {
         return &(it->second.methods[methodId]);
     }
     
-    void InnerRpcServer::start() {
-        RoutineEnvironment::startCoroutine(requestQueueRoutine, this);
+    void InnerRpcServer::start(bool startInNewThread) {
+        if (startInNewThread) {
+            _t = std::thread(threadEntry, this);
+        } else {
+            RoutineEnvironment::startCoroutine(requestQueueRoutine, this);
+        }
+    }
+    
+    void InnerRpcServer::threadEntry( InnerRpcServer * self ) {
+        // 启动rpc任务处理协程
+        RoutineEnvironment::startCoroutine(requestQueueRoutine, self);
+        
+        RoutineEnvironment::runEventLoop();
     }
     
     void *InnerRpcServer::requestQueueRoutine( void * arg ) {

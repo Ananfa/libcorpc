@@ -44,9 +44,7 @@ static void *rpc_routine( void *arg )
 {
     co_enable_hook_sys();
     
-    InnerRpcClient::Channel *channel = (InnerRpcClient::Channel*)arg;
-    
-    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
+    HelloWorldService::Stub *helloworld_clt = (HelloWorldService::Stub *)arg;
     
     FooRequest *request = new FooRequest();
     FooResponse *response = new FooResponse();
@@ -72,12 +70,8 @@ static void *rpc_routine( void *arg )
     return NULL;
 }
 
-static void clientEntry( InnerRpcServer *server ) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
-    
-    RoutineEnvironment::startCoroutine(rpc_routine, channel);
+static void clientEntry( HelloWorldService::Stub *helloworld_clt ) {
+    RoutineEnvironment::startCoroutine(rpc_routine, helloworld_clt);
     
     RoutineEnvironment::runEventLoop();
 }
@@ -89,7 +83,11 @@ int main(int argc, const char * argv[]) {
     HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
     server->registerService(helloWorldService);
     
-    std::thread t = std::thread(clientEntry, server);
+    InnerRpcClient *client = InnerRpcClient::instance();
+    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
+    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
+    
+    std::thread t = std::thread(clientEntry, helloworld_clt);
     
     RoutineEnvironment::runEventLoop();
     

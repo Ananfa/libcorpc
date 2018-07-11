@@ -19,6 +19,7 @@
 
 #include "co_routine.h"
 
+#include <thread>
 #include <map>
 #include <google/protobuf/service.h>
 
@@ -81,9 +82,8 @@ namespace corpc {
     };
     
     class InnerRpcServer {
-        
     public:
-        static InnerRpcServer* create();
+        static InnerRpcServer* create(bool startInNewThread = false);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -97,7 +97,9 @@ namespace corpc {
         InnerRpcServer() {}
         ~InnerRpcServer() {}  // 不允许在栈上创建server
         
-        void start();
+        void start(bool startInNewThread = false);
+        
+        static void threadEntry( InnerRpcServer * self );
         
         static void *requestQueueRoutine( void * arg );   // 处理Request，若rpc定义了need_coroutine，启动单独的taskCallRoutine协程来处理rpc任务
         
@@ -107,6 +109,7 @@ namespace corpc {
         
         InnerRpcRequestQueue _queue;
         
+        std::thread _t;
     public:
         friend class InnerRpcClient::Channel;
     };
