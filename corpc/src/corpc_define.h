@@ -46,13 +46,14 @@
 
 #define CORPC_MSG_TYPE_CONNECT -1
 #define CORPC_MSG_TYPE_CLOSE -2
+#define CORPC_MSG_TYPE_UDP_UNSHAKE -110
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
 #define CORPC_MSG_TYPE_HEARTBEAT -115
 
-#define CORPC_HEARTBEAT_PERIOD 10000
-#define CORPC_MAX_NO_HEARTBEAT_TIME 30000
+#define CORPC_HEARTBEAT_PERIOD 5000
+#define CORPC_MAX_NO_HEARTBEAT_TIME 15000
 
 
 #define bswap16(_x)        (uint16_t)((_x) << 8 | (_x) >> 8)
@@ -73,7 +74,8 @@
     (((_x) << 40) & (0xffUL << 48)) |   \
     ((_x) << 56))
 
-#if ( 1>>1 == 0 )
+// 注意：该实现没有考虑PDP_ENDIAN情形
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     // Little Endian
     #ifndef htobe16
         #define    htobe16(x)    bswap16((uint16_t)(x))
