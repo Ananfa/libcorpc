@@ -30,6 +30,7 @@
 
 #define LOCAL_PORT 20000
 
+#define CORPC_MSG_TYPE_UDP_UNSHAKE -110
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
@@ -38,8 +39,8 @@
 #define CORPC_MESSAGE_HEAD_SIZE 8
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
 
-#define CORPC_HEARTBEAT_PERIOD 10000
-#define CORPC_MAX_NO_HEARTBEAT_TIME 30000
+#define CORPC_HEARTBEAT_PERIOD 5000
+#define CORPC_MAX_NO_HEARTBEAT_TIME 15000
 
 template <typename T>
 class SyncQueue {
@@ -298,6 +299,21 @@ void UdpClient::threadEntry( UdpClient *self ) {
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                         //printf("recv heartbeat\n");
                         self->_lastRecvHBTime = nowms;
+                    } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
+                        // 重发handshake_3
+                        char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
+                        *(uint32_t *)handshake3msg = htonl(0);
+                        *(uint32_t *)(handshake3msg + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+                        
+                        if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+                            perror("can't send handshake3");
+                            close(s);
+                            return;
+                        }
+                    } else if (msgType == CORPC_MSG_TYPE_UDP_UNSHAKE) {
+                        perror("unshake");
+                        close(s);
+                        return;
                     }
                 } else {
                     // 解码数据
