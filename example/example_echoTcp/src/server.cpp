@@ -92,7 +92,7 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
     
-    TestTcpServer *server = TestTcpServer::create(io, false, ip, port);
+    TestTcpServer *server = TestTcpServer::create(io, true, ip, port);
     
     server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());

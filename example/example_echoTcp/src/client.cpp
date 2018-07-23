@@ -25,8 +25,8 @@
 #define CORPC_MESSAGE_HEAD_SIZE 8
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 
-#define CORPC_HEARTBEAT_PERIOD 10000
-#define CORPC_MAX_NO_HEARTBEAT_TIME 30000
+#define CORPC_HEARTBEAT_PERIOD 5000
+#define CORPC_MAX_NO_HEARTBEAT_TIME 15000
 
 template <typename T>
 class SyncQueue {
@@ -358,7 +358,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
             
             int writeNum = 0;
             while (writeNum < sendNum) {
-                ret = (int)write(s, buf, sendNum);
+                ret = (int)write(s, buf + writeNum, sendNum);
                 
                 if (ret == -1) {
                     perror("write message");
