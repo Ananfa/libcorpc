@@ -464,10 +464,13 @@ namespace corpc {
         return true;
     }
     
-    UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0) {
+    UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0), _unshakemsg(CORPC_MESSAGE_HEAD_SIZE, 0) {
         _shakemsg2buf = (uint8_t *)_shakemsg2.data();
         *(uint32_t *)_shakemsg2buf = htobe32(0);
         *(uint32_t *)(_shakemsg2buf + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+        _unshakemsg2buf = (uint8_t *)_unshakemsg.data();
+        *(uint32_t *)_unshakemsg2buf = htobe32(0);
+        *(uint32_t *)(_unshakemsg2buf + 4) = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
     }
     
     void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -496,6 +499,9 @@ namespace corpc {
             ssize_t ret = recvfrom(listen_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE, 0, (struct sockaddr *)&client_addr, &slen);
             if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                 printf("ERROR: UdpAcceptor::acceptRoutine() -- wrong msg.\n");
+                
+                sendto(listen_fd, self->_unshakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+                
                 continue;
             }
             
@@ -544,10 +550,11 @@ namespace corpc {
         bool shakeOK = false;
         int trytimes = 4;
         
+        co_set_timeout(shake_fd, waittime, 1000);
+        
         while (trytimes > 0 && !shakeOK) {
-            co_set_timeout(shake_fd, waittime, 1000);
-            
             // 发送“连接确认”给客户的
+            printf("Debug: Send shake 2 msg\n");
             int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
             if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                 printf("ERROR: UdpAcceptor::handshakeRoutine() -- write shake msg fail for fd %d ret %d errno %d (%s)\n",
@@ -579,9 +586,8 @@ namespace corpc {
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
                     // 消息类型不对
-                    printf("ERROR: UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d\n", shake_fd);
-                    close(shake_fd);
-                    break;
+                    printf("WARNING: UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d, msgtype %d\n", shake_fd, msgtype);
+                    continue;
                 }
                 
                 // 握手成功，创建connection对象

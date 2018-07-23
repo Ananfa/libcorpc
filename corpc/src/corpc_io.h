@@ -362,6 +362,8 @@ namespace corpc {
         
         std::string _shakemsg2;
         uint8_t *_shakemsg2buf;
+        std::string _unshakemsg;
+        uint8_t *_unshakemsg2buf;
     };
     
     struct SenderTask {
