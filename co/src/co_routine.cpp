@@ -857,31 +857,30 @@ static short EpollEvent2Poll( uint32_t events )
 	return e;
 }
 
-static stCoRoutineEnv_t* g_arrCoEnvPerThread[ 204800 ] = { 0 };
+//static stCoRoutineEnv_t* g_arrCoEnvPerThread[ 204800 ] = { 0 };
+static __thread stCoRoutineEnv_t* g_coRoutineEnv = nullptr;
 void co_init_curr_thread_env()
 {
-	pid_t pid = GetPid();	
-	g_arrCoEnvPerThread[ pid ] = (stCoRoutineEnv_t*)calloc( 1,sizeof(stCoRoutineEnv_t) );
-	stCoRoutineEnv_t *env = g_arrCoEnvPerThread[ pid ];
+    g_coRoutineEnv = (stCoRoutineEnv_t*)calloc( 1,sizeof(stCoRoutineEnv_t) );
 
-	env->iCallStackSize = 0;
-	struct stCoRoutine_t *self = co_create_env( env, NULL, NULL,NULL );
+	g_coRoutineEnv->iCallStackSize = 0;
+	struct stCoRoutine_t *self = co_create_env( g_coRoutineEnv, NULL, NULL,NULL );
 	self->cIsMain = 1;
 
-	env->pending_co = NULL;
-	env->occupy_co = NULL;
+	g_coRoutineEnv->pending_co = NULL;
+	g_coRoutineEnv->occupy_co = NULL;
 
 	coctx_init( &self->ctx );
 
-	env->pCallStack[ env->iCallStackSize++ ] = self;
+	g_coRoutineEnv->pCallStack[ g_coRoutineEnv->iCallStackSize++ ] = self;
 
 	stCoEpoll_t *ev = AllocEpoll();
-	SetEpoll( env,ev );
+	SetEpoll( g_coRoutineEnv,ev );
 }
 
 stCoRoutineEnv_t *co_get_curr_thread_env()
 {
-	return g_arrCoEnvPerThread[ GetPid() ];
+    return g_coRoutineEnv;
 }
 
 void OnPollProcessEvent( stTimeoutItem_t * ap )
