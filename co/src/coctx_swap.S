@@ -49,7 +49,7 @@ coctx_swap:
 
 #elif defined(__x86_64__)
 	leaq 8(%rsp), %rax       // rsp + 8 -> rax
-    movq -8(%rax), %rdx
+    movq 0(%rsp), %rdx
 	movq %rax, 104(%rdi)
 	movq %rbx, 96(%rdi)
 	movq %rdx, 72(%rdi)     // ret func addr
@@ -75,4 +75,5 @@ coctx_swap:
 	
 	xorl %eax, %eax
 	ret
+
 #endif
