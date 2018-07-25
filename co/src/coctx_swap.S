@@ -23,34 +23,28 @@
 coctx_swap:
 
 #if defined(__i386__)
-	leal 4(%esp), %eax //sp 
-	movl 4(%esp), %esp 
-	leal 32(%esp), %esp //parm a : &regs[7] + sizeof(void*)
-
-	pushl %eax //esp ->parm a 
-
-	pushl %ebp
-	pushl %esi
-	pushl %edi
-	pushl %edx
-	pushl %ecx
-	pushl %ebx
-	pushl -4(%eax)
-
+	leal 4(%esp), %edx // sp
+	movl 4(%esp), %eax // param1
+	movl %edx, 28(%eax)
+	movl %ebp, 24(%eax)
+	movl %esi, 20(%eax)
+	movl %edi, 16(%eax)
+	movl %ebx, 4(%eax)
 	
-	movl 4(%eax), %esp //parm b -> &regs[0]
+	movl 0(%esp), %edx // ret func addr
+	movl %edx, 0(%eax)
+	
+	movl 8(%esp), %eax // param2
+	
+	movl 0(%eax), %edx // ret func addr
+	movl 4(%eax), %ebx
+	movl 16(%eax), %edi
+	movl 20(%eax), %esi
+	movl 24(%eax), %ebp
+	movl 28(%eax), %esp
+	pushl %edx // set ret func addr
 
-	popl %eax  //ret func addr
-	popl %ebx  
-	popl %ecx
-	popl %edx
-	popl %edi
-	popl %esi
-	popl %ebp
-	popl %esp
-	pushl %eax //set ret func addr
-
-	xorl %eax, %eax
+	xorl %edx, %edx
 	ret
 
 #elif defined(__x86_64__)
