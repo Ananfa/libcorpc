@@ -327,8 +327,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 0.5.0;
+				DYLIB_CURRENT_VERSION = 0.5.0;
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
@@ -344,8 +344,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 0.5.0;
+				DYLIB_CURRENT_VERSION = 0.5.0;
 				EXECUTABLE_PREFIX = lib;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,

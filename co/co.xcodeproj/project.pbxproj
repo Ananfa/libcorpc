@@ -337,8 +337,8 @@
 		2DFF01C01F9EF04A0005D0A6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 0.5.0;
+				DYLIB_CURRENT_VERSION = 0.5.0;
 				EXECUTABLE_PREFIX = lib;
 				MACH_O_TYPE = mh_dylib;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -348,8 +348,8 @@
 		2DFF01C11F9EF04A0005D0A6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 0.5.0;
+				DYLIB_CURRENT_VERSION = 0.5.0;
 				EXECUTABLE_PREFIX = lib;
 				MACH_O_TYPE = mh_dylib;
 				PRODUCT_NAME = "$(TARGET_NAME)";
