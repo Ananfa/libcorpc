@@ -54,40 +54,29 @@ coctx_swap:
 	ret
 
 #elif defined(__x86_64__)
-	leaq 8(%rsp),%rax
-	leaq 112(%rdi),%rsp
-	pushq %rax
-	pushq %rbx
-	pushq %rcx
-	pushq %rdx
-
-	pushq -8(%rax) //ret func addr
-
-	pushq %rsi
-	pushq %rdi
-	pushq %rbp
-	pushq %r8
-	pushq %r9
-	pushq %r12
-	pushq %r13
-	pushq %r14
-	pushq %r15
+	leaq 8(%rsp), %rax       // rsp + 8 -> rax
+    movq -8(%rax), %rdx
+	movq %rax, 104(%rdi)
+	movq %rbx, 96(%rdi)
+	movq %rdx, 72(%rdi)     // ret func addr
+	movq %rbp, 48(%rdi)
+	movq %r12, 24(%rdi)
+	movq %r13, 16(%rdi)
+	movq %r14, 8(%rdi)
+	movq %r15, 0(%rdi)
+	movq %rsi, 64(%rdi)     // param
+	movq %rdi, 56(%rdi)     // param
 	
-	movq %rsi, %rsp
-	popq %r15
-	popq %r14
-	popq %r13
-	popq %r12
-	popq %r9
-	popq %r8
-	popq %rbp
-	popq %rdi
-	popq %rsi
-	popq %rax //ret func addr
-	popq %rdx
-	popq %rcx
-	popq %rbx
-	popq %rsp
+	movq 0(%rsi), %r15
+	movq 8(%rsi), %r14
+	movq 16(%rsi), %r13
+	movq 24(%rsi), %r12
+	movq 48(%rsi), %rbp
+	movq 72(%rsi), %rax     // ret func addr
+	movq 96(%rsi), %rbx
+	movq 104(%rsi), %rsp
+	movq 56(%rsi), %rdi     // param
+	movq 64(%rsi), %rsi     // param
 	pushq %rax
 	
 	xorl %eax, %eax
