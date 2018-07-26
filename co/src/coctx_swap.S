@@ -30,22 +30,17 @@ coctx_swap:
 	movl %esi, 20(%eax)
 	movl %edi, 16(%eax)
 	movl %ebx, 4(%eax)
-	
 	movl 0(%esp), %edx // ret func addr
 	movl %edx, 0(%eax)
 	
 	movl 8(%esp), %eax // param2
-	
-	movl 0(%eax), %edx // ret func addr
 	movl 4(%eax), %ebx
 	movl 16(%eax), %edi
 	movl 20(%eax), %esi
 	movl 24(%eax), %ebp
 	movl 28(%eax), %esp
-	pushl %edx // set ret func addr
 
-	xorl %edx, %edx
-	ret
+    jmp *(%eax)
 
 #elif defined(__x86_64__)
 	leaq 8(%rsp), %rax       // rsp + 8 -> rax
@@ -71,9 +66,7 @@ coctx_swap:
 	movq 104(%rsi), %rsp
 	movq 56(%rsi), %rdi     // param
 	movq 64(%rsi), %rsi     // param
-	pushq %rax
-	
-	xorl %eax, %eax
-	ret
+
+    jmp *%rax
 
 #endif
