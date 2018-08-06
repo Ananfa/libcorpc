@@ -93,7 +93,6 @@ char* _convert(unsigned int num, int base) {
 }
 
 FILE* _getLogFile(uint32_t today) {
-#ifdef LOG2FILE
     extern char *__progname;
     static __thread uint32_t date(0);
     static __thread FILE* logFile(nullptr);
@@ -124,18 +123,21 @@ FILE* _getLogFile(uint32_t today) {
     logFile = fopen(logFileName, "a");
     
     return logFile;
-#else
-    return stdout;
-#endif
 }
 
 void _print_time(FILE* fd, struct tm& tm_now, uint32_t mseconds) {
     char buffer[26];
     strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", &tm_now);
     fputs(buffer, fd);
+#if DEBUG
+    fputs(buffer, stdout);
+#endif
     
     snprintf(buffer, 26, ".%03ld", mseconds);
     fputs(buffer, fd);
+#if DEBUG
+    fputs(buffer, stdout);
+#endif
 }
 
 void debuglog(const char *format, ...)
@@ -157,8 +159,14 @@ void debuglog(const char *format, ...)
     
     _print_time(fd, tm_now, mseconds);
     fputs(" [DEBUG] : ", fd);
+#if DEBUG
+    fputs(" [DEBUG] : ", stdout);
+#endif
     
     vfprintf(fd, format, arg);
+#if DEBUG
+    vfprintf(stdout, format, arg);
+#endif
     
     va_end(arg);
 }
@@ -182,8 +190,14 @@ void infolog(const char *format, ...)
     
     _print_time(fd, tm_now, mseconds);
     fputs(" [INFO]  : ", fd);
+#if DEBUG
+    fputs(" [INFO]  : ", stdout);
+#endif
     
     vfprintf(fd, format, arg);
+#if DEBUG
+    vfprintf(stdout, format, arg);
+#endif
     
     va_end(arg);
 }
@@ -207,8 +221,14 @@ void warnlog(const char *format, ...)
     
     _print_time(fd, tm_now, mseconds);
     fputs(" [WARN]  : ", fd);
+#if DEBUG
+    fputs(" [WARN]  : ", stdout);
+#endif
     
     vfprintf(fd, format, arg);
+#if DEBUG
+    vfprintf(stdout, format, arg);
+#endif
     
     va_end(arg);
 }
@@ -232,8 +252,14 @@ void errlog(const char *format, ...)
     
     _print_time(fd, tm_now, mseconds);
     fputs(" [ERROR] : ", fd);
+#if DEBUG
+    fputs(" [ERROR] : ", stdout);
+#endif
     
     vfprintf(fd, format, arg);
+#if DEBUG
+    vfprintf(stdout, format, arg);
+#endif
     
     va_end(arg);
 }
