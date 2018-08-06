@@ -49,7 +49,7 @@ namespace corpc {
             
             if (itor == conn->_waitResultCoMap.end()) {
                 // 打印出错信息
-                printf("ERROR: RpcClient::decode can't find task : %llu\n", callId);
+                ERROR_LOG("RpcClient::decode can't find task : %llu\n", callId);
                 assert(false);
                 
                 // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
@@ -64,7 +64,7 @@ namespace corpc {
         
         // 解析包体（RpcResponseData）
         if (!task->rpcTask->response->ParseFromArray(body, respSize)) {
-            printf("ERROR: RpcClient::decode -- parse response body fail\n");
+            ERROR_LOG("RpcClient::decode -- parse response body fail\n");
             assert(false);
             
             // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
@@ -273,7 +273,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("Error: RpcClient::connectionRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("RpcClient::connectionRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -331,7 +331,7 @@ namespace corpc {
                         // 建立连接
                         connection->_fd = socket(PF_INET, SOCK_STREAM, 0);
                         co_set_timeout(connection->_fd, -1, 1000);
-                        printf("co %d socket fd %d\n", co_self(), connection->_fd);
+                        LOG("co %d socket fd %d\n", co_self(), connection->_fd);
                         struct sockaddr_in addr;
                         
                         Channel *channel = connection->_channel;
@@ -365,7 +365,7 @@ namespace corpc {
                                 ret = getsockopt(connection->_fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
                                 if ( ret == -1 ) {
                                     // 出错处理
-                                    printf("Error: RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                    ERROR_LOG("RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
                                            co_self(), connection->_fd, ret, errno, strerror(errno));
                                     
                                     close(connection->_fd);
@@ -373,7 +373,7 @@ namespace corpc {
                                     connection->_st = Connection::CLOSED;
                                 } else if ( error ) {
                                     // 出错处理
-                                    printf("Error: RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
+                                    ERROR_LOG("RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
                                            co_self(), connection->_fd, ret, error, strerror(error));
                                     
                                     close(connection->_fd);
@@ -384,7 +384,7 @@ namespace corpc {
                                 assert(connection->_waitResultCoMap.empty());
                             } else {
                                 // 出错处理
-                                printf("Error: RpcClient::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
+                                ERROR_LOG("RpcClient::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
                                        co_self(), connection->_fd, ret, errno, strerror(errno));
                                 
                                 close(connection->_fd);
@@ -469,7 +469,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: RpcClient::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("RpcClient::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？

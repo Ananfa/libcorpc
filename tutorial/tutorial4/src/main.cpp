@@ -31,7 +31,7 @@ public:
                      const ::FooRequest* request,
                      ::FooResponse* response,
                      ::google::protobuf::Closure* done) {
-        printf("HelloWorldServiceImpl::foo is called\n");
+        LOG("HelloWorldServiceImpl::foo is called\n");
         
         std::string msg1 = request->msg1();
         std::string msg2 = request->msg2();
@@ -56,9 +56,9 @@ static void *rpc_routine( void *arg )
     helloworld_clt->foo(controller, request, response, NULL);
     
     if (controller->Failed()) {
-        printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
     } else {
-        printf("========= %s =========\n", response->msg().c_str());
+        LOG("========= %s =========\n", response->msg().c_str());
     }
     
     delete controller;

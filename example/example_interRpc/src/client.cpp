@@ -73,7 +73,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
+        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -124,12 +124,12 @@ static void *rpc_routine( void *arg )
                     testStubs->foo_clt->Foo(controller, request, response, NULL);
                     
                     if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                        //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iFooFailCnt++;
                         
                         msleep(100);
                     } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
                         iFooSuccCnt++;
                     }
                 } while (controller->Failed());
@@ -152,12 +152,12 @@ static void *rpc_routine( void *arg )
                     testStubs->bar_clt->Bar(controller, request, response, NULL);
                     
                     if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                        //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iBarFailCnt++;
                         
                         msleep(100);
                     } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
                         iBarSuccCnt++;
                     }
                 } while (controller->Failed());
@@ -200,7 +200,7 @@ static void *test_routine( void *arg )
 {
     co_enable_hook_sys();
     
-    printf("test_routine begin\n");
+    LOG("test_routine begin\n");
     
     for (int i=0; i<test_routine_count; i++) {
         RoutineEnvironment::startCoroutine(rpc_routine, arg);
@@ -212,7 +212,7 @@ static void *test_routine( void *arg )
 void clientThread() {
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
     
-    printf("thread %d running...\n", GetPid());
+    LOG("thread %d running...\n", GetPid());
     
     RoutineEnvironment::runEventLoop();
 }
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
     co_start_hook();
     
     if(argc<4){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "rpccli [HOST] [PORT] [TEST_ROUTINE_COUNT]\n");
         return -1;
     }
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     
-    printf("thread %d running...\n", GetPid());
+    LOG("thread %d running...\n", GetPid());
     
     RoutineEnvironment::runEventLoop();
 }

@@ -22,21 +22,27 @@
 #include <netinet/tcp.h>
 
 #include <errno.h>
+#include <assert.h>
 #include <string.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>
 
 int setKeepAlive(int fd, int interval)
 {
     int val = 1;
     
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1) {
-        printf("setsockopt SO_KEEPALIVE: %s", strerror(errno));
+        LOG("setsockopt SO_KEEPALIVE: %s", strerror(errno));
         return -1;
     }
     
 #if defined( __APPLE__ )
     val = interval;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        printf("setsockopt TCP_KEEPALIVE: %s\n", strerror(errno));
+        LOG("setsockopt TCP_KEEPALIVE: %s\n", strerror(errno));
         return -1;
     }
     
@@ -44,7 +50,7 @@ int setKeepAlive(int fd, int interval)
     /* Send first probe after `interval' seconds. */
     val = interval;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        printf("setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));
+        LOG("setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));
         return -1;
     }
     
@@ -54,7 +60,7 @@ int setKeepAlive(int fd, int interval)
     val = interval/3;
     if (val == 0) val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        printf("setsockopt TCP_KEEPINTVL: %s\n", strerror(errno));
+        LOG("setsockopt TCP_KEEPINTVL: %s\n", strerror(errno));
         return -1;
     }
     
@@ -62,11 +68,173 @@ int setKeepAlive(int fd, int interval)
      * probes without getting a reply. */
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        printf("setsockopt TCP_KEEPCNT: %s\n", strerror(errno));
+        LOG("setsockopt TCP_KEEPCNT: %s\n", strerror(errno));
         return -1;
     }
 #endif
     
     return 0;
+}
+
+char* _convert(unsigned int num, int base) {
+    static char representation[]= "0123456789ABCDEF";
+    static char buffer[50];
+    char* ptr;
+    
+    ptr = &buffer[49];
+    *ptr = '\0';
+    
+    do {
+        *--ptr = representation[num%base];
+        num /= base;
+    } while (num != 0);
+    
+    return ptr;
+}
+
+FILE* _getLogFile(uint32_t today) {
+#ifdef LOG2FILE
+    extern char *__progname;
+    static __thread uint32_t date(0);
+    static __thread FILE* logFile(nullptr);
+    static __thread char* exeName(nullptr);
+    
+    if (today == date) {
+        assert(logFile != nullptr);
+        return logFile;
+    }
+    
+    if (logFile) {
+        fclose(logFile);
+        logFile = nullptr;
+    }
+    
+    if (exeName == nullptr) {
+        exeName = __progname;
+    }
+    
+    if (access("log/", F_OK) != 0)
+    {
+        mkdir("log/", 0755);
+    }
+    
+    char logFileName[200];
+    snprintf(logFileName, 200, "log/%s_%d.log", exeName, today);
+    
+    logFile = fopen(logFileName, "a");
+    
+    return logFile;
+#else
+    return stdout;
+#endif
+}
+
+void _print_time(FILE* fd, struct tm& tm_now, uint32_t mseconds) {
+    char buffer[26];
+    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", &tm_now);
+    fputs(buffer, fd);
+    
+    snprintf(buffer, 26, ".%03ld", mseconds);
+    fputs(buffer, fd);
+}
+
+void debuglog(const char *format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm tm_now;
+    localtime_r(&tv.tv_sec, &tm_now);
+    
+    uint32_t mseconds = tv.tv_usec / 1000;
+    
+    uint32_t today = (tm_now.tm_year+1900)*10000+(tm_now.tm_mon+1)*100+tm_now.tm_mday;
+    
+    FILE *fd = _getLogFile(today);
+    
+    _print_time(fd, tm_now, mseconds);
+    fputs(" [DEBUG] : ", fd);
+    
+    vfprintf(fd, format, arg);
+    
+    va_end(arg);
+}
+
+void infolog(const char *format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm tm_now;
+    localtime_r(&tv.tv_sec, &tm_now);
+    
+    uint32_t mseconds = tv.tv_usec / 1000;
+    
+    uint32_t today = (tm_now.tm_year+1900)*10000+(tm_now.tm_mon+1)*100+tm_now.tm_mday;
+    
+    FILE *fd = _getLogFile(today);
+    
+    _print_time(fd, tm_now, mseconds);
+    fputs(" [INFO]  : ", fd);
+    
+    vfprintf(fd, format, arg);
+    
+    va_end(arg);
+}
+
+void warnlog(const char *format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm tm_now;
+    localtime_r(&tv.tv_sec, &tm_now);
+    
+    uint32_t mseconds = tv.tv_usec / 1000;
+    
+    uint32_t today = (tm_now.tm_year+1900)*10000+(tm_now.tm_mon+1)*100+tm_now.tm_mday;
+    
+    FILE *fd = _getLogFile(today);
+    
+    _print_time(fd, tm_now, mseconds);
+    fputs(" [WARN]  : ", fd);
+    
+    vfprintf(fd, format, arg);
+    
+    va_end(arg);
+}
+
+void errlog(const char *format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
+    struct tm tm_now;
+    localtime_r(&tv.tv_sec, &tm_now);
+    
+    uint32_t mseconds = tv.tv_usec / 1000;
+    
+    uint32_t today = (tm_now.tm_year+1900)*10000+(tm_now.tm_mon+1)*100+tm_now.tm_mday;
+    
+    FILE *fd = _getLogFile(today);
+    
+    _print_time(fd, tm_now, mseconds);
+    fputs(" [ERROR] : ", fd);
+    
+    vfprintf(fd, format, arg);
+    
+    va_end(arg);
 }
 

@@ -155,7 +155,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: InnerServer::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("InnerServer::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？

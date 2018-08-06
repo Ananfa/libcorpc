@@ -28,6 +28,8 @@
 #include <memory>
 #include <unistd.h>
 
+#include "corpc_utils.h"
+
 #define USE_NO_LOCK_QUEUE
 
 //#define MONITOR_ROUTINE
@@ -370,7 +372,7 @@ namespace corpc {
             int now = time(NULL);
             if (now >iTime)
             {
-                printf("%s Co:%llu time %d Succ Cnt %d Fail Cnt %d\n", pref, GetCurrThreadCo(), iTime, iSuccCnt, iFailCnt);
+                LOG("%s Co:%llu time %d Succ Cnt %d Fail Cnt %d\n", pref, GetCurrThreadCo(), iTime, iSuccCnt, iFailCnt);
                 iTime = now;
                 iSuccCnt = 0;
                 iFailCnt = 0;
@@ -385,7 +387,7 @@ namespace corpc {
             int now = time(NULL);
             if (now >iTime)
             {
-                printf("%s Co:%llu time %d Succ Cnt %d Fail Cnt %d\n", pref, GetCurrThreadCo(), iTime, iSuccCnt, iFailCnt);
+                LOG("%s Co:%llu time %d Succ Cnt %d Fail Cnt %d\n", pref, GetCurrThreadCo(), iTime, iSuccCnt, iFailCnt);
                 iTime = now;
                 iSuccCnt = 0;
                 iFailCnt = 0;

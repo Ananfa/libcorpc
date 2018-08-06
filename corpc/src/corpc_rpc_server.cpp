@@ -41,7 +41,7 @@ namespace corpc {
     }
     
     RpcServer::Connection::~Connection() {
-        printf("INFO: RpcServer::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
+        LOG("INFO: RpcServer::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
     }
     
     void RpcServer::Connection::onClose() {
@@ -179,7 +179,7 @@ namespace corpc {
             Controller *controller = new Controller();
             if (!request->ParseFromArray(body, size)) {
                 // 出错处理
-                printf("ERROR: RpcServer::decode -- parse request body fail\n");
+                ERROR_LOG("RpcServer::decode -- parse request body fail\n");
                 
                 return nullptr;
             }
@@ -198,7 +198,7 @@ namespace corpc {
             return task;
         } else {
             // 出错处理
-            printf("ERROR: RpcServer::decode -- can't find method object of serviceId: %u methodId: %u\n", serviceId, methodId);
+            ERROR_LOG("RpcServer::decode -- can't find method object of serviceId: %u methodId: %u\n", serviceId, methodId);
             
             return nullptr;
         }
@@ -294,7 +294,7 @@ namespace corpc {
     }
     
     void RpcServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
-        printf("INFO: RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
+        LOG("RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
     }
     
 }

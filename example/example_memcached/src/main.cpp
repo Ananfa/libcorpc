@@ -51,7 +51,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
+        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
         
         g_cnt = 0;
     }
@@ -78,7 +78,7 @@ static void *memc_routine( void *arg )
         memcached_st *memc = proxy->take();
         
         if (!memc) {
-            fprintf(stderr, "can't take memcached handle\n");
+            ERROR_LOG("can't take memcached handle\n");
             return NULL;
         }
         
@@ -87,7 +87,7 @@ static void *memc_routine( void *arg )
         if (rc == MEMCACHED_SUCCESS) {
             //fprintf(stderr, "Key stored successfully\n");
         } else {
-            fprintf(stderr, "Couldn't store key: %s\n", memcached_strerror(memc, rc));
+            ERROR_LOG("Couldn't store key: %s\n", memcached_strerror(memc, rc));
             proxy->put(memc, true);
             return NULL;
         }
@@ -99,7 +99,7 @@ static void *memc_routine( void *arg )
             free(retrieved_value);
         }
         else {
-            fprintf(stderr, "Couldn't retrieve key: %s\n", memcached_strerror(memc, rc));
+            ERROR_LOG("Couldn't retrieve key: %s\n", memcached_strerror(memc, rc));
             proxy->put(memc, true);
             return NULL;
         }
@@ -119,7 +119,7 @@ void *timerTask(void * arg) {
     while (1) {
         sleep(1);
         
-        printf("======================\n");
+        LOG("======================\n");
     }
     
     return NULL;
@@ -131,7 +131,7 @@ void clientThread(MemcachedConnectPool *memcPool) {
         RoutineEnvironment::startCoroutine(memc_routine, memcPool);
     }
     
-    printf("running...\n");
+    LOG("running...\n");
     
     corpc::RoutineEnvironment::startCoroutine(timerTask, NULL);
     //corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

@@ -57,7 +57,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, foo: %d, bar: %d, baz: %d, average: %d, total: %d\n", difTime, iFooCnt, iBarCnt, iBazCnt, average, total);
+        LOG("time %ld seconds, foo: %d, bar: %d, baz: %d, average: %d, total: %d\n", difTime, iFooCnt, iBarCnt, iBazCnt, average, total);
         
         iFooCnt = 0;
         iBarCnt = 0;
@@ -113,7 +113,7 @@ public:
         std::string str = request->text();
         
         iBazCnt++;
-        //printf("BazServiceImpl::Baz: %s\n", str.c_str());
+        //LOG("BazServiceImpl::Baz: %s\n", str.c_str());
     }
 };
 
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     co_start_hook();
     
     if(argc<3){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "rpcsvr [IP] [PORT]\n");
         return -1;
     }

@@ -58,9 +58,15 @@ struct stCoRoutineEnv_t
 	stCoRoutine_t* pending_co;
 	stCoRoutine_t* occupy_co;
 };
-//int socket(int domain, int type, int protocol);
+
 void co_log_err( const char *fmt,... )
 {
+    va_list arg;
+    va_start(arg, fmt);
+    
+    vfprintf(stderr, fmt, arg);
+    
+    va_end(arg);
 }
 
 
@@ -366,10 +372,10 @@ stTimeout_t *AllocTimeout( int iSize )
 {
     assert((iSize & (iSize-1))==0);
     if (iSize & (iSize-1)) {
-        co_log_err("CO_ERR: AllocTimeout line %d iSize is not power of 2", __LINE__);
+        co_log_err("CO_ERR: AllocTimeout line %d iSize is not power of 2\n", __LINE__);
         return NULL;
     } else if (iSize < 1024) {
-        co_log_err("CO_ERR: AllocTimeout line %d iSize is too small", __LINE__);
+        co_log_err("CO_ERR: AllocTimeout line %d iSize is too small\n", __LINE__);
         return NULL;
     }
     
@@ -401,7 +407,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
     
 	if( allNow < apTimeout->ullStart )
 	{
-		co_log_err("CO_ERR: AddTimeout line %d allNow %llu < apTimeout->ullStart %llu",
+		co_log_err("CO_ERR: AddTimeout line %d allNow %llu < apTimeout->ullStart %llu\n",
 					__LINE__,allNow,apTimeout->ullStart);
 
 		return __LINE__;
@@ -409,7 +415,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
     
 	if( apItem->ullExpireTime < allNow )
 	{
-		co_log_err("CO_ERR: AddTimeout line %d apItem->ullExpireTime %llu allNow %llu apTimeout->ullStart %llu",
+		co_log_err("CO_ERR: AddTimeout line %d apItem->ullExpireTime %llu allNow %llu apTimeout->ullStart %llu\n",
 					__LINE__,apItem->ullExpireTime,allNow,apTimeout->ullStart);
 
 		return __LINE__;
@@ -420,7 +426,7 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 	if( diff >= (unsigned long long)apTimeout->iItemSize )
 	{
 		diff = apTimeout->iItemSize - 1;
-		co_log_err("CO_ERR: AddTimeout line %d diff %d",
+		co_log_err("CO_ERR: AddTimeout line %d diff %d\n",
 					__LINE__,diff);
 
 		//return __LINE__;
@@ -446,7 +452,7 @@ inline void TakeAllTimeout( stCoEpoll_t *ctx,unsigned long long allNow,stTimeout
 
 	if( allNow < apTimeout->ullStart )
 	{
-        co_log_err("CO_ERR: TakeAllTimeout line %d allNow %llu < apTimeout->ullStart %llu",
+        co_log_err("CO_ERR: TakeAllTimeout line %d allNow %llu < apTimeout->ullStart %llu\n",
                    __LINE__,allNow,apTimeout->ullStart);
         
 		return ;
@@ -490,7 +496,7 @@ inline int GetNextTimeoutInASecond( stTimeout_t *apTimeout, unsigned long long a
     
     if( allNow < apTimeout->ullStart )
     {
-        co_log_err("CO_ERR: GetNextTimeout line %d allNow %llu < apTimeout->ullStart %llu",
+        co_log_err("CO_ERR: GetNextTimeout line %d allNow %llu < apTimeout->ullStart %llu\n",
                    __LINE__,allNow,apTimeout->ullStart);
         
         return 1024;
@@ -1111,7 +1117,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
         int ret = AddTimeout( ctx->pTimeout,&arg,now );
         if( ret != 0 )
         {
-            co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld",
+            co_log_err("CO_ERR: AddTimeout ret %d now %lld timeout %d arg.ullExpireTime %lld\n",
                        ret,now,timeout,arg.ullExpireTime);
             errno = EINVAL;
             iRaiseCnt = -1;

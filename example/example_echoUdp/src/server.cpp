@@ -53,7 +53,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, g_cnt, average, total);
+        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, g_cnt, average, total);
         
         g_cnt = 0;
     }
@@ -85,7 +85,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     if(argc<3){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "rpcsvr [IP] [PORT]\n");
         return -1;
     }

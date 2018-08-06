@@ -67,7 +67,7 @@ public:
                      ::google::protobuf::Closure* done) {
         std::string str = request->text();
         
-        //printf("BazServiceImpl::Baz: %s\n", str.c_str());
+        //LOG("BazServiceImpl::Baz: %s\n", str.c_str());
     }
 };
 
@@ -118,7 +118,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        printf("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
+        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -168,12 +168,12 @@ static void *rpc_routine( void *arg )
                     testStubs->foo_clt->Foo(controller, request, response, NULL);
                     
                     if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                        //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iFooFailCnt++;
                         
                         usleep(100000);
                     } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
                         iFooSuccCnt++;
                     }
                 } while (controller->Failed());
@@ -196,12 +196,12 @@ static void *rpc_routine( void *arg )
                     testStubs->bar_clt->Bar(controller, request, response, NULL);
                     
                     if (controller->Failed()) {
-                        //printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                        //ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                         iBarFailCnt++;
                         
                         usleep(100000);
                     } else {
-                        //printf("++++++ Rpc Response is %s\n", response->text().c_str());
+                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
                         iBarSuccCnt++;
                     }
                 } while (controller->Failed());
@@ -238,7 +238,7 @@ static void clientEntry() {
         RoutineEnvironment::startCoroutine(rpc_routine, &g_stubs);
     }
     
-    printf("running...\n");
+    LOG("running...\n");
     
     RoutineEnvironment::runEventLoop();
 }

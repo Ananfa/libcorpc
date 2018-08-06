@@ -30,7 +30,7 @@ static void *helloworld_routine( void *arg )
 {
     co_enable_hook_sys();
     
-    printf("rpc_routine begin\n");
+    LOG("rpc_routine begin\n");
     
     RpcClient::Channel *channel = (RpcClient::Channel*)arg;
     
@@ -47,9 +47,9 @@ static void *helloworld_routine( void *arg )
         helloworld_clt->foo(controller, request, response, NULL);
         
         if (controller->Failed()) {
-            printf("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+            ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
         } else {
-            printf("========= %s =========\n", response->msg().c_str());
+            LOG("========= %s =========\n", response->msg().c_str());
         }
         
         delete controller;
@@ -66,7 +66,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     if(argc<3){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "Tutorial2Client [HOST] [PORT]\n");
         return -1;
     }
@@ -85,7 +85,7 @@ int main(int argc, const char * argv[]) {
     
     RoutineEnvironment::startCoroutine(helloworld_routine, channel);
     
-    printf("running...\n");
+    LOG("running...\n");
     
     RoutineEnvironment::runEventLoop();
 }

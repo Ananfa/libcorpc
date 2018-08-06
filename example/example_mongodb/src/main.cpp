@@ -54,7 +54,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
+        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
         
         g_cnt = 0;
     }
@@ -75,7 +75,7 @@ static void *mongodb_routine( void *arg )
         mongoc_client_t *mongoc = proxy->take();
         
         if (!mongoc) {
-            fprintf(stderr, "can't take mongoc handle\n");
+            ERROR_LOG("can't take mongoc handle\n");
             return NULL;
         }
         
@@ -111,7 +111,7 @@ void *timerTask(void * arg) {
     while (1) {
         sleep(1);
         
-        printf("======================\n");
+        LOG("======================\n");
     }
     
     return NULL;
@@ -123,7 +123,7 @@ void clientThread(MongodbConnectPool *mongodbPool) {
         RoutineEnvironment::startCoroutine(mongodb_routine, mongodbPool);
     }
     
-    printf("running...\n");
+    LOG("running...\n");
     
     corpc::RoutineEnvironment::startCoroutine(timerTask, NULL);
     //corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

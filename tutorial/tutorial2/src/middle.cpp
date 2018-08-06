@@ -29,7 +29,7 @@ public:
                      const ::FooRequest* request,
                      ::FooResponse* response,
                      ::google::protobuf::Closure* done) {
-        printf("HelloWorldServiceImpl::foo is called\n");
+        LOG("HelloWorldServiceImpl::foo is called\n");
         
         _helloworld_clt->foo(controller, request, response, done);
     }
@@ -42,7 +42,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     if(argc<5){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "Tutorial2Middle [IP] [PORT] [HOST] [ServerPort] \n");
         return -1;
     }

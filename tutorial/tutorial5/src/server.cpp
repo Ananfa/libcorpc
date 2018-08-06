@@ -30,7 +30,7 @@ public:
                            ::FactorialResponse* response,
                            ::google::protobuf::Closure* done) {
         uint32_t n = request->n();
-        printf("FactorialServiceImpl::factorial is called for n: %d\n", n);
+        LOG("FactorialServiceImpl::factorial is called for n: %d\n", n);
         if (n > 20) { // 数太大，无法表示
             response->set_result(0);
         } else if (n > 1) {
@@ -44,7 +44,7 @@ public:
             response->set_result(1);
         }
         
-        printf("FactorialServiceImpl::factorial result for %d is %llu\n", n, response->result());
+        LOG("FactorialServiceImpl::factorial result for %d is %llu\n", n, response->result());
     }
     
 private:
@@ -74,7 +74,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     if(argc<5){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "Tutorial2Middle [IP] [PORT] [ServerIP] [ServerPort] \n");
         return -1;
     }

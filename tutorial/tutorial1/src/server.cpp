@@ -28,7 +28,7 @@ public:
                      const ::FooRequest* request,
                      ::FooResponse* response,
                      ::google::protobuf::Closure* done) {
-        printf("HelloWorldServiceImpl::foo is called\n");
+        LOG("HelloWorldServiceImpl::foo is called\n");
         
         std::string msg1 = request->msg1();
         std::string msg2 = request->msg2();
@@ -41,7 +41,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     if(argc<3){
-        printf("Usage:\n"
+        LOG("Usage:\n"
                "Tutorial1Server [IP] [PORT]\n");
         return -1;
     }

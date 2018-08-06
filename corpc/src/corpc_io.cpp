@@ -54,7 +54,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Worker::msgHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("Worker::msgHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -218,7 +218,7 @@ namespace corpc {
                 }
                 
                 if (_bodySize > _maxBodySize) { // 数据超长
-                    printf("ERROR: TcpPipeline::upflow -- request too large in thread\n");
+                    ERROR_LOG("TcpPipeline::upflow -- request too large in thread\n");
                     
                     return false;
                 }
@@ -268,7 +268,7 @@ namespace corpc {
         assert(connection);
         
         if (size < _headSize) {
-            printf("ERROR: UdpPipeline::upflow -- package size too small\n");
+            ERROR_LOG("UdpPipeline::upflow -- package size too small\n");
             
             return false;
         }
@@ -326,7 +326,7 @@ namespace corpc {
     Server::~Server() {}
     
     std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
-        printf("fd %d connected", fd);
+        LOG("fd %d connected", fd);
         std::shared_ptr<corpc::Connection> connection(buildConnection(fd));
         std::shared_ptr<corpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);
@@ -347,18 +347,18 @@ namespace corpc {
     
     bool Server::start() {
         if (!_acceptor) {
-            printf("ERROR: Server::start() -- acceptor is NULL.\n");
+            ERROR_LOG("Server::start() -- acceptor is NULL.\n");
             return false;
         }
         
         if (!_worker) {
-            printf("ERROR: Server::start() -- worker is NULL.\n");
+            ERROR_LOG("Server::start() -- worker is NULL.\n");
             return false;
         }
         
         // 启动acceptor
         if (!_acceptor->start()) {
-            printf("ERROR: Server::start() -- start acceptor failed.\n");
+            ERROR_LOG("Server::start() -- start acceptor failed.\n");
             return false;
         }
         
@@ -396,7 +396,7 @@ namespace corpc {
         Server *server = self->_server;
         int listen_fd = self->_listen_fd;
         
-        printf("INFO: start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+        LOG("start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
         listen( listen_fd, 1024 );
         
         // 注意：由于accept方法没有进行hook，只好将它设置为NONBLOCK并且自己对它进行poll
@@ -421,7 +421,7 @@ namespace corpc {
                 continue;
             }
             
-            printf("INFO: accept fd %d\n", fd);
+            LOG("accept fd %d\n", fd);
             // 保持连接
             setKeepAlive(fd, 10);
             
@@ -436,7 +436,7 @@ namespace corpc {
     
     bool TcpAcceptor::start() {
         if (_port == 0) {
-            printf("ERROR: TcpAcceptor::start() -- port can't be 0\n");
+            ERROR_LOG("TcpAcceptor::start() -- port can't be 0\n");
             return false;
         }
         
@@ -454,7 +454,7 @@ namespace corpc {
         }
         
         if(_listen_fd==-1){
-            printf("ERROR: TcpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+            ERROR_LOG("TcpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
             return false;
         }
         
@@ -491,14 +491,14 @@ namespace corpc {
         struct sockaddr_in client_addr;
         socklen_t slen = sizeof(client_addr);
         
-        printf("INFO: start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+        LOG("start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
         
         while (true) {
             bzero(&client_addr, slen);
             
             ssize_t ret = recvfrom(listen_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE, 0, (struct sockaddr *)&client_addr, &slen);
             if (ret != CORPC_MESSAGE_HEAD_SIZE) {
-                printf("ERROR: UdpAcceptor::acceptRoutine() -- wrong msg.\n");
+                ERROR_LOG("UdpAcceptor::acceptRoutine() -- wrong msg.\n");
                 
                 sendto(listen_fd, self->_unshakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
                 
@@ -512,7 +512,7 @@ namespace corpc {
             
             // 判断是否“连接请求”消息
             if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
-                printf("ERROR: UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
+                ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
                 continue;
             }
             
@@ -524,7 +524,7 @@ namespace corpc {
             
             if (bind(new_fd , (struct sockaddr *)&self->_local_addr, sizeof(struct sockaddr)) == -1 ||
                 connect(new_fd , (struct sockaddr * )&client_addr, sizeof(struct sockaddr)) == -1) {
-                printf("ERROR: UdpAcceptor::acceptRoutine() -- bind and connect new fd\n");
+                ERROR_LOG("UdpAcceptor::acceptRoutine() -- bind and connect new fd\n");
                 close(new_fd);
                 continue;
             }
@@ -554,10 +554,10 @@ namespace corpc {
         
         while (trytimes > 0 && !shakeOK) {
             // 发送“连接确认”给客户的
-            printf("Debug: Send shake 2 msg\n");
+            DEBUG_LOG("Send shake 2 msg\n");
             int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
             if (ret != CORPC_MESSAGE_HEAD_SIZE) {
-                printf("ERROR: UdpAcceptor::handshakeRoutine() -- write shake msg fail for fd %d ret %d errno %d (%s)\n",
+                ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg fail for fd %d ret %d errno %d (%s)\n",
                        shake_fd, ret, errno, strerror(errno));
                 close(shake_fd);
                 break;
@@ -575,7 +575,7 @@ namespace corpc {
                 }
                 
                 // 读取的数据长度不对
-                printf("ERROR: UdpAcceptor::handshakeRoutine() -- read shake msg fail for fd %d ret %d errno %d (%s)\n",
+                ERROR_LOG("UdpAcceptor::handshakeRoutine() -- read shake msg fail for fd %d ret %d errno %d (%s)\n",
                        shake_fd, ret, errno, strerror(errno));
                 close(shake_fd);
                 break;
@@ -586,7 +586,7 @@ namespace corpc {
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
                     // 消息类型不对
-                    printf("WARNING: UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d, msgtype %d\n", shake_fd, msgtype);
+                    WARN_LOG("UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d, msgtype %d\n", shake_fd, msgtype);
                     continue;
                 }
                 
@@ -604,7 +604,7 @@ namespace corpc {
     
     bool UdpAcceptor::start() {
         if (_port == 0) {
-            printf("ERROR: UdpAcceptor::start() -- port can't be 0\n");
+            ERROR_LOG("UdpAcceptor::start() -- port can't be 0\n");
             return false;
         }
         
@@ -624,7 +624,7 @@ namespace corpc {
         }
         
         if(_listen_fd==-1){
-            printf("ERROR: UdpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+            ERROR_LOG("UdpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
             return false;
         }
         
@@ -656,7 +656,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Receiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("Receiver::connectDispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -683,7 +683,7 @@ namespace corpc {
         IO *io = connection->_io;
         
         int fd = connection->getfd();
-        printf("INFO: start connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
+        LOG("start connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
         
         std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
         uint8_t *buf = (uint8_t *)buffs.data();
@@ -699,7 +699,7 @@ namespace corpc {
                 }
                 
                 // 出错处理
-                printf("ERROR: Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+                ERROR_LOG("Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
                        fd, ret, errno, strerror(errno));
                 
                 break;
@@ -796,7 +796,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("Sender::taskQueueRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -892,7 +892,7 @@ namespace corpc {
             // 发数据
             int ret = (int)write(connection->_fd, buf + startIndex, dataSize);
             if (ret < 0) {
-                printf("ERROR: Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
+                ERROR_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));
                 
                 break;
@@ -911,7 +911,7 @@ namespace corpc {
         shutdown(connection->_fd, SHUT_RD);
         connection->_canClose = true;
         
-        printf("ERROR: Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
+        ERROR_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
         
         return NULL;
     }
@@ -1030,7 +1030,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("ERROR: Heartbeater::dispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("Heartbeater::dispatchRoutine read from pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -1093,7 +1093,7 @@ namespace corpc {
             
             if (nowms - item.connection->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
                 // 心跳超时，断线处理
-                printf("ERROR: Heartbeater::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
+                ERROR_LOG("Heartbeater::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
                 item.connection->close();
                 continue;
             }
@@ -1127,7 +1127,7 @@ namespace corpc {
     
     IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
         if (receiveThreadNum == 0 && sendThreadNum == 0) {
-            printf("ERROR: IO::create() -- sender and receiver can't run at same thread.\n");
+            ERROR_LOG("IO::create() -- sender and receiver can't run at same thread.\n");
             return nullptr;
         }
         
@@ -1139,7 +1139,7 @@ namespace corpc {
     
     bool IO::start() {
         if (_sendThreadNum == 0 && _receiveThreadNum == 0) {
-            printf("ERROR: IO::start() -- sender and receiver can't run at same thread.\n");
+            ERROR_LOG("IO::start() -- sender and receiver can't run at same thread.\n");
             return false;
         }
         
@@ -1158,12 +1158,12 @@ namespace corpc {
         }
         
         if (!_receiver->start()) {
-            printf("ERROR: IO::start() -- start receiver failed.\n");
+            ERROR_LOG("IO::start() -- start receiver failed.\n");
             return false;
         }
         
         if (!_sender->start()) {
-            printf("ERROR: IO::start() -- start sender failed.\n");
+            ERROR_LOG("IO::start() -- start sender failed.\n");
             return false;
         }
         

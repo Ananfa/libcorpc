@@ -61,7 +61,7 @@ namespace corpc {
         pid_t pid = GetPid();
         assert(!g_routineEnvPerThread[pid]);
         
-        printf("initialize env for pid: %d\n", pid);
+        DEBUG_LOG("initialize env for pid: %d\n", pid);
         
         RoutineEnvironment *env = new RoutineEnvironment();
         g_routineEnvPerThread[pid] = env;
@@ -172,7 +172,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("Error: RoutineEnvironment::cleanRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("RoutineEnvironment::cleanRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            pReadFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -217,7 +217,7 @@ namespace corpc {
                     continue;
                 } else {
                     // 管道出错
-                    printf("Error: RoutineEnvironment::resumeRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
+                    ERROR_LOG("RoutineEnvironment::resumeRoutine read from up pipe fd %d ret %d errno %d (%s)\n",
                            readFd, ret, errno, strerror(errno));
                     
                     // TODO: 如何处理？退出协程？
@@ -257,7 +257,7 @@ namespace corpc {
         while( true ) {
             sleep(1);
             
-            printf("monitorRoutine -- env: %ld, living: %d, dead: %d\n", curenv, curenv->_livingRoutineNum, curenv->_routineNum - curenv->_livingRoutineNum);
+            LOG("monitorRoutine -- env: %ld, living: %d, dead: %d\n", curenv, curenv->_livingRoutineNum, curenv->_routineNum - curenv->_livingRoutineNum);
         }
         
         return NULL;

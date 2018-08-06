@@ -28,5 +28,19 @@ inline void msleep(int msec)
     poll( &pf,1,msec );
 }
 
+void debuglog(const char *format, ...);
+void infolog(const char *format, ...);
+void warnlog(const char *format, ...);
+void errlog(const char *format, ...);
+
+#ifdef DEBUG
+#  define DEBUG_LOG(format, ...) debuglog(format, ## __VA_ARGS__)
+#  define LOG(format, ...) infolog(format, ## __VA_ARGS__)
+#else
+#  define DEBUG_LOG(...)
+#  define LOG(...)
+#endif
+#define WARN_LOG(format, ...) warnlog(format, ## __VA_ARGS__)
+#define ERROR_LOG(format, ...) errlog(format, ## __VA_ARGS__)
 
 #endif /* corpc_utils_h */

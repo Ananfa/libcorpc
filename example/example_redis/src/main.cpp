@@ -47,7 +47,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
+        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
         
         g_cnt = 0;
     }
@@ -69,36 +69,36 @@ static void *redis_routine( void *arg )
         redisContext *redis = proxy->take();
         
         if (!redis) {
-            fprintf(stderr, "can't take redis handle\n");
+            ERROR_LOG("can't take redis handle\n");
             return NULL;
         }
         
         // PING server
         reply = (redisReply *)redisCommand(redis,"PING");
-        //printf("PING: %s\n", reply->str);
+        //LOG("PING: %s\n", reply->str);
         freeReplyObject(reply);
         
         // Set a key
         reply = (redisReply *)redisCommand(redis,"SET %s %s", "foo", "hello world");
-        //printf("SET: %s\n", reply->str);
+        //LOG("SET: %s\n", reply->str);
         freeReplyObject(reply);
         
         // Set a key using binary safe API
         reply = (redisReply *)redisCommand(redis,"SET %b %b", "bar", (size_t) 3, "hello", (size_t) 5);
-        //printf("SET (binary API): %s\n", reply->str);
+        //LOG("SET (binary API): %s\n", reply->str);
         freeReplyObject(reply);
         
         // Try a GET and two INCR
         reply = (redisReply *)redisCommand(redis,"GET foo");
-        //printf("GET foo: %s\n", reply->str);
+        //LOG("GET foo: %s\n", reply->str);
         freeReplyObject(reply);
         
         reply = (redisReply *)redisCommand(redis,"INCR counter");
-        //printf("INCR counter: %lld\n", reply->integer);
+        //LOG("INCR counter: %lld\n", reply->integer);
         freeReplyObject(reply);
         // again ...
         reply = (redisReply *)redisCommand(redis,"INCR counter");
-        //printf("INCR counter: %lld\n", reply->integer);
+        //LOG("INCR counter: %lld\n", reply->integer);
         freeReplyObject(reply);
         
         // Create a list of numbers, from 0 to 9
@@ -136,7 +136,7 @@ void *timerTask(void * arg) {
     while (1) {
         sleep(1);
         
-        printf("======================\n");
+        LOG("======================\n");
     }
     
     return NULL;
@@ -148,7 +148,7 @@ void clientThread(RedisConnectPool *redisPool) {
         RoutineEnvironment::startCoroutine(redis_routine, redisPool);
     }
     
-    printf("running...\n");
+    LOG("running...\n");
     
     corpc::RoutineEnvironment::startCoroutine(timerTask, NULL);
     //corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

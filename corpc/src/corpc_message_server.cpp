@@ -17,7 +17,7 @@ namespace corpc {
     }
     
     MessageServer::Connection::~Connection() {
-        printf("INFO: MessageServer::Connection::~Connection -- fd:%d\n", _fd);
+        LOG("MessageServer::Connection::~Connection -- fd:%d\n", _fd);
     }
     
     void MessageServer::Connection::onClose() {
@@ -45,11 +45,11 @@ namespace corpc {
         
         switch (task->type) {
             case -1: // 新连接建立
-                printf("INFO: MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
+                LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
                 // TODO:
                 break;
             case -2: // 连接断开
-                printf("INFO: MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
+                LOG("MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
                 // TODO:
                 break;
             default: {
@@ -57,7 +57,7 @@ namespace corpc {
                 // 其他消息处理
                 auto iter = _server->_registerMessageMap.find(task->type);
                 if (iter == _server->_registerMessageMap.end()) {
-                    printf("ERROR: MessageServer::Worker::handleMessage -- unknown msg type\n");
+                    ERROR_LOG("MessageServer::Worker::handleMessage -- unknown msg type\n");
                     
                     return;
                 }
@@ -138,7 +138,7 @@ namespace corpc {
                 
                 connection->setLastRecvHBTime(nowms);
             } else {
-                printf("Warning: MessageServer::decode -- recv system message: %d\n", msgType);
+                WARN_LOG("MessageServer::decode -- recv system message: %d\n", msgType);
             }
             
             return nullptr;
@@ -146,7 +146,7 @@ namespace corpc {
         
         auto iter = server->_registerMessageMap.find(msgType);
         if (iter == server->_registerMessageMap.end()) {
-            printf("ERROR: MessageServer::decode -- unknown message: %d\n", msgType);
+            ERROR_LOG("MessageServer::decode -- unknown message: %d\n", msgType);
             connection->setDecodeError();
             return nullptr;
         }
@@ -154,7 +154,7 @@ namespace corpc {
         google::protobuf::Message *msg = iter->second.proto->New();
         if (!msg->ParseFromArray(body, size)) {
             // 出错处理
-            printf("ERROR: MessageServer::decode -- parse body fail for message: %d\n", msgType);
+            ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
             connection->setDecodeError();
             return nullptr;
         }

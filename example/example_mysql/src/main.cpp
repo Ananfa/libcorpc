@@ -51,7 +51,7 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        printf("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
+        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, int(g_cnt), average, total);
         
         g_cnt = 0;
     }
@@ -109,7 +109,7 @@ static void *mysql_routine( void *arg )
                 return NULL;
             }
             
-            //printf("data length %lu \n", lengths[0]);
+            //LOG("data length %lu \n", lengths[0]);
         }
         
         mysql_free_result(result);
@@ -129,7 +129,7 @@ void clientThread(MysqlConnectPool *mysqlPool) {
         RoutineEnvironment::startCoroutine(mysql_routine, mysqlPool);
     }
     
-    printf("running...\n");
+    LOG("running...\n");
     
     //corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     
