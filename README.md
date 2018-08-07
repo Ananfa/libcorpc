@@ -1,26 +1,24 @@
 libcorpc
 ========
-- 在腾讯开源项目libco基础上开发，拥有libco的特性
-- 开发过程中对libco做了少量修改，在项目的co目录中
-- 使用protobuf定义rpc服务和方法
-- 支持进程间和进程内的rpc
-- 结合了协程和rpc的特点，进行rpc调用时不用担心阻塞线程执行，提升线程使用效率
-- RpcClient和InnerRpcClient实现是线程安全的，可在主线程创建对象然后在多个线程中并发调用rpc
-- 全双工模式的RPC框架，比连接池实现方式效率更高且需要连接数更少
-- 为非rpc数据传输提供了Tcp/Udp消息服务：TcpMessageServer和UdpMessageServer
-- 以连接池方式提供对MySQL,Mongodb,Redis,Memcached等服务的访问
-- 目前支持macOS和linux系统
+- Libcorpc is a high performance coroutine base RPC framework.
+- Libcorpc is developed base on Tencent's libco(Some change has been maked to the libco and the changed source of libco is in the co directory).
+- Using Google's protobuf to define RPC service.
+- Send/Recv are handle in different IO threads, and multiple RPC requests can be send at the same times. 
+- Libcorpc support interprocess and innerprocess RPC.
+- Libcorpc support not only RPC service but also TCP/UDP message service.
+- Libcorpc provide connect-pool access to MySQL/MongoDB/Redis/Memcached.
+- Libcorpc can build in macOS and Linux.
 
 ***
 
-### 架构图
-![Alt 架构图](res/libcorpc架构图.png "libcorpc架构图")
+### Architecture
+![Alt Architecture](res/libcorpc架构图.png "libcorpc Architecture")
 
 ***
 
-### proto
-- 采用google protobuf 2.6.1
-- corpc_option.proto
+### Proto
+- Using google protobuf 2.6.1
+- corpc_option.proto (It need to be imported from rpc service proto files)
 
 ```protobuf
 import "google/protobuf/descriptor.proto";
@@ -28,22 +26,22 @@ import "google/protobuf/descriptor.proto";
 package corpc;
 
 extend google.protobuf.ServiceOptions {
-    optional uint32 global_service_id = 10000;  // 用于定义每个service的id
+    optional uint32 global_service_id = 10000;  // define service id
 }
 
 extend google.protobuf.MethodOptions {
-    optional bool need_coroutine = 10002;       // 是否新开协程执行方法
-    optional bool not_care_response = 10003;    // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
+    optional bool need_coroutine = 10002;       // start new coroutine to call the method
+    optional bool not_care_response = 10003;    // care response or not
 }
 
 message Void {}
 ```
 
-- 定义rpc服务proto文件时，需要先 import "corpc_option.proto";
-- global_service_id为每个service定义id，注册到同一个CoRpc::Server中的service的id不能重复
-- need_coroutine设置是否启动新协程来调用rpc服务实现方法，默认为false（tutorial3和tutorial5有关于该选项的用例）
-- not_care_response设置为true时相当于单向消息传递，默认为false
-- 例子：helloworld.proto
+***
+
+### HelloWorld
+
+- helloworld.proto
 
 ```protobuf
 import "corpc_option.proto";
@@ -66,52 +64,162 @@ service HelloWorldService {
 }
 ```
 
+- server.cpp
+
+```server
+#include "corpc_routine_env.h"
+#include "corpc_rpc_server.h"
+
+#include "helloworld.pb.h"
+
+using namespace corpc;
+
+class HelloWorldServiceImpl : public HelloWorldService {
+public:
+    HelloWorldServiceImpl() {}
+    virtual void foo(::google::protobuf::RpcController* controller,
+                     const ::FooRequest* request,
+                     ::FooResponse* response,
+                     ::google::protobuf::Closure* done) {
+        std::string msg1 = request->msg1();
+        std::string msg2 = request->msg2();
+        
+        response->set_msg(msg1 + " " + msg2);
+    }
+};
+
+int main(int argc, const char * argv[]) {
+    co_start_hook();
+    
+    if(argc<3){
+        LOG("Usage:\n"
+               "HelloWorldServer [IP] [PORT]\n");
+        return -1;
+    }
+    
+    std::string ip = argv[1];
+    unsigned short int port = atoi(argv[2]);
+    
+    IO *io = IO::create(1, 1); // create IO layer for recv&send
+    
+    RpcServer *server = RpcServer::create(io, 0, ip, port);
+    
+    HelloWorldServiceImpl *helloWorldService = new HelloWorldServiceImpl();
+    server->registerService(helloWorldService);
+    
+    RoutineEnvironment::runEventLoop();
+}
+```
+
+- client.cpp
+
+```client
+#include "corpc_routine_env.h"
+#include "corpc_rpc_client.h"
+#include "corpc_controller.h"
+#include "helloworld.pb.h"
+
+using namespace corpc;
+
+static void *helloworld_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    HelloWorldService::Stub *helloworld_clt = (HelloWorldService::Stub *)arg;
+    
+    FooRequest *request = new FooRequest();
+    FooResponse *response = new FooResponse();
+    Controller *controller = new Controller();
+    
+    request->set_msg1("Hello");
+    request->set_msg2("World");
+    
+    helloworld_clt->foo(controller, request, response, NULL);
+    
+    if (controller->Failed()) {
+        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+    } else {
+        LOG(response->msg().c_str());
+    }
+    
+    delete controller;
+    delete response;
+    delete request;
+    
+    return NULL;
+}
+
+int main(int argc, const char * argv[]) {
+    co_start_hook();
+    
+    if(argc<3){
+        LOG("Usage:\n"
+               "HelloWorldClient [HOST] [PORT] [NUM]\n");
+        return -1;
+    }
+    
+    std::string host = argv[1];
+    unsigned short int port = atoi(argv[2]);
+    
+    IO *io = IO::create(1, 1); // create IO layer for recv&send
+    
+    RpcClient *client = RpcClient::create(io);
+    RpcClient::Channel *channel = new RpcClient::Channel(client, host, port, 1);
+    HelloWorldService::Stub *helloworld_clt = new HelloWorldService::Stub(channel);
+    
+    RoutineEnvironment::startCoroutine(helloworld_routine, helloworld_clt);
+    
+    RoutineEnvironment::runEventLoop();
+}
+
+```
+
 ***
 
 ### tutorial
-- Tutorial1:一个简单的Hello World例子
-- Tutorial2:在Tutorial1基础上加一个中间服务器
-- Tutorial3:proto定义中“need_coroutine”选项的使用
-- Tutorial4:进程内RPC
-- Tutorial5:服务器间递归调用
+- Tutorial1: a simple hello world example
+- Tutorial2: add a middle RPC server on the base of Tutorial1
+- Tutorial3: show how to use the "need_coroutine" option
+- Tutorial4: innerprocess RPC
+- Tutorial5: recursive RPC call between two RPC servers to calculate factorial value
 
 ***
 
 ### benchmark
-- 测试环境：MacBook Pro, macOS 10.12.6, cpu: 2.6GHz i5, 一台机器
-- 进程间rpc调用benchmark程序：example/example_interRpc，在一台机器中测试，平均每秒8万+次rpc
-- 进程内rpc调用benchmark程序：example/example_innerRpc，平均每秒30万+次
+- Environment：a MacBook Pro, macOS 10.12.6, cpu: 2.6GHz i5 
+- Interprocess RPC benchmark：example/example_interRpc, average 75000+ rpc per second
+- Innerprocess RPC benchmark：example/example_innerRpc，average 200000+ rpc per second
 
 ***
 
 ### build
-- 需要GCC 4.8.3以上版本
-- 使用cmake（在MacOS下可通过xcode工程生成，但xcode工程不会进行install步骤）
-- 安装libco库
+- Need GCC 4.8.3 or later
+- Need cmake（btw, 'libcorpc.xcworkspace' can be used In MacOS Xcode）
+- Install libco library
 ```libco
 $ cd co && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- 安装libcorpc库（需要先装libprotobuf 2.6）
+- Install libcorpc library（need libprotobuf 2.6）
 ```libcorpc
 $ cd corpc && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- 根据需要安装libcorpc_memcached库（需要先装libmemcached 1.0）
+- Base on needs install libcorpc_memcached library（need libmemcached 1.0）
 ```libcorpc_memcached
 $ cd corpc_memcached && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- 根据需要安装libcorpc_mongodb库（需要先装libmongoc-1.0和libbson-1.0）
+- Base on needs install libcorpc_mongodb library（need libmongoc-1.0 and libbson-1.0）
 ```libcorpc_mongodb
 $ cd corpc_mongodb && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- 根据需要安装libcorpc_redis库（需要先装libhiredis）
+- Base on needs install libcorpc_redis library（need libhiredis）
 ```libcorpc_redis
 $ cd corpc_redis && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- 根据需要安装libcorpc_mysql库（需要先装libmysqlclient）
+- Base on needs install libcorpc_mysql library（need libmysqlclient）
 ```libcorpc_mysql
 $ cd corpc_mysql && mkdir build && cd build && cmake .. && make install && cd ../..
 ```
-- Tutorial生成
+- Build tutorials
 ```tutorial
 $ cd tutorial/tutorial1 && mkdir build && cd build && cmake .. && make && cd ../../..
 $ cd tutorial/tutorial2 && mkdir build && cd build && cmake .. && make && cd ../../..
@@ -119,7 +227,7 @@ $ cd tutorial/tutorial3 && mkdir build && cd build && cmake .. && make && cd ../
 $ cd tutorial/tutorial4 && mkdir build && cd build && cmake .. && make && cd ../../..
 $ cd tutorial/tutorial5 && mkdir build && cd build && cmake .. && make && cd ../../..
 ```
-- Example生成
+- Build Examples
 ```example
 $ cd example/example_interRpc && mkdir build && cd build && cmake .. && make && cd ../../..
 $ cd example/example_innerRpc && mkdir build && cd build && cmake .. && make && cd ../../..
@@ -133,10 +241,6 @@ $ cd example/example_redis && mkdir build && cd build && cmake .. && make && cd 
 
 ***
 
-### 使用libcorpc开发一些要注意的地方
-- socket族IO操作、某些第三方库函数（如：mysqlclient）、sleep方法、co_yield_ct方法等会产生协程切换
-- 协程的切换实际是掌握在程序员手中
-- 一个线程中的多个协程对线程资源的访问和修改不需要对资源上锁
-- 如果一协程中有死循环并且循环中没有能产生协程切换的方法调用，其他协程将不会被调度执行
-- 在使用第三方库时（如：mysqlclient），需要在启动程序时加上“LD_PRELOAD=<libco库路径>”（如果在mac OS中加“DYLD_INSERT_LIBRARIES=<HOOK了系统接口的动态库> DYLD_FORCE_FLAT_NAMESPACE=y”）
+### Notice
+- When using third party library(E.g. MySQL,MongoDB,Redis,Memcached,etc), add "LD_PRELOAD=<libco library path>"(Linux) or “DYLD_INSERT_LIBRARIES=<libco library path> DYLD_FORCE_FLAT_NAMESPACE=y”(MacOS) to start program.
 
