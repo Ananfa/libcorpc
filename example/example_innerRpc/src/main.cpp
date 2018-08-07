@@ -273,7 +273,7 @@ int main(int argc, const char * argv[]) {
     // 注意：线程开多了性能不一定会增加，也可能降低，因此在具体项目中需要根据CPU核心数来调整线程数量
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
-    
+    LOG("innerRpc started\n");
     RoutineEnvironment::runEventLoop();
     
     return 0;
