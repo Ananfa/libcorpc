@@ -427,8 +427,8 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 	if( diff >= (unsigned long long)apTimeout->iItemSize )
 	{
 		diff = apTimeout->iItemSize - 1;
-		co_log_err("CO_ERR: AddTimeout line %d diff %d\n",
-					__LINE__,diff);
+		//co_log_err("CO_ERR: AddTimeout line %d diff %d\n",
+		//			__LINE__,diff);
 
 		//return __LINE__;
 	}
