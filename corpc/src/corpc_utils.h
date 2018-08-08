@@ -38,11 +38,10 @@ namespace corpc {
 
 #ifdef DEBUG
 #  define DEBUG_LOG(format, ...) corpc::debuglog(format, ## __VA_ARGS__)
-#  define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
 #else
 #  define DEBUG_LOG(...)
-#  define LOG(...)
 #endif
+#define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
 #define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
 #define ERROR_LOG(format, ...) corpc::errlog(format, ## __VA_ARGS__)
 
