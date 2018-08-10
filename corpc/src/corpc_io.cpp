@@ -326,7 +326,7 @@ namespace corpc {
     Server::~Server() {}
     
     std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
-        LOG("fd %d connected", fd);
+        LOG("fd %d connected\n", fd);
         std::shared_ptr<corpc::Connection> connection(buildConnection(fd));
         std::shared_ptr<corpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
         connection->setPipeline(pipeline);

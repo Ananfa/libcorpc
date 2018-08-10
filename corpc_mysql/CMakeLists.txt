@@ -7,7 +7,7 @@ if(NOT PROTOBUF_LIB)
     message(FATAL_ERROR "protobuf library not found")
 endif()
 
-find_library(MYSQLCLIENT_LIB mysqlclient /usr/local/mysql/lib)
+find_library(MYSQLCLIENT_LIB mysqlclient /usr/local/mysql/lib /usr/lib64/mysql)
 if(NOT MYSQLCLIENT_LIB)
     message(FATAL_ERROR "mysqlclient library not found")
 endif()
@@ -41,6 +41,7 @@ include_directories(/usr/local/include/co)
 include_directories(/usr/local/include/corpc)
 include_directories(/usr/local/include/corpc/proto)
 include_directories(/usr/local/mysql/include)
+include_directories(/usr/include/mysql)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Add static and shared library target
