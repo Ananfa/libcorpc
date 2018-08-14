@@ -81,6 +81,7 @@ namespace corpc {
         
         static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum);
         
+        virtual bool start() { return corpc::Server::start(); }
     protected:
         virtual corpc::Connection * buildConnection(int fd);
         
@@ -97,13 +98,13 @@ namespace corpc {
     class TcpMessageServer: public MessageServer {
     public:
         TcpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
-        virtual ~TcpMessageServer() = 0;
+        virtual ~TcpMessageServer() {}
     };
     
     class UdpMessageServer: public MessageServer {
     public:
         UdpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
-        virtual ~UdpMessageServer() = 0;
+        virtual ~UdpMessageServer() {}
     };
 }
 

@@ -241,14 +241,10 @@ namespace corpc {
         _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
     }
     
-    TcpMessageServer::~TcpMessageServer() {}
-
     UdpMessageServer::UdpMessageServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): MessageServer(io, needHB) {
         _acceptor = new UdpAcceptor(this, ip, port);
         
         _pipelineFactory = new UdpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE);
     }
     
-    UdpMessageServer::~UdpMessageServer() {}
-
 }

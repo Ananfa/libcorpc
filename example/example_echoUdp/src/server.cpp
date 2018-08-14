@@ -61,26 +61,6 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-class TestUdpServer : public corpc::UdpMessageServer {
-public:
-    static TestUdpServer* create(corpc::IO *io, const std::string& ip, uint16_t port);
-    
-private:
-    TestUdpServer( corpc::IO *io, const std::string& ip, uint16_t port);
-    virtual ~TestUdpServer() {}
-};
-
-TestUdpServer::TestUdpServer(corpc::IO *io, const std::string& ip, uint16_t port): corpc::UdpMessageServer(io, true, ip, port) {
-}
-
-TestUdpServer* TestUdpServer::create( corpc::IO *io, const std::string& ip, uint16_t port) {
-    assert(io);
-    TestUdpServer *server = new TestUdpServer(io, ip, port);
-    
-    server->start();
-    return server;
-}
-
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
@@ -100,7 +80,8 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
     
-    TestUdpServer *server = TestUdpServer::create(io, ip, port);
+    corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, ip, port);
+    server->start();
     
     server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());

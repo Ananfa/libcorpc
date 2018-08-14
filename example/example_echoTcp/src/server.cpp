@@ -53,26 +53,6 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-class TestTcpServer : public corpc::TcpMessageServer {
-public:
-    static TestTcpServer* create(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
-    
-private:
-    TestTcpServer( corpc::IO *io, bool needHB, const std::string& ip, uint16_t port);
-    virtual ~TestTcpServer() {}
-};
-
-TestTcpServer::TestTcpServer(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port): corpc::TcpMessageServer(io, needHB, ip, port) {
-}
-
-TestTcpServer* TestTcpServer::create(corpc::IO *io, bool needHB, const std::string& ip, uint16_t port) {
-    assert(io);
-    TestTcpServer *server = new TestTcpServer(io, needHB, ip, port);
-    
-    server->start();
-    return server;
-}
-
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
@@ -92,7 +72,8 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
     
-    TestTcpServer *server = TestTcpServer::create(io, true, ip, port);
+    corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, true, ip, port);
+    server->start();
     
     server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
