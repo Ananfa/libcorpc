@@ -75,7 +75,7 @@ int main(int argc, const char * argv[]) {
     corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, true, ip, port);
     server->start();
     
-    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
+    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -87,12 +87,7 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
         
-        std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
-        sendInfo->type = 1;
-        sendInfo->isRaw = false;
-        sendInfo->msg = response;
-        
-        conn->send(sendInfo);
+        conn->send(1, false, response);
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

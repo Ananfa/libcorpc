@@ -25,7 +25,7 @@
 namespace corpc {
     
     class MessageServer: public corpc::Server {
-    private:
+    public:
         class Connection: public corpc::Connection {
         public:
             Connection(int fd, MessageServer* server);
@@ -34,10 +34,15 @@ namespace corpc {
             virtual void onClose();
             
             MessageServer *getServer() { return _server; }
+            uint64_t getCreateTime() { return _createTime; }
+            
+            void send(int32_t type, bool isRaw, std::shared_ptr<void> msg);
         private:
             MessageServer *_server;
+            uint64_t _createTime;   // 连接创建时间
         };
         
+    private:
         typedef std::function<void(std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
         
         struct RegisterMessageInfo {

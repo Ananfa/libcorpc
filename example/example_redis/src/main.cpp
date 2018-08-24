@@ -130,6 +130,56 @@ static void *redis_routine( void *arg )
     return NULL;
 }
 
+struct TestStruct {
+    uint32_t id;
+    bool bantalk;
+    bool banlogin;
+};
+
+static void *redis_routine1( void *arg )
+{
+    co_enable_hook_sys();
+    
+    RedisConnectPool *redisPool = (RedisConnectPool*)arg;
+    RedisConnectPool::Proxy* proxy = redisPool->getProxy();
+    
+    redisReply *reply;
+    
+    // 获取连接
+    redisContext *redis = proxy->take();
+    
+    if (!redis) {
+        ERROR_LOG("can't take redis handle\n");
+        return NULL;
+    }
+    
+    reply = (redisReply *)redisCommand(redis,"SETNX hahaha 100");
+    LOG("SET: %d\n", reply->type);
+    freeReplyObject(reply);
+    /*
+    TestStruct ts;
+    ts.id = 1000;
+    ts.bantalk = true;
+    ts.banlogin = false;
+    reply = (redisReply *)redisCommand(redis,"SET hahaha %b", &ts, sizeof(ts));
+    //LOG("SET: %s\n", reply->str);
+    freeReplyObject(reply);
+    
+    TestStruct ts_get;
+    reply = (redisReply *)redisCommand(redis,"GET hahaha");
+    assert(reply->len == sizeof(ts));
+    memcpy(&ts_get, reply->str, sizeof(ts));
+    LOG("GET hahaha: %d\n", ts_get.id);
+    freeReplyObject(reply);
+     */
+    
+    // 归还连接
+    proxy->put(redis, false);
+    
+    
+    return NULL;
+}
+
 void *timerTask(void * arg) {
     co_enable_hook_sys();
     
@@ -162,11 +212,15 @@ int main(int argc, const char * argv[]) {
     
     RedisConnectPool *redisPool = RedisConnectPool::create("127.0.0.1", 6379, 8, 4);
     
+    /*
     // 开两个线程进行多线程访问
     std::thread t1 = std::thread(clientThread, redisPool);
     std::thread t2 = std::thread(clientThread, redisPool);
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
+    */
+    
+    RoutineEnvironment::startCoroutine(redis_routine1, redisPool);
     
     RoutineEnvironment::runEventLoop();
     

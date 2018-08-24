@@ -130,7 +130,7 @@ namespace corpc {
     public:
         static RpcClient* create(IO *io);
         
-        bool registerChannel(Channel *channel);
+        //bool registerChannel(Channel *channel);
         
     private:
         RpcClient(IO *io);
@@ -160,7 +160,7 @@ namespace corpc {
         
         ClientTaskQueue _taskQueue; // taskHandleRoutine
         
-        ChannelSet _channelSet; // 注册的channel
+        //ChannelSet _channelSet; // 注册的channel
         
         PipelineFactory *_pipelineFactory;
     };

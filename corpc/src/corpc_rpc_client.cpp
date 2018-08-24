@@ -157,7 +157,7 @@ namespace corpc {
             _connections.push_back(nullptr);
         }
         
-        _client->registerChannel(this);
+        //_client->registerChannel(this);
     }
     
     RpcClient::Channel::~Channel() {
@@ -231,14 +231,14 @@ namespace corpc {
         return client;
     }
     
-    bool RpcClient::registerChannel(Channel *channel) {
-        if (_channelSet.find(channel) != _channelSet.end()) {
-            return false;
-        }
-        
-        _channelSet.insert(std::make_pair(channel, channel));
-        return true;
-    }
+    //bool RpcClient::registerChannel(Channel *channel) {
+    //    if (_channelSet.find(channel) != _channelSet.end()) {
+    //        return false;
+    //    }
+    //
+    //    _channelSet.insert(std::make_pair(channel, channel));
+    //    return true;
+    //}
     
     void RpcClient::start() {
         _t = std::thread(threadEntry, this);

@@ -14,6 +14,9 @@
 namespace corpc {
     
     MessageServer::Connection::Connection(int fd, MessageServer* server): corpc::Connection(fd, server->_io, server->_needHB), _server(server) {
+        struct timeval now = { 0 };
+        gettimeofday( &now,NULL );
+        _createTime = now.tv_sec;
     }
     
     MessageServer::Connection::~Connection() {
@@ -23,6 +26,15 @@ namespace corpc {
     void MessageServer::Connection::onClose() {
         std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
         _server->onClose(self);
+    }
+    
+    void MessageServer::Connection::send(int32_t type, bool isRaw, std::shared_ptr<void> msg) {
+        std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
+        sendInfo->type = 1;
+        sendInfo->isRaw = false;
+        sendInfo->msg = msg;
+        
+        corpc::Connection::send(sendInfo);
     }
     
     void * MessageServer::Worker::taskCallRoutine( void * arg ) {
@@ -44,34 +56,29 @@ namespace corpc {
         WorkerTask *task = (WorkerTask *)msg;
         
         switch (task->type) {
-            case -1: // 新连接建立
+            case CORPC_MSG_TYPE_CONNECT: // 新连接建立
                 LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
                 // TODO:
                 break;
-            case -2: // 连接断开
+            case CORPC_MSG_TYPE_CLOSE: // 连接断开
                 LOG("MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
                 // TODO:
                 break;
-            default: {
-                assert(task->type > 0);
-                // 其他消息处理
-                auto iter = _server->_registerMessageMap.find(task->type);
-                if (iter == _server->_registerMessageMap.end()) {
-                    ERROR_LOG("MessageServer::Worker::handleMessage -- unknown msg type\n");
-                    
-                    return;
-                }
-                
-                if (iter->second.needCoroutine) {
-                    corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
-                } else {
-                    iter->second.handle(task->msg, task->connection);
-                    
-                    delete task;
-                }
-                
-                break;
-            }
+        }
+        
+        auto iter = _server->_registerMessageMap.find(task->type);
+        if (iter == _server->_registerMessageMap.end()) {
+            ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
+            
+            return;
+        }
+        
+        if (iter->second.needCoroutine) {
+            corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
+        } else {
+            iter->second.handle(task->msg, task->connection);
+            
+            delete task;
         }
     }
     
