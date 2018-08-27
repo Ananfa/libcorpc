@@ -33,6 +33,36 @@ namespace corpc {
     
     // 注意：RpcClient的实现不考虑运行时的关闭销毁，只能通过关闭程序来关闭
     class RpcClient {
+    public:
+        class Channel;
+        
+    private:
+        class Connection;
+        class ChannelCore : public std::enable_shared_from_this<ChannelCore> {
+        public:
+            ChannelCore(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum);
+            virtual ~ChannelCore();
+            
+            virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
+            
+        private:
+            std::shared_ptr<Connection> getNextConnection();
+            
+        private:
+            std::string _host;
+            uint32_t _port;
+            
+            RpcClient *_client;
+            std::vector<std::shared_ptr<Connection>> _connections;
+            uint32_t _conIndex;
+            
+            bool _connectDelay; // 是否需要延迟连接
+            
+        public:
+            friend class Channel;
+            friend class RpcClient;
+            friend class Encoder;
+        };
         
         struct RpcTask {
             pid_t pid;
@@ -46,27 +76,24 @@ namespace corpc {
         };
         
         struct ClientTask {
-            google::protobuf::RpcChannel *channel;
+            std::shared_ptr<ChannelCore> channel;
             std::shared_ptr<RpcTask> rpcTask;
         };
         
-    public:
-        class Channel;
-    private:
         class Connection: public corpc::Connection {
             enum Status {CLOSED, CONNECTING, CONNECTED};
             typedef std::list<std::shared_ptr<ClientTask> > WaitTaskList;
             typedef std::map<uint64_t, std::shared_ptr<ClientTask> > WaitTaskMap;
             
         public:
-            Connection(Channel *channel);
+            Connection(std::shared_ptr<ChannelCore> channel);
             ~Connection() {}
             
             virtual void onClose();
             virtual void cleanDataOnClosing(std::shared_ptr<void>& data);
             
         private:
-            Channel *_channel;
+            std::shared_ptr<ChannelCore> _channel;
             
             Status _st;
             
@@ -84,34 +111,20 @@ namespace corpc {
     public:
         class Channel : public google::protobuf::RpcChannel {
         public:
-            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1);
-            virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
+            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1): _channel(new ChannelCore(client, host, port, connectNum)) {}
+            virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
+                _channel->CallMethod(method, controller, request, response, done);
+            }
             
-            const std::string& getHost() const { return _host; }
-            uint32_t getPort() const { return _port; }
+            const std::string& getHost() const { return _channel->_host; }
+            uint32_t getPort() const { return _channel->_port; }
             
         private:
             virtual ~Channel();
             
-            std::shared_ptr<Connection>& getNextConnection();
-            
         private:
-            std::string _host;
-            uint32_t _port;
-            
-            RpcClient *_client;
-            std::vector<std::shared_ptr<Connection>> _connections;
-            uint32_t _conIndex;
-            
-            bool _connectDelay; // 是否需要延迟连接
-            
-        public:
-            friend class ClientConnection;
-            friend class RpcClient;
-            friend class Encoder;
+            std::shared_ptr<ChannelCore> _channel;
         };
-        
-        typedef std::map<Channel*, Channel*> ChannelSet;
         
         struct ConnectionTask {
             enum TaskType {CLOSE, CONNECT};
@@ -122,15 +135,15 @@ namespace corpc {
 #ifdef USE_NO_LOCK_QUEUE
         typedef Co_MPSC_NoLockQueue<ConnectionTask*> ConnectionTaskQueue;
         typedef Co_MPSC_NoLockQueue<std::shared_ptr<ClientTask> > ClientTaskQueue;
+        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ChannelCore> > ClearChannelQueue;
 #else
         typedef CoSyncQueue<ConnectionTask*> ConnectionTaskQueue;
         typedef CoSyncQueue<std::shared_ptr<ClientTask> > ClientTaskQueue;
+        typedef CoSyncQueue<std::shared_ptr<ChannelCore> > ClearChannelQueue;
 #endif
        
     public:
         static RpcClient* create(IO *io);
-        
-        //bool registerChannel(Channel *channel);
         
     private:
         RpcClient(IO *io);
@@ -149,6 +162,8 @@ namespace corpc {
         
         static void *taskHandleRoutine(void * arg);   // 负责将rpc调用请求通过connection交由sender发出
         
+        static void *clearChannelRoutine(void * arg); // 用于清理Channel中的连接
+        
         virtual void start();
         
     private:
@@ -160,7 +175,7 @@ namespace corpc {
         
         ClientTaskQueue _taskQueue; // taskHandleRoutine
         
-        //ChannelSet _channelSet; // 注册的channel
+        ClearChannelQueue _clearChannelQueue; // clearChannelRoutine
         
         PipelineFactory *_pipelineFactory;
     };

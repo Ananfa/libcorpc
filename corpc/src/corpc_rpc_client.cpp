@@ -126,7 +126,7 @@ namespace corpc {
         return true;
     }
     
-    RpcClient::Connection::Connection(Channel *channel): corpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
+    RpcClient::Connection::Connection(std::shared_ptr<ChannelCore> channel): corpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
     }
     
     void RpcClient::Connection::onClose() {
@@ -147,7 +147,7 @@ namespace corpc {
         }
     }
     
-    RpcClient::Channel::Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum)
+    RpcClient::ChannelCore::ChannelCore(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum)
     : _client(client), _host(host), _port(port), _conIndex(0), _connectDelay(false) {
         if (connectNum == 0) {
             connectNum = 1;
@@ -156,20 +156,23 @@ namespace corpc {
         for (int i = 0; i < connectNum; i++) {
             _connections.push_back(nullptr);
         }
-        
-        //_client->registerChannel(this);
     }
     
-    RpcClient::Channel::~Channel() {
+    RpcClient::ChannelCore::~ChannelCore() {
         // TODO: 如何优雅的关闭channel？涉及其中connection关闭，而connection中有协程正在执行
         // 一般情况channel是不会被关闭的
     }
     
-    std::shared_ptr<RpcClient::Connection>& RpcClient::Channel::getNextConnection() {
+    std::shared_ptr<RpcClient::Connection> RpcClient::ChannelCore::getNextConnection() {
+        // 若Channel正在清理，连接会被清空，此时返回空
+        if (!_connections.size()) {
+            return nullptr;
+        }
+        
         _conIndex = (_conIndex + 1) % _connections.size();
         
         if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
-            _connections[_conIndex] = std::make_shared<Connection>(this);
+            _connections[_conIndex] = std::make_shared<Connection>(shared_from_this());
             
             std::shared_ptr<corpc::Connection> connection = _connections[_conIndex];
             
@@ -190,9 +193,9 @@ namespace corpc {
         return _connections[_conIndex];
     }
     
-    void RpcClient::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
+    void RpcClient::ChannelCore::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
         std::shared_ptr<ClientTask> clientTask(new ClientTask);
-        clientTask->channel = this;
+        clientTask->channel = shared_from_this();
         clientTask->rpcTask = std::make_shared<RpcTask>();
         clientTask->rpcTask->pid = GetPid();
         clientTask->rpcTask->co = co_self();
@@ -219,6 +222,12 @@ namespace corpc {
         
     }
     
+    RpcClient::Channel::~Channel() {
+        // 发消息给RpcClient线程来清理Channel
+        // 注意：不能在这里清理，因为会产生多线程问题
+        _channel->_client->_clearChannelQueue.push(_channel);
+    }
+    
     RpcClient::RpcClient(IO *io): _io(io) {
         _pipelineFactory = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
     }
@@ -231,15 +240,6 @@ namespace corpc {
         return client;
     }
     
-    //bool RpcClient::registerChannel(Channel *channel) {
-    //    if (_channelSet.find(channel) != _channelSet.end()) {
-    //        return false;
-    //    }
-    //
-    //    _channelSet.insert(std::make_pair(channel, channel));
-    //    return true;
-    //}
-    
     void RpcClient::start() {
         _t = std::thread(threadEntry, this);
     }
@@ -249,6 +249,8 @@ namespace corpc {
         
         RoutineEnvironment::startCoroutine(taskHandleRoutine, self);
 
+        RoutineEnvironment::startCoroutine(clearChannelRoutine, self);
+        
         RoutineEnvironment::runEventLoop();
     }
     
@@ -334,7 +336,7 @@ namespace corpc {
                         LOG("co %d socket fd %d\n", co_self(), connection->_fd);
                         struct sockaddr_in addr;
                         
-                        Channel *channel = connection->_channel;
+                        std::shared_ptr<ChannelCore>& channel = connection->_channel;
                         bzero(&addr,sizeof(addr));
                         addr.sin_family = AF_INET;
                         addr.sin_port = htons(channel->_port);
@@ -485,22 +487,30 @@ namespace corpc {
             std::shared_ptr<ClientTask> task = queue.pop();
             while (task) {
                 // 先从channel中获得一connection
-                std::shared_ptr<Connection> conn = ((Channel*)(task->channel))->getNextConnection();
+                std::shared_ptr<Connection> conn = task->channel->getNextConnection();
                 assert(conn->_st != Connection::CLOSED);
                 
-                // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
-                // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
-                if (conn->_st == Connection::CONNECTING) {
-                    conn->_waitSendTaskCoList.push_back(task);
+                if (!conn) {
+                    // 若连接为空，需要应直接唤醒rpc任务对应的协程进行出错处理
+                    task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                    
+                    RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
                 } else {
-                    std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(conn);
                     
-                    if (task->rpcTask->response) {
-                        std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
-                        conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                    // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
+                    // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
+                    if (conn->_st == Connection::CONNECTING) {
+                        conn->_waitSendTaskCoList.push_back(task);
+                    } else {
+                        std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(conn);
+                        
+                        if (task->rpcTask->response) {
+                            std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
+                            conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                        }
+                        
+                        sender->send(ioConn, task->rpcTask);
                     }
-                    
-                    sender->send(ioConn, task->rpcTask);
                 }
                 
                 // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，这里在处理一段时间后让出一下
@@ -512,6 +522,53 @@ namespace corpc {
                 }
                 
                 task = queue.pop();
+            }
+        }
+        
+        return NULL;
+    }
+    
+    void *RpcClient::clearChannelRoutine(void *arg) {
+        RpcClient *self = (RpcClient *)arg;
+        
+        ClearChannelQueue& queue = self->_clearChannelQueue;
+
+        // 初始化pipe readfd
+        int readFd = queue.getReadFd();
+        co_register_fd(readFd);
+        co_set_timeout(readFd, -1, 1000);
+        
+        int ret;
+        std::vector<char> buf(1024);
+        while (true) {
+            // 等待处理信号
+            ret = (int)read(readFd, &buf[0], 1024);
+            assert(ret != 0);
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue;
+                } else {
+                    // 管道出错
+                    ERROR_LOG("RpcClient::clearChannelRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+                              readFd, ret, errno, strerror(errno));
+                    
+                    // TODO: 如何处理？退出协程？
+                    // sleep 10 milisecond
+                    msleep(10);
+                }
+            }
+            
+            // 处理任务队列
+            std::shared_ptr<ChannelCore> channel = queue.pop();
+            while (channel) {
+                for (auto iter = channel->_connections.begin(); iter != channel->_connections.end(); iter++) {
+                    if (*iter) {
+                        (*iter)->close();
+                    }
+                }
+                channel->_connections.clear();
+                
+                channel = queue.pop();
             }
         }
         
