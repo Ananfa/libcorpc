@@ -97,9 +97,9 @@ namespace corpc {
     
     void MultiThreadWorker::start() {
         // 启动线程
-        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
-            it->_queueContext._worker = this;
-            it->_t = std::thread(threadEntry, &(*it));
+        for (auto& td : _threadDatas) {
+            td._queueContext._worker = this;
+            td._t = std::thread(threadEntry, &td);
         }
     }
     
@@ -737,9 +737,9 @@ namespace corpc {
     
     bool MultiThreadReceiver::start() {
         // 启动线程
-        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
-            it->_queueContext._receiver = this;
-            it->_t = std::thread(threadEntry, &(*it));
+        for (auto& td : _threadDatas) {
+            td._queueContext._receiver = this;
+            td._t = std::thread(threadEntry, &td);
         }
         
         return true;
@@ -918,9 +918,9 @@ namespace corpc {
     
     bool MultiThreadSender::start() {
         // 启动线程
-        for (std::vector<ThreadData>::iterator it = _threadDatas.begin(); it != _threadDatas.end(); it++) {
-            it->_queueContext._sender = this;
-            it->_t = std::thread(threadEntry, &(*it));
+        for (auto& td : _threadDatas) {
+            td._queueContext._sender = this;
+            td._t = std::thread(threadEntry, &td);
         }
         
         return true;

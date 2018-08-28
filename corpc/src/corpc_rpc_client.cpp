@@ -311,8 +311,8 @@ namespace corpc {
                         
                         // 注意：连接断开时，需要调用回调
                         std::list<std::shared_ptr<void>>& datas = connection->_datas;
-                        for (auto iter = datas.begin(); iter != datas.end(); iter++) {
-                            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(*iter);
+                        for (auto& data : datas) {
+                            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
                             
                             // 对于not_care_response类型的rpc需要在这里调用回调处理
                             if (!rpcTask->response) {
@@ -561,11 +561,12 @@ namespace corpc {
             // 处理任务队列
             std::shared_ptr<ChannelCore> channel = queue.pop();
             while (channel) {
-                for (auto iter = channel->_connections.begin(); iter != channel->_connections.end(); iter++) {
-                    if (*iter) {
-                        (*iter)->close();
+                for (auto& connection : channel->_connections) {
+                    if (connection) {
+                        connection->close();
                     }
                 }
+                
                 channel->_connections.clear();
                 
                 channel = queue.pop();
