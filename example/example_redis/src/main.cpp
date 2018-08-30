@@ -153,8 +153,26 @@ static void *redis_routine1( void *arg )
         return NULL;
     }
     
-    reply = (redisReply *)redisCommand(redis,"SETNX hahaha 100");
+    sleep(10);
+    
+    reply = (redisReply *)redisCommand(redis,"WATCH hahaha");
+    LOG("WATCH: %d\n", reply->type);
+    freeReplyObject(reply);
+    
+    reply = (redisReply *)redisCommand(redis,"SET hahaha abc");
     LOG("SET: %d\n", reply->type);
+    freeReplyObject(reply);
+    
+    reply = (redisReply *)redisCommand(redis,"MULTI");
+    LOG("MULTI: %d\n", reply->type);
+    freeReplyObject(reply);
+    
+    reply = (redisReply *)redisCommand(redis,"DEL hahaha");
+    LOG("DEL: %d\n", reply->type);
+    freeReplyObject(reply);
+    
+    reply = (redisReply *)redisCommand(redis,"EXEC");
+    LOG("EXEC: %d\n", reply->type);
     freeReplyObject(reply);
     /*
     TestStruct ts;

@@ -7,6 +7,11 @@ if(NOT PROTOBUF_LIB)
     message(FATAL_ERROR "protobuf library not found")
 endif()
 
+find_library(CO_LIB co)
+if(NOT CO_LIB)
+    message(FATAL_ERROR "co library not found")
+endif()
+
 if (CMAKE_BUILD_TYPE)
 else()
     set(CMAKE_BUILD_TYPE RELEASE)

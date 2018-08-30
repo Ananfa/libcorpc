@@ -7,6 +7,16 @@ if(NOT PROTOBUF_LIB)
     message(FATAL_ERROR "protobuf library not found")
 endif()
 
+find_library(CO_LIB co)
+if(NOT CO_LIB)
+    message(FATAL_ERROR "co library not found")
+endif()
+
+find_library(CORPC_LIB corpc)
+if(NOT CORPC_LIB)
+    message(FATAL_ERROR "corpc library not found")
+endif()
+
 find_library(HIREDIS_LIB hiredis)
 if(NOT HIREDIS_LIB)
     message(FATAL_ERROR "hiredis library not found")

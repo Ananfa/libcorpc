@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(example_echoUdp)
+project(tutorial6)
 
 # Check dependency libraries
 find_library(PROTOBUF_LIB protobuf)
@@ -25,13 +25,9 @@ endif()
 message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
-set(SERVER_SOURCE_FILES
-    ../proto/echo.pb.cc
-    src/server.cpp)
-
-set(CLIENT_SOURCE_FILES
-    ../proto/echo.pb.cc
-    src/client.cpp)
+set(SOURCE_FILES
+    ../proto/helloworld.pb.cc
+    src/main.cpp)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -48,13 +44,10 @@ include_directories(/usr/local/include)
 include_directories(/usr/local/include/co)
 include_directories(/usr/local/include/corpc)
 include_directories(/usr/local/include/corpc/proto)
-include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/../proto)
 
 # Add target
-add_executable(echoUdpS ${SERVER_SOURCE_FILES})
-add_executable(echoUdpC ${CLIENT_SOURCE_FILES})
+add_executable(tutorial6 ${SOURCE_FILES})
 
 set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
-target_link_libraries(echoUdpS ${MY_LINK_LIBRARIES})
-target_link_libraries(echoUdpC ${MY_LINK_LIBRARIES})
+target_link_libraries(tutorial6 ${MY_LINK_LIBRARIES})

@@ -7,6 +7,21 @@ if(NOT PROTOBUF_LIB)
     message(FATAL_ERROR "protobuf library not found")
 endif()
 
+find_library(CO_LIB co)
+if(NOT CO_LIB)
+    message(FATAL_ERROR "co library not found")
+endif()
+
+find_library(CORPC_LIB corpc)
+if(NOT CORPC_LIB)
+    message(FATAL_ERROR "corpc library not found")
+endif()
+
+find_library(CORPC_MYSQL_LIB corpc_mysql)
+if(NOT CORPC_MYSQL_LIB)
+    message(FATAL_ERROR "corpc_mysql library not found")
+endif()
+
 find_library(MYSQLCLIENT_LIB mysqlclient /usr/local/mysql/lib)
 if(NOT MYSQLCLIENT_LIB)
     message(FATAL_ERROR "mysqlclient library not found")

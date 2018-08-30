@@ -40,15 +40,31 @@ namespace corpc {
         typedef CoSyncQueue<stCoRoutine_t*> WaitResumeQueue;
 #endif
         
+        class Guard {
+        public:
+            Guard() { RoutineEnvironment::_keyRoutineNum++; }
+            ~Guard() { RoutineEnvironment::_keyRoutineNum--; }
+            
+        private:
+            Guard(Guard const&) = delete;                  // copy ctor delete
+            Guard(Guard &&) = delete;                      // move ctor delete
+            Guard& operator=(Guard const&) = delete;       // assign op. delete
+            Guard& operator=(Guard &&) = delete;           // move assign op. delete
+            
+            void* operator new (std::size_t size) throw (std::bad_alloc) = delete;
+        };
+        
     public:
-        void destroy(); // 清理当前线程协程环境
+        //void destroy(); // 清理当前线程协程环境
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
+        static stCoRoutine_t *startKeyCoroutine(pfn_co_routine_t pfn,void *arg);
         static void resumeCoroutine( pid_t pid, stCoRoutine_t *co ); // 用于跨线程唤醒协程
         static void runEventLoop(); // 事件循环
         
         static RoutineEnvironment *getEnv();    // 获取线程相关的协程环境
         stCoRoutineAttr_t *getAttr() { return _attr; }
         
+        static void quit();
         
     private:
         RoutineEnvironment();
@@ -58,9 +74,13 @@ namespace corpc {
         
         static void *routineEntry( void *arg ); // 协程入口
         
+        static void *keyRoutineEntry( void *arg ); // 关键协程入口
+        
         static void *cleanRoutine( void *arg ); // 协程清理协程
         
         static void *resumeRoutine( void *arg ); // 协程唤醒协程
+        
+        static void *safeQuitRoutine( void *arg ); // 安全退出程序协程（等待_keyRoutineNum计数为0时退出程序）
         
         void addEndedCoroutine( stCoRoutine_t *co ); // 协程结束
         
@@ -71,6 +91,8 @@ namespace corpc {
         std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）
         
         WaitResumeQueue _waitResumeQueue; // 用于跨线程唤醒协程
+        
+        static std::atomic<uint32_t> _keyRoutineNum;
         
 #ifdef MONITOR_ROUTINE
         // 监控状态

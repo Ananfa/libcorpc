@@ -7,6 +7,21 @@ if(NOT PROTOBUF_LIB)
     message(FATAL_ERROR "protobuf library not found")
 endif()
 
+find_library(CO_LIB co)
+if(NOT CO_LIB)
+    message(FATAL_ERROR "co library not found")
+endif()
+
+find_library(CORPC_LIB corpc)
+if(NOT CORPC_LIB)
+    message(FATAL_ERROR "corpc library not found")
+endif()
+
+find_library(CORPC_MEMCACHED_LIB corpc_memcached)
+if(NOT CORPC_MEMCACHED_LIB)
+    message(FATAL_ERROR "corpc_memcached library not found")
+endif()
+
 find_library(MEMCACHED_LIB memcached)
 if(NOT MEMCACHED_LIB)
     message(FATAL_ERROR "memcached library not found")

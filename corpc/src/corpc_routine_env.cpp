@@ -26,6 +26,7 @@
 
 namespace corpc {
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
+    std::atomic<uint32_t> RoutineEnvironment::_keyRoutineNum(0);
     
     RoutineEnvironment::RoutineEnvironment() {
         _attr = new stCoRoutineAttr_t;
@@ -85,24 +86,26 @@ namespace corpc {
         return env;
     }
     
-    void RoutineEnvironment::destroy() {
-        // TODO: 清理当前线程协程环境
-        // 当线程结束时进行回收工作
-        // 需进行的工作包括：
-        //   1.禁止新协程创建
-        //   2.等待正在运行的协程结束（这点不好处理，原因：1.协程正注册在IO事件中等待，当IO事件发生时会唤醒协程执行，若此时协程已被清理则程序跑飞，2.程序员在协程中在堆中创建的对象无法释放，导致资源泄漏。一般只能等待协程自然结束，而协程中的处理很可能不会结束）
-        //   3.守护协程结束
-        //   4.从g_routineEnvPerThread中清理线程协程环境
-        //   5.delete this;
-        //
-        // 由于第2点不好处理，而且一般情况开的线程不需要结束，因此先不实现
+    void RoutineEnvironment::quit() {
+        RoutineEnvironment::startCoroutine(safeQuitRoutine, NULL);
     }
+    
+    //void RoutineEnvironment::destroy() {
+    //    // TODO: 清理当前线程协程环境
+    //    // 当线程结束时进行回收工作
+    //    // 需进行的工作包括：
+    //    //   1.禁止新协程创建
+    //    //   2.等待正在运行的协程结束（这点不好处理，原因：1.协程正注册在IO事件中等待，当IO事件发生时会唤醒协程执行，若此时协程已被清理则程序跑飞，2.程序员在协程中在堆中创建的对象无法释放，导致资源泄漏。一般只能等待协程自然结束，而协程中的处理很可能不会结束）
+    //    //   3.守护协程结束
+    //    //   4.从g_routineEnvPerThread中清理线程协程环境
+    //    //   5.delete this;
+    //    //
+    //    // 由于第2点不好处理，而且一般情况开的线程不需要结束，因此先不实现
+    //}
     
     stCoRoutine_t *RoutineEnvironment::startCoroutine(pfn_co_routine_t pfn,void *arg) {
         RoutineEnvironment *curenv = getEnv();
         assert(curenv);
-        
-        // TODO: 若禁止新协程创建则返回false
         
         stCoRoutine_t *co = NULL;
         RoutineContext *context = new RoutineContext;
@@ -110,6 +113,21 @@ namespace corpc {
         context->arg = arg;
         
         co_create( &co, curenv->_attr, routineEntry, context);
+        co_resume( co );
+        
+        return co;
+    }
+    
+    stCoRoutine_t *RoutineEnvironment::startKeyCoroutine(pfn_co_routine_t pfn,void *arg) {
+        RoutineEnvironment *curenv = getEnv();
+        assert(curenv);
+        
+        stCoRoutine_t *co = NULL;
+        RoutineContext *context = new RoutineContext;
+        context->pfn = pfn;
+        context->arg = arg;
+        
+        co_create( &co, curenv->_attr, keyRoutineEntry, context);
         co_resume( co );
         
         return co;
@@ -152,6 +170,16 @@ namespace corpc {
         return NULL;
     }
     
+    void *RoutineEnvironment::keyRoutineEntry( void *arg ) {
+        RoutineEnvironment::Guard guard;
+        
+        co_enable_hook_sys();
+        
+        RoutineEnvironment::routineEntry(arg);
+        
+        return NULL;
+    }
+
     void *RoutineEnvironment::cleanRoutine( void *arg ) {
         co_enable_hook_sys();
         
@@ -270,4 +298,19 @@ namespace corpc {
         char buf = 'L';
         write(_endPipe.pipefd[1], &buf, 1);
     }
+    
+    void *RoutineEnvironment::safeQuitRoutine( void *arg ) {
+        co_enable_hook_sys();
+        
+        while ( true ) {
+            if (RoutineEnvironment::_keyRoutineNum == 0) {
+                exit(EXIT_SUCCESS);
+            }
+            
+            sleep(1);
+        }
+        
+        return NULL;
+    }
+    
 }
