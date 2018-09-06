@@ -40,6 +40,7 @@ namespace corpc {
         typedef CoSyncQueue<stCoRoutine_t*> WaitResumeQueue;
 #endif
         
+    public:
         class Guard {
         public:
             Guard() { RoutineEnvironment::_keyRoutineNum++; }

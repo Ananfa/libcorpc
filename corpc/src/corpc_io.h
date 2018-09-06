@@ -261,8 +261,7 @@ namespace corpc {
         std::shared_ptr<void>& getFrontData() { return _datas.front(); }
         void popFrontData() { _datas.pop_front(); }
         
-        bool closing() const { return _isClosing; }
-        bool closed() const { return _closed; }
+        bool isOpen() const { return !(_isClosing || _closed); }
         
     protected:
         IO *_io;
