@@ -30,7 +30,7 @@ namespace corpc {
     
     void MessageServer::Connection::send(int32_t type, bool isRaw, std::shared_ptr<void> msg) {
         std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
-        sendInfo->type = 1;
+        sendInfo->type = type;
         sendInfo->isRaw = false;
         sendInfo->msg = msg;
         
