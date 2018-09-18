@@ -69,7 +69,7 @@ namespace corpc {
         auto iter = _server->_registerMessageMap.find(task->type);
         if (iter == _server->_registerMessageMap.end()) {
             ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
-            
+            delete task;
             return;
         }
         
