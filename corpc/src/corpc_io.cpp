@@ -683,7 +683,7 @@ namespace corpc {
         IO *io = connection->_io;
         
         int fd = connection->getfd();
-        LOG("start connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
+        LOG("start Receiver::connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
         
         std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
         uint8_t *buf = (uint8_t *)buffs.data();
@@ -855,6 +855,8 @@ namespace corpc {
         assert(task->type == SenderTask::INIT);
         std::shared_ptr<Connection> connection = task->connection;
         delete task;
+        
+        LOG("start Sender::connectionRoutine for fd:%d in thread:%d\n", connection->getfd(), GetPid());
         
         connection->_routine = co_self();
         connection->_routineHang = false;
@@ -1171,8 +1173,9 @@ namespace corpc {
     }
 
     void IO::addConnection(std::shared_ptr<Connection>& connection) {
-        _receiver->addConnection(connection);
+        // 注意：以下两行顺序不能调换，不然会有多线程问题
         _sender->addConnection(connection);
+        _receiver->addConnection(connection);
     }
     
     void IO::removeConnection(std::shared_ptr<Connection>& connection) {
