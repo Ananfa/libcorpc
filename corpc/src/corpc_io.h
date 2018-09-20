@@ -426,7 +426,7 @@ namespace corpc {
         };
         
     public:
-        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _threadDatas(threadNum) {}
+        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _threadDatas(threadNum), _lastThreadIndex(0) {}
         virtual ~MultiThreadReceiver() {}
         
         virtual bool start();
@@ -438,7 +438,7 @@ namespace corpc {
         
     private:
         uint16_t _threadNum;
-        uint16_t _lastThreadIndex;
+        std::atomic<uint16_t> _lastThreadIndex;
         std::vector<ThreadData> _threadDatas;
     };
     
@@ -492,7 +492,7 @@ namespace corpc {
         };
         
     public:
-        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _threadDatas(threadNum) {}
+        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _threadDatas(threadNum), _lastThreadIndex(0) {}
         virtual ~MultiThreadSender() {}
         
         virtual bool start();
@@ -505,7 +505,7 @@ namespace corpc {
         
     private:
         uint16_t _threadNum;
-        uint16_t _lastThreadIndex;
+        std::atomic<uint16_t> _lastThreadIndex;
         std::vector<ThreadData> _threadDatas;
     };
     

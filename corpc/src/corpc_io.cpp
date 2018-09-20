@@ -746,14 +746,14 @@ namespace corpc {
     }
     
     void MultiThreadReceiver::addConnection(std::shared_ptr<Connection>& connection) {
-        _lastThreadIndex = (_lastThreadIndex + 1) % _threadNum;
+        uint16_t index = (_lastThreadIndex++) % _threadNum;
         
-        connection->setRecvThreadIndex(_lastThreadIndex);
+        connection->setRecvThreadIndex(index);
         
         ReceiverTask *recvTask = new ReceiverTask;
         recvTask->connection = connection;
         
-        _threadDatas[_lastThreadIndex]._queueContext._queue.push(recvTask);
+        _threadDatas[index]._queueContext._queue.push(recvTask);
     }
     
     bool CoroutineReceiver::start() {
@@ -929,15 +929,15 @@ namespace corpc {
     }
     
     void MultiThreadSender::addConnection(std::shared_ptr<Connection>& connection) {
-        _lastThreadIndex = (_lastThreadIndex + 1) % _threadNum;
+        uint16_t index = (_lastThreadIndex++) % _threadNum;
         
-        connection->setSendThreadIndex(_lastThreadIndex);
+        connection->setSendThreadIndex(index);
         
         SenderTask *senderTask = new SenderTask;
         senderTask->type = SenderTask::INIT;
         senderTask->connection = connection;
         
-        _threadDatas[_lastThreadIndex]._queueContext._queue.push(senderTask);
+        _threadDatas[index]._queueContext._queue.push(senderTask);
     }
     
     void MultiThreadSender::removeConnection(std::shared_ptr<Connection>& connection) {
