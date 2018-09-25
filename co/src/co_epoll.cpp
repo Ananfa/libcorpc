@@ -143,7 +143,7 @@ int co_epoll_wait( int epfd,struct co_epoll_res *events,int maxevents,int timeou
         // old code:
         // t.tv_sec = timeout;
 		t.tv_sec = timeout / 1000;
-        t.tv_nsec = timeout % 1000 * 1000;
+        t.tv_nsec = timeout % 1000 * 1000000; // nano-seconds
 	}
 	int ret = kevent( epfd, 
 					NULL, 0, //register null
