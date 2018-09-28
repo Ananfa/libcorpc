@@ -699,7 +699,7 @@ namespace corpc {
                 }
                 
                 // 出错处理
-                ERROR_LOG("Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+                WARN_LOG("Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
                        fd, ret, errno, strerror(errno));
                 
                 break;
@@ -892,28 +892,33 @@ namespace corpc {
             }
             
             // 发数据
-            int ret = (int)write(connection->_fd, buf + startIndex, dataSize);
-            if (ret < 0) {
-                ERROR_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
+            int ret;
+            do {
+                ret = (int)write(connection->_fd, buf + startIndex, dataSize);
+                if (ret > 0) {
+                    assert(ret <= dataSize);
+                    startIndex += ret;
+                    dataSize -= ret;
+                }
+            } while (dataSize > 0 && errno == EAGAIN);
+            
+            if (dataSize > 0) {
+                WARN_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
                        connection->_fd, ret, errno, strerror(errno));
                 
                 break;
             }
             
-            assert(ret == dataSize);
-            
-            startIndex += ret;
             if (startIndex == endIndex) {
                 startIndex = endIndex = 0;
             }
-            
         }
         
         connection->_isClosing = true;
         shutdown(connection->_fd, SHUT_RD);
         connection->_canClose = true;
         
-        ERROR_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
+        WARN_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
         
         return NULL;
     }

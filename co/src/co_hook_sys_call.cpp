@@ -435,16 +435,17 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 	}
 	while( wrotelen < nbyte )
 	{
-
 		struct pollfd pf = { 0 };
 		pf.fd = fd;
 		pf.events = ( POLLOUT | POLLERR | POLLHUP );
 		poll( &pf,1,timeout );
-
+        
 		writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
 		
 		if( writeret <= 0 )
 		{
+            co_log_err("CO_ERR: write fd %d ret %d errno %d (%s)\n",
+                     fd, writeret, errno, strerror(errno));
 			break;
 		}
 		wrotelen += writeret ;

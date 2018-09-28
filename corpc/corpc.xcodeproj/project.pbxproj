@@ -335,6 +335,7 @@
 					../co/src,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				OTHER_CFLAGS = "-DLOG_LEVEL=2";
 				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -352,6 +353,7 @@
 					../co/src,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				OTHER_CFLAGS = "-DLOG_LEVEL=2";
 				OTHER_LDFLAGS = "-lprotobuf";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};

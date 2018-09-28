@@ -36,13 +36,27 @@ namespace corpc {
     void errlog(const char *format, ...);
 }
 
-#ifdef DEBUG
+#define LOG_LEVEL_DEBUG 0
+#define LOG_LEVEL_INFO 1
+#define LOG_LEVEL_WARN 2
+
+#if LOG_LEVEL == LOG_LEVEL_DEBUG
 #  define DEBUG_LOG(format, ...) corpc::debuglog(format, ## __VA_ARGS__)
+#  define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
+#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
+#elif LOG_LEVEL == LOG_LEVEL_INFO
+#  define DEBUG_LOG(...)
+#  define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
+#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
+#elif LOG_LEVEL == LOG_LEVEL_WARN
+#  define DEBUG_LOG(...)
+#  define LOG(...)
+#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
 #else
 #  define DEBUG_LOG(...)
+#  define LOG(...)
+#  define WARN_LOG(...)
 #endif
-#define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
-#define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
 #define ERROR_LOG(format, ...) corpc::errlog(format, ## __VA_ARGS__)
 
 #endif /* corpc_utils_h */

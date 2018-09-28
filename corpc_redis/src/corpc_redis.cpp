@@ -85,16 +85,18 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
         // 建立新连接
         _realConnectCount++;
         
-        struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+        struct timeval timeout = { 3, 0 }; // 3 seconds
         redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
         
         if (redis && !redis->err) {
             response->set_handle((intptr_t)redis);
         } else if (redis) {
+            std::string reason = "can't connect to redis server for ";
+            reason.append(redis->errstr);
+            controller->SetFailed(reason);
+            
             redisFree(redis);
             redis = NULL;
-            
-            controller->SetFailed("can't connect to redis server");
         } else {
             controller->SetFailed("can't allocate redis context");
         }
