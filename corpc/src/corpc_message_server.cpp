@@ -95,7 +95,7 @@ namespace corpc {
         RegisterMessageInfo info;
         info.type = type;
         info.proto = proto;
-        info.needCoroutine = info.needCoroutine;
+        info.needCoroutine = needCoroutine;
         info.handle = handle;
         
         _registerMessageMap.insert(std::make_pair(type, info));
