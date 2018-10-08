@@ -22,9 +22,7 @@ std::mutex MongodbConnectPool::_initMutex;
 bool MongodbConnectPool::_initialized = false;
 
 MongodbConnectPool::Proxy::Proxy(MongodbConnectPool *pool) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
+    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
     
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
@@ -71,7 +69,7 @@ void MongodbConnectPool::Proxy::put(mongoc_client_t* mongoc, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MongodbConnectPool::MongodbConnectPool(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum): _uri(uri), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MongodbConnectPool::MongodbConnectPool(const char *uri, uint32_t maxConnectNum): _uri(uri), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -80,8 +78,8 @@ void MongodbConnectPool::take(::google::protobuf::RpcController* controller,
                                 thirdparty::TakeResponse* response,
                                 ::google::protobuf::Closure* done) {
     if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.front();
-        _idleList.pop_front();
+        intptr_t handle = (intptr_t)_idleList.back().handle;
+        _idleList.pop_back();
         
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
@@ -112,8 +110,8 @@ void MongodbConnectPool::take(::google::protobuf::RpcController* controller,
         if (_idleList.size() == 0) {
             controller->SetFailed("can't connect to mongodb server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.front();
-            _idleList.pop_front();
+            intptr_t handle = (intptr_t)_idleList.back().handle;
+            _idleList.pop_back();
             
             response->set_handle(handle);
         }
@@ -126,7 +124,7 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
                                ::google::protobuf::Closure* done) {
     mongoc_client_t *mongoc = (mongoc_client_t *)request->handle();
     
-    if (_idleList.size() < _maxIdleNum) {
+    if (_idleList.size() < _maxConnectNum) {
         if (request->error()) {
             _realConnectCount--;
             mongoc_client_destroy(mongoc);
@@ -144,7 +142,7 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
                     mongoc = mongoc_client_new(_uri.c_str());
                     
                     if (mongoc) {
-                        _idleList.push_back(mongoc);
+                        _idleList.push_back({mongoc, time(nullptr)});
                     } else {
                         _realConnectCount--;
                     }
@@ -164,7 +162,7 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(mongoc);
+            _idleList.push_back({mongoc, time(nullptr)});
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -181,7 +179,7 @@ void MongodbConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConnectNum, uint32_t maxIdleNum) {
+MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConnectNum) {
     if (!_initialized) {
         std::unique_lock<std::mutex> lock( _initMutex );
         
@@ -191,7 +189,7 @@ MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConn
         }
     }
     
-    MongodbConnectPool *pool = new MongodbConnectPool(uri, maxConnectNum, maxIdleNum);
+    MongodbConnectPool *pool = new MongodbConnectPool(uri, maxConnectNum);
     pool->init();
     
     return pool;
@@ -200,19 +198,30 @@ MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConn
 void MongodbConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
+    _proxy = new Proxy(this);
+    
+    RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
 
-MongodbConnectPool::Proxy* MongodbConnectPool::getProxy() {
-    pid_t pid = GetPid();
+void *MongodbConnectPool::clearIdleRoutine( void *arg ) {
+    // 定时清理过期连接
+    MongodbConnectPool *self = (MongodbConnectPool*)arg;
     
-    auto iter = _threadProxyMap.find(pid);
-    if (iter != _threadProxyMap.end()) {
-        return iter->second;
+    time_t now = 0;
+    
+    while (true) {
+        sleep(10);
+        
+        time(&now);
+        
+        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+            DEBUG_LOG("MongodbConnectPool::clearIdleRoutine -- disconnect a Mongodb connection");
+            mongoc_client_t *handle = self->_idleList.front().handle;
+            self->_idleList.pop_front();
+            self->_realConnectCount--;
+            mongoc_client_destroy(handle);
+        }
     }
     
-    // 为当前线程创建proxy
-    Proxy *proxy = new Proxy(this);
-    _threadProxyMap.insert(std::make_pair(pid, proxy));
-    
-    return proxy;
+    return NULL;
 }

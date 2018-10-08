@@ -14,9 +14,7 @@
 namespace corpc {
     
     MessageServer::Connection::Connection(int fd, MessageServer* server): corpc::Connection(fd, server->_io, server->_needHB), _server(server) {
-        struct timeval now = { 0 };
-        gettimeofday( &now,NULL );
-        _createTime = now.tv_sec;
+        time(&_createTime);
     }
     
     MessageServer::Connection::~Connection() {

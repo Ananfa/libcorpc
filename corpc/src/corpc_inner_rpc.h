@@ -26,11 +26,9 @@
 namespace corpc {
     
     // 进程内线程间通信rpc实现
-    class InnerRpcClient;
     class InnerRpcServer;
     
     struct InnerRpcRequest {
-        InnerRpcClient *client; // 发起调用的Client，用于在rpc处理完成后返回结果给发起者
         InnerRpcServer *server;
         pid_t pid;
         stCoRoutine_t *co;
@@ -48,37 +46,16 @@ namespace corpc {
     typedef CoSyncQueue<InnerRpcRequest*> InnerRpcRequestQueue;
 #endif
     
-    class InnerRpcClient {
+    class InnerRpcChannel : public google::protobuf::RpcChannel {
     public:
-        class Channel : public google::protobuf::RpcChannel {
-        public:
-            Channel(InnerRpcClient *client, InnerRpcServer *server): _client(client), _server(server) {}
-            virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
-            
-        private:
-            virtual ~Channel() {}
-            
-        private:
-            InnerRpcClient *_client;
-            InnerRpcServer *_server;
-            
-        public:
-            friend class InnerRpcClient;
-        };
-        
-    public:
-        static InnerRpcClient* instance();
+        InnerRpcChannel(InnerRpcServer *server): _server(server) {}
+        virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
         
     private:
-        InnerRpcClient() {}
-        ~InnerRpcClient() {}
+        virtual ~InnerRpcChannel() {}
         
     private:
-        static __thread InnerRpcClient *_instance;
-        
-    public:
-        friend class InnerRpcServer;
-        
+        InnerRpcServer *_server;
     };
     
     class InnerRpcServer {
@@ -111,7 +88,7 @@ namespace corpc {
         
         std::thread _t;
     public:
-        friend class InnerRpcClient::Channel;
+        friend class InnerRpcChannel;
     };
     
 }

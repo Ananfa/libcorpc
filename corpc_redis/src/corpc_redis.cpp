@@ -19,9 +19,7 @@
 using namespace corpc;
 
 RedisConnectPool::Proxy::Proxy(RedisConnectPool *pool) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
+    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
     
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
@@ -68,7 +66,7 @@ void RedisConnectPool::Proxy::put(redisContext* redis, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-RedisConnectPool::RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum): _host(host), _port(port), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+RedisConnectPool::RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum): _host(host), _port(port), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -77,8 +75,8 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
                               thirdparty::TakeResponse* response,
                               ::google::protobuf::Closure* done) {
     if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.front();
-        _idleList.pop_front();
+        intptr_t handle = (intptr_t)_idleList.back().handle;
+        _idleList.pop_back();
         
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
@@ -121,8 +119,8 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
         if (_idleList.size() == 0) {
             controller->SetFailed("can't connect to redis server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.front();
-            _idleList.pop_front();
+            intptr_t handle = (intptr_t)_idleList.back().handle;
+            _idleList.pop_back();
             
             response->set_handle(handle);
         }
@@ -135,7 +133,7 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
                              ::google::protobuf::Closure* done) {
     redisContext *redis = (redisContext *)request->handle();
     
-    if (_idleList.size() < _maxIdleNum) {
+    if (_idleList.size() < _maxConnectNum) {
         if (request->error()) {
             _realConnectCount--;
             redisFree(redis);
@@ -154,7 +152,7 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
                     redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
                     
                     if (redis && !redis->err) {
-                        _idleList.push_back(redis);
+                        _idleList.push_back({redis, time(nullptr)});
                     } else if (redis) {
                         redisFree(redis);
                         redis = NULL;
@@ -179,7 +177,7 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(redis);
+            _idleList.push_back({redis, time(nullptr)});
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -196,8 +194,8 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-RedisConnectPool* RedisConnectPool::create(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    RedisConnectPool *pool = new RedisConnectPool(host, port, maxConnectNum, maxIdleNum);
+RedisConnectPool* RedisConnectPool::create(const char *host, unsigned int port, uint32_t maxConnectNum) {
+    RedisConnectPool *pool = new RedisConnectPool(host, port, maxConnectNum);
     pool->init();
     
     return pool;
@@ -206,19 +204,30 @@ RedisConnectPool* RedisConnectPool::create(const char *host, unsigned int port, 
 void RedisConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
+    _proxy = new Proxy(this);
+    
+    RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
 
-RedisConnectPool::Proxy* RedisConnectPool::getProxy() {
-    pid_t pid = GetPid();
+void *RedisConnectPool::clearIdleRoutine( void *arg ) {
+    // 定时清理过期连接
+    RedisConnectPool *self = (RedisConnectPool*)arg;
     
-    auto iter = _threadProxyMap.find(pid);
-    if (iter != _threadProxyMap.end()) {
-        return iter->second;
+    time_t now = 0;
+    
+    while (true) {
+        sleep(10);
+        
+        time(&now);
+        
+        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+            DEBUG_LOG("RedisConnectPool::clearIdleRoutine -- disconnect a redis connection");
+            redisContext *handle = self->_idleList.front().handle;
+            self->_idleList.pop_front();
+            self->_realConnectCount--;
+            redisFree(handle);
+        }
     }
     
-    // 为当前线程创建proxy
-    Proxy *proxy = new Proxy(this);
-    _threadProxyMap.insert(std::make_pair(pid, proxy));
-    
-    return proxy;
+    return NULL;
 }

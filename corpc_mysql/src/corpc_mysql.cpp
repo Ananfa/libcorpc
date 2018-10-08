@@ -15,13 +15,12 @@
  */
 
 #include "corpc_mysql.h"
+#include <time.h>
 
 using namespace corpc;
 
 MysqlConnectPool::Proxy::Proxy(MysqlConnectPool *pool) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
+    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
     
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
@@ -43,7 +42,7 @@ MYSQL* MysqlConnectPool::Proxy::take() {
     _stub->take(controller, request, response, NULL);
     
     if (controller->Failed()) {
-        fprintf(stderr, "Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
         return NULL;
     }
     
@@ -68,7 +67,7 @@ void MysqlConnectPool::Proxy::put(MYSQL* mysql, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MysqlConnectPool::MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum): _host(host), _user(user), _passwd(passwd), _db(db), _port(port), _unix_socket(unix_socket), _clientflag(clientflag), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MysqlConnectPool::MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum): _host(host), _user(user), _passwd(passwd), _db(db), _port(port), _unix_socket(unix_socket), _clientflag(clientflag), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -77,8 +76,8 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
                             thirdparty::TakeResponse* response,
                             ::google::protobuf::Closure* done) {
     if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.front();
-        _idleList.pop_front();
+        intptr_t handle = (intptr_t)_idleList.back().handle;
+        _idleList.pop_back();
         
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
@@ -119,8 +118,8 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         if (_idleList.size() == 0) {
             controller->SetFailed("can't connect to mysql server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.front();
-            _idleList.pop_front();
+            intptr_t handle = (intptr_t)_idleList.back().handle;
+            _idleList.pop_back();
             
             response->set_handle(handle);
         }
@@ -133,7 +132,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                            ::google::protobuf::Closure* done) {
     MYSQL *con = (MYSQL *)request->handle();
     
-    if (_idleList.size() < _maxIdleNum) {
+    if (_idleList.size() < _maxConnectNum) {
         if (request->error()) {
             _realConnectCount--;
             mysql_close(con);
@@ -152,7 +151,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                     
                     if (con) {
                         if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
-                            _idleList.push_back(con);
+                            _idleList.push_back({con, time(nullptr)});
                         } else {
                             mysql_close(con);
                             con = NULL;
@@ -178,7 +177,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(con);
+            _idleList.push_back({con, time(nullptr)});
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -195,8 +194,8 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    MysqlConnectPool *pool = new MysqlConnectPool(host, user, passwd, db, port, unix_socket, clientflag, maxConnectNum, maxIdleNum);
+MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum) {
+    MysqlConnectPool *pool = new MysqlConnectPool(host, user, passwd, db, port, unix_socket, clientflag, maxConnectNum);
     pool->init();
     
     return pool;
@@ -205,19 +204,30 @@ MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, c
 void MysqlConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
+    _proxy = new Proxy(this);
+    
+    RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
 
-MysqlConnectPool::Proxy* MysqlConnectPool::getProxy() {
-    pid_t pid = GetPid();
+void *MysqlConnectPool::clearIdleRoutine( void *arg ) {
+    // 定时清理过期连接
+    MysqlConnectPool *self = (MysqlConnectPool*)arg;
     
-    auto iter = _threadProxyMap.find(pid);
-    if (iter != _threadProxyMap.end()) {
-        return iter->second;
+    time_t now = 0;
+    
+    while (true) {
+        sleep(10);
+        
+        time(&now);
+        
+        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+            DEBUG_LOG("MysqlConnectPool::clearIdleRoutine -- disconnect a mysql connection");
+            MYSQL *handle = self->_idleList.front().handle;
+            self->_idleList.pop_front();
+            self->_realConnectCount--;
+            mysql_close(handle);
+        }
     }
     
-    // 为当前线程创建proxy
-    Proxy *proxy = new Proxy(this);
-    _threadProxyMap.insert(std::make_pair(pid, proxy));
-    
-    return proxy;
+    return NULL;
 }

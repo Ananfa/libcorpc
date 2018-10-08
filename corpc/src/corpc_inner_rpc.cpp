@@ -28,11 +28,8 @@
 
 namespace corpc {
     
-    __thread InnerRpcClient *InnerRpcClient::_instance(nullptr);
-    
-    void InnerRpcClient::Channel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
+    void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
         InnerRpcRequest *req = new InnerRpcRequest;
-        req->client = _client;
         req->server = _server;
         req->pid = GetPid();
         req->co = co_self();
@@ -56,14 +53,6 @@ namespace corpc {
                 done->Run();
             }
         }
-    }
-    
-    InnerRpcClient* InnerRpcClient::instance() {
-        if (!_instance) {
-            _instance = new InnerRpcClient();
-        }
-        
-        return _instance;
     }
     
     InnerRpcServer* InnerRpcServer::create(bool startInNewThread) {

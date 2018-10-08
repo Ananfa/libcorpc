@@ -39,7 +39,7 @@ namespace corpc {
             void send(int32_t type, bool isRaw, std::shared_ptr<void> msg);
         private:
             MessageServer *_server;
-            uint64_t _createTime;   // 连接创建时间
+            time_t _createTime;   // 连接创建时间
         };
         
     private:

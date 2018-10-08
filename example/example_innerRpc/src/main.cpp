@@ -251,9 +251,7 @@ int main(int argc, const char * argv[]) {
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
     
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, server);
+    InnerRpcChannel *channel = new InnerRpcChannel(server);
     
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);

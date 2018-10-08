@@ -19,9 +19,7 @@
 using namespace corpc;
 
 MemcachedConnectPool::Proxy::Proxy(MemcachedConnectPool *pool) {
-    InnerRpcClient *client = InnerRpcClient::instance();
-    
-    InnerRpcClient::Channel *channel = new InnerRpcClient::Channel(client, pool->_server);
+    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
     
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
@@ -68,7 +66,7 @@ void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _maxIdleNum(maxIdleNum), _realConnectCount(0) {
+MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -77,8 +75,8 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
                             thirdparty::TakeResponse* response,
                             ::google::protobuf::Closure* done) {
     if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.front();
-        _idleList.pop_front();
+        intptr_t handle = (intptr_t)_idleList.back().handle;
+        _idleList.pop_back();
         
         response->set_handle(handle);
     } else if (_realConnectCount < _maxConnectNum) {
@@ -121,8 +119,8 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         if (_idleList.size() == 0) {
             controller->SetFailed("can't connect to memcached server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.front();
-            _idleList.pop_front();
+            intptr_t handle = (intptr_t)_idleList.back().handle;
+            _idleList.pop_back();
             
             response->set_handle(handle);
         }
@@ -135,7 +133,7 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                            ::google::protobuf::Closure* done) {
     memcached_st *memc = (memcached_st *)request->handle();
     
-    if (_idleList.size() < _maxIdleNum) {
+    if (_idleList.size() < _maxConnectNum) {
         if (request->error()) {
             _realConnectCount--;
             memcached_free(memc);
@@ -156,7 +154,7 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                         memcached_return rc = memcached_server_push(memc, _memcServers);
                         
                         if (rc == MEMCACHED_SUCCESS) {
-                            _idleList.push_back(memc);
+                            _idleList.push_back({memc, time(nullptr)});
                         } else {
                             memcached_free(memc);
                             memc = NULL;
@@ -182,7 +180,7 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back(memc);
+            _idleList.push_back({memc, time(nullptr)});
             
             if (_waitingList.size() > 0) {
                 assert(_idleList.size() == 1);
@@ -199,8 +197,8 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServers, uint32_t maxConnectNum, uint32_t maxIdleNum) {
-    MemcachedConnectPool *pool = new MemcachedConnectPool(memcServers, maxConnectNum, maxIdleNum);
+MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServers, uint32_t maxConnectNum) {
+    MemcachedConnectPool *pool = new MemcachedConnectPool(memcServers, maxConnectNum);
     pool->init();
     
     return pool;
@@ -209,19 +207,30 @@ MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServ
 void MemcachedConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
+    _proxy = new Proxy(this);
+    
+    RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
 
-MemcachedConnectPool::Proxy* MemcachedConnectPool::getProxy() {
-    pid_t pid = GetPid();
+void *MemcachedConnectPool::clearIdleRoutine( void *arg ) {
+    // 定时清理过期连接
+    MemcachedConnectPool *self = (MemcachedConnectPool*)arg;
     
-    auto iter = _threadProxyMap.find(pid);
-    if (iter != _threadProxyMap.end()) {
-        return iter->second;
+    time_t now = 0;
+    
+    while (true) {
+        sleep(10);
+        
+        time(&now);
+        
+        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+            DEBUG_LOG("MemcachedConnectPool::clearIdleRoutine -- disconnect a memcached connection");
+            memcached_st *handle = self->_idleList.front().handle;
+            self->_idleList.pop_front();
+            self->_realConnectCount--;
+            memcached_free(handle);
+        }
     }
     
-    // 为当前线程创建proxy
-    Proxy *proxy = new Proxy(this);
-    _threadProxyMap.insert(std::make_pair(pid, proxy));
-    
-    return proxy;
+    return NULL;
 }

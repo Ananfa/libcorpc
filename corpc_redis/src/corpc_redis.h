@@ -28,6 +28,11 @@
 namespace corpc {
     
     class RedisConnectPool : public thirdparty::ThirdPartyService {
+        struct IdleHandle {
+            redisContext *handle;
+            time_t time;  // 开始idle的时间
+        };
+        
     public:
         class Proxy {
         public:
@@ -58,29 +63,30 @@ namespace corpc {
                          ::google::protobuf::Closure* done);
         
     public:
-        static RedisConnectPool* create(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        static RedisConnectPool* create(const char *host, unsigned int port, uint32_t maxConnectNum);
         
-        Proxy* getProxy();
+        Proxy* getProxy() const { return _proxy; }
         
     private:
-        RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum, uint32_t maxIdleNum);
+        RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum);
         ~RedisConnectPool() {}
         
         void init();
+        
+        static void *clearIdleRoutine( void *arg );
         
     private:
         std::string _host;
         unsigned int _port;
         
         uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
-        uint32_t _maxIdleNum;       // 最大空闲连接数量
         uint32_t _realConnectCount; // 当前实际建立连接的数量
         
-        std::list<redisContext*> _idleList; // 空闲连接表
+        std::list<IdleHandle> _idleList; // 空闲连接表
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
-        std::map<pid_t, Proxy*> _threadProxyMap; // 线程相关代理
+        Proxy *_proxy;
     };
 
 }
