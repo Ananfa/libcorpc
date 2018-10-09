@@ -43,8 +43,10 @@ namespace corpc {
             void put(MYSQL* mysql, bool error);
             
         private:
-            Proxy(MysqlConnectPool *pool);
+            Proxy(): _stub(nullptr) {}
             ~Proxy();
+            
+            void init(InnerRpcServer *server);
             
             static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
             
@@ -68,8 +70,6 @@ namespace corpc {
     public:
         static MysqlConnectPool* create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum);
         
-        Proxy* getProxy() const { return _proxy; }
-        
     private:
         MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum);
         ~MysqlConnectPool() {}
@@ -77,6 +77,9 @@ namespace corpc {
         void init();
         
         static void *clearIdleRoutine( void *arg );
+        
+    public:
+        Proxy proxy;
         
     private:
         std::string _host;
@@ -94,7 +97,6 @@ namespace corpc {
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
-        Proxy *_proxy;
     };
 
 }

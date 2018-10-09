@@ -40,8 +40,10 @@ namespace corpc {
             void put(memcached_st* memc, bool error);
             
         private:
-            Proxy(MemcachedConnectPool *pool);
+            Proxy(): _stub(nullptr) {}
             ~Proxy();
+            
+            void init(InnerRpcServer *server);
             
             static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
             
@@ -65,8 +67,6 @@ namespace corpc {
     public:
         static MemcachedConnectPool* create(memcached_server_st *memcServers, uint32_t maxConnectNum);
         
-        Proxy* getProxy() const { return _proxy; }
-        
     private:
         MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum);
         ~MemcachedConnectPool() {}
@@ -74,6 +74,9 @@ namespace corpc {
         void init();
         
         static void *clearIdleRoutine( void *arg );
+        
+    public:
+        Proxy proxy;
         
     private:
         memcached_server_st *_memcServers; // memcached服务器列表
@@ -85,7 +88,6 @@ namespace corpc {
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
-        Proxy *_proxy;
     };
 
 }

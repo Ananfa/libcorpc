@@ -18,14 +18,16 @@
 
 using namespace corpc;
 
-MemcachedConnectPool::Proxy::Proxy(MemcachedConnectPool *pool) {
-    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
-    
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+MemcachedConnectPool::Proxy::~Proxy() {
+    if (_stub) {
+        delete _stub;
+    }
 }
 
-MemcachedConnectPool::Proxy::~Proxy() {
-    delete _stub;
+void MemcachedConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
+    InnerRpcChannel *channel = new InnerRpcChannel(server);
+    
+    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
 void MemcachedConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
@@ -207,7 +209,7 @@ MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServ
 void MemcachedConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
-    _proxy = new Proxy(this);
+    proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }

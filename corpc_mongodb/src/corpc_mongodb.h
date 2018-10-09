@@ -40,8 +40,10 @@ namespace corpc {
             void put(mongoc_client_t* mongoc, bool error);
             
         private:
-            Proxy(MongodbConnectPool *pool);
+            Proxy(): _stub(nullptr) {}
             ~Proxy();
+            
+            void init(InnerRpcServer *server);
             
             static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
             
@@ -65,8 +67,6 @@ namespace corpc {
     public:
         static MongodbConnectPool* create(const char *uri, uint32_t maxConnectNum);
         
-        Proxy* getProxy() const { return _proxy; }
-        
     private:
         MongodbConnectPool(const char *uri, uint32_t maxConnectNum);
         ~MongodbConnectPool() {}
@@ -79,6 +79,9 @@ namespace corpc {
         static std::mutex _initMutex;
         static bool _initialized;
         
+    public:
+        Proxy proxy;
+        
     private:
         std::string _uri;
         
@@ -89,7 +92,6 @@ namespace corpc {
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
-        Proxy *_proxy;
     };
 
 }

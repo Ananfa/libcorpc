@@ -19,14 +19,10 @@
 
 using namespace corpc;
 
-MysqlConnectPool::Proxy::Proxy(MysqlConnectPool *pool) {
-    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
-    
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
-}
-
 MysqlConnectPool::Proxy::~Proxy() {
-    delete _stub;
+    if (_stub) {
+        delete _stub;
+    }
 }
 
 void MysqlConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
@@ -34,6 +30,12 @@ void MysqlConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *reques
     delete request;
 }
 
+void MysqlConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
+    InnerRpcChannel *channel = new InnerRpcChannel(server);
+    
+    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+}
+    
 MYSQL* MysqlConnectPool::Proxy::take() {
     Void *request = new Void();
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
@@ -204,7 +206,7 @@ MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, c
 void MysqlConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
-    _proxy = new Proxy(this);
+    proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }

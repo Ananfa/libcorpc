@@ -40,8 +40,10 @@ namespace corpc {
             void put(redisContext* redis, bool error);
             
         private:
-            Proxy(RedisConnectPool *pool);
+            Proxy(): _stub(nullptr) {}
             ~Proxy();
+            
+            void init(InnerRpcServer *server);
             
             static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
             
@@ -65,8 +67,6 @@ namespace corpc {
     public:
         static RedisConnectPool* create(const char *host, unsigned int port, uint32_t maxConnectNum);
         
-        Proxy* getProxy() const { return _proxy; }
-        
     private:
         RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum);
         ~RedisConnectPool() {}
@@ -74,6 +74,9 @@ namespace corpc {
         void init();
         
         static void *clearIdleRoutine( void *arg );
+        
+    public:
+        Proxy proxy;
         
     private:
         std::string _host;
@@ -86,7 +89,6 @@ namespace corpc {
         std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
         InnerRpcServer *_server;
-        Proxy *_proxy;
     };
 
 }

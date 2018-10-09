@@ -21,14 +21,16 @@ using namespace corpc;
 std::mutex MongodbConnectPool::_initMutex;
 bool MongodbConnectPool::_initialized = false;
 
-MongodbConnectPool::Proxy::Proxy(MongodbConnectPool *pool) {
-    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
-    
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+MongodbConnectPool::Proxy::~Proxy() {
+    if (_stub) {
+        delete _stub;
+    }
 }
 
-MongodbConnectPool::Proxy::~Proxy() {
-    delete _stub;
+void MongodbConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
+    InnerRpcChannel *channel = new InnerRpcChannel(server);
+    
+    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
 void MongodbConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
@@ -198,7 +200,7 @@ MongodbConnectPool* MongodbConnectPool::create(const char *uri, uint32_t maxConn
 void MongodbConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
-    _proxy = new Proxy(this);
+    proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }

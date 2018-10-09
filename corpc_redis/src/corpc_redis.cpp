@@ -18,14 +18,16 @@
 
 using namespace corpc;
 
-RedisConnectPool::Proxy::Proxy(RedisConnectPool *pool) {
-    InnerRpcChannel *channel = new InnerRpcChannel(pool->_server);
-    
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+RedisConnectPool::Proxy::~Proxy() {
+    if (_stub) {
+        delete _stub;
+    }
 }
 
-RedisConnectPool::Proxy::~Proxy() {
-    delete _stub;
+void RedisConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
+    InnerRpcChannel *channel = new InnerRpcChannel(server);
+    
+    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
 void RedisConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
@@ -204,7 +206,7 @@ RedisConnectPool* RedisConnectPool::create(const char *host, unsigned int port, 
 void RedisConnectPool::init() {
     _server = InnerRpcServer::create();
     _server->registerService(this);
-    _proxy = new Proxy(this);
+    proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
