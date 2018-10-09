@@ -265,6 +265,7 @@
 					/usr/local/mysql/lib,
 					/usr/local/lib,
 				);
+				OTHER_CFLAGS = "-DLOG_LEVEL=0";
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
 					"-lmysqlclient",
@@ -291,6 +292,7 @@
 					/usr/local/mysql/lib,
 					/usr/local/lib,
 				);
+				OTHER_CFLAGS = "-DLOG_LEVEL=2";
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
 					"-lmysqlclient",

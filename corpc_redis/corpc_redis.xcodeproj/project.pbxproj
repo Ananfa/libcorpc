@@ -262,6 +262,7 @@
 					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				OTHER_CFLAGS = "-DLOG_LEVEL=0";
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
 					"-lhiredis",
@@ -285,6 +286,7 @@
 					../corpc/src/proto,
 				);
 				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				OTHER_CFLAGS = "-DLOG_LEVEL=2";
 				OTHER_LDFLAGS = (
 					"-lprotobuf",
 					"-lhiredis",
