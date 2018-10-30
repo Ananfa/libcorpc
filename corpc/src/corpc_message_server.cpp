@@ -156,12 +156,18 @@ namespace corpc {
             return nullptr;
         }
         
-        google::protobuf::Message *msg = iter->second.proto->New();
-        if (!msg->ParseFromArray(body, size)) {
-            // 出错处理
-            ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
-            connection->setDecodeError();
-            return nullptr;
+        google::protobuf::Message *msg = NULL;
+        
+        if (iter->second.proto) {
+            msg = iter->second.proto->New();
+            if (!msg->ParseFromArray(body, size)) {
+                // 出错处理
+                ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
+                connection->setDecodeError();
+                return nullptr;
+            }
+        } else {
+            assert(size == 0);
         }
         
         WorkerTask *task = new WorkerTask;
