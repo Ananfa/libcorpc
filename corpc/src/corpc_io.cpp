@@ -319,8 +319,10 @@ namespace corpc {
     }
     
     void Connection::close() {
-        std::shared_ptr<Connection> self = shared_from_this();
-        _io->removeConnection(self);
+        if (isOpen()) {
+            std::shared_ptr<Connection> self = shared_from_this();
+            _io->removeConnection(self);
+        }
     }
     
     Server::~Server() {}
