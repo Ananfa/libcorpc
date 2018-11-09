@@ -17,13 +17,25 @@
 #ifndef corpc_utils_h
 #define corpc_utils_h
 
+#include <unistd.h>
 #include <sys/poll.h>
+#include <sys/time.h>
 
 inline void msleep(int msec)
 {
     struct pollfd pf = { 0 };
     pf.fd = -1;
     poll( &pf,1,msec );
+}
+
+inline uint64_t mtime()
+{
+    static struct timeval now = { 0 };
+    gettimeofday( &now,NULL );
+    uint64_t nowms = now.tv_sec;
+    nowms *= 1000;
+    nowms += now.tv_usec / 1000;
+    return nowms;
 }
 
 namespace corpc {

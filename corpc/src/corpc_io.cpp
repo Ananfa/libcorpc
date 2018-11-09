@@ -1051,11 +1051,7 @@ namespace corpc {
             // 处理任务队列
             std::shared_ptr<Connection> connection = queue.pop();
             while (connection) {
-                struct timeval now = { 0 };
-                gettimeofday( &now,NULL );
-                uint64_t nowms = now.tv_sec;
-                nowms *= 1000;
-                nowms += now.tv_usec / 1000;
+                uint64_t nowms = mtime();
                 self->_heartbeatList.push_back({connection, nowms + CORPC_HEARTBEAT_PERIOD});
                 
                 if (self->_heartbeatRoutineHang) {
@@ -1083,11 +1079,7 @@ namespace corpc {
                 continue;
             }
             
-            struct timeval now = { 0 };
-            gettimeofday( &now,NULL );
-            uint64_t nowms = now.tv_sec;
-            nowms *= 1000;
-            nowms += now.tv_usec / 1000;
+            uint64_t nowms = mtime();
             
             HeartbeatItem item = self->_heartbeatList.front();
             self->_heartbeatList.pop_front();
@@ -1110,10 +1102,7 @@ namespace corpc {
             if (item.nexttime > nowms) {
                 msleep(item.nexttime - nowms);
                 
-                gettimeofday( &now,NULL );
-                nowms = now.tv_sec;
-                nowms *= 1000;
-                nowms += now.tv_usec / 1000;
+                nowms = mtime();
             }
             
             if (item.connection->_closed) {

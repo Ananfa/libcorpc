@@ -135,12 +135,7 @@ namespace corpc {
         // 注意：如果是UDP握手消息怎么办？
         if (msgType < 0) {
             if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
-                struct timeval now = { 0 };
-                gettimeofday( &now,NULL );
-                uint64_t nowms = now.tv_sec;
-                nowms *= 1000;
-                nowms += now.tv_usec / 1000;
-                
+                uint64_t nowms = mtime();
                 connection->setLastRecvHBTime(nowms);
             } else {
                 WARN_LOG("MessageServer::decode -- recv system message: %d\n", msgType);
