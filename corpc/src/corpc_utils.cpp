@@ -260,4 +260,31 @@ namespace corpc {
         va_end(arg);
     }
 
+    void fatallog(const char *format, ...)
+    {
+        va_list arg;
+        va_start(arg, format);
+        
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        
+        struct tm tm_now;
+        localtime_r(&tv.tv_sec, &tm_now);
+        
+        uint32_t mseconds = tv.tv_usec / 1000;
+        
+        uint32_t today = (tm_now.tm_year+1900)*10000+(tm_now.tm_mon+1)*100+tm_now.tm_mday;
+        
+        FILE *fd = _getLogFile(today);
+        
+        _print_time(fd, tm_now, mseconds);
+        fputs(" [FATAL] : ", fd);
+        
+        vfprintf(fd, format, arg);
+        
+        fflush(fd);
+        
+        va_end(arg);
+    }
+
 }

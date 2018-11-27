@@ -46,6 +46,7 @@ namespace corpc {
     void infolog(const char *format, ...);
     void warnlog(const char *format, ...);
     void errlog(const char *format, ...);
+    void fatallog(const char *format, ...);
 }
 
 #define LOG_LEVEL_DEBUG 0
@@ -70,5 +71,6 @@ namespace corpc {
 #  define WARN_LOG(...)
 #endif
 #define ERROR_LOG(format, ...) corpc::errlog(format, ## __VA_ARGS__)
+#define FATAL_LOG(format, ...) corpc::fatallog(format, ## __VA_ARGS__)
 
 #endif /* corpc_utils_h */
