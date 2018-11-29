@@ -18,6 +18,7 @@
 #define corpc_utils_h
 
 #include <unistd.h>
+#include <stdint.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 
