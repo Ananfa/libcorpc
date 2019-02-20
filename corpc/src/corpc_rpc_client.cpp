@@ -418,6 +418,7 @@ namespace corpc {
                         connection->_st = Connection::CONNECTED;
                         connection->_channel->_connectDelay = false;
                         
+                        setKeepAlive(connection->_fd, 10);
                         // 加入到IO中
                         std::shared_ptr<corpc::Connection> ioConnection = std::static_pointer_cast<corpc::Connection>(connection);
                         io->addConnection(ioConnection);
