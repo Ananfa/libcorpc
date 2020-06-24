@@ -19,6 +19,7 @@
 
 #include "co_routine.h"
 #include "corpc_define.h"
+#include <functional>
 
 #include <thread>
 

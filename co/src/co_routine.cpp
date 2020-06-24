@@ -718,6 +718,26 @@ void co_resume( stCoRoutine_t *co )
 
 
 }
+
+void ActiveProcess( stTimeoutItem_t * ap )
+{
+	stCoRoutine_t *co = (stCoRoutine_t*)ap->pArg;
+	co_resume( co );
+
+	free(ap);
+}
+
+void co_activate( stCoRoutine_t *co ) {
+	stCoRoutineEnv_t *env = co->env;
+	assert(env == co_self()->env);
+
+	stTimeoutItem_t* item = (stTimeoutItem_t*)calloc(1, sizeof(stTimeoutItem_t));
+	item->pfnProcess = ActiveProcess;
+	item->pArg = co;
+
+	AddTail( env->pEpoll->pstActiveList, item );
+}
+
 void co_yield_env( stCoRoutineEnv_t *env )
 {
 	
