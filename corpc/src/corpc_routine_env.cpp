@@ -24,6 +24,8 @@
 #include <vector>
 #include <sys/time.h>
 
+#include <google/protobuf/message.h>
+
 namespace corpc {
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
     std::atomic<uint32_t> RoutineEnvironment::_keyRoutineNum(0);
@@ -82,6 +84,10 @@ namespace corpc {
         // 启动resume协程
         co_create( &co, env->_attr, resumeRoutine, env);
         co_resume( co );
+
+        // 启动timeout协程
+        co_create( &co, env->_attr, timeoutRoutine, env);
+        co_resume( co );
         
         return env;
     }
@@ -90,6 +96,11 @@ namespace corpc {
         RoutineEnvironment::startCoroutine(safeQuitRoutine, NULL);
     }
     
+    void RoutineEnvironment::addTimeoutTask( std::shared_ptr<RpcClientTask>& rpcTask ) {
+        RoutineEnvironment *curenv = getEnv();
+        curenv->_timeoutList.insert(uint64_t(rpcTask->co), rpcTask->expireTime, rpcTask);
+    }
+
     //void RoutineEnvironment::destroy() {
     //    // TODO: 清理当前线程协程环境
     //    // 当线程结束时进行回收工作
@@ -133,11 +144,16 @@ namespace corpc {
         return co;
     }
     
-    void RoutineEnvironment::resumeCoroutine( pid_t pid, stCoRoutine_t *co ) {
+    void RoutineEnvironment::resumeCoroutine( pid_t pid, stCoRoutine_t *co, uint64_t expireTime, int err ) {
         RoutineEnvironment *env = g_routineEnvPerThread[pid];
         assert(env);
         
-        env->_waitResumeQueue.push(co);
+        WaitResumeRPCRoutine *wr = new WaitResumeRPCRoutine;
+        wr->co = co;
+        wr->expireTime = expireTime;
+        wr->err = err;
+
+        env->_waitResumeQueue.push(wr);
     }
     
     void RoutineEnvironment::runEventLoop() {
@@ -254,15 +270,61 @@ namespace corpc {
                 }
             }
             
-            stCoRoutine_t *co = curenv->_waitResumeQueue.pop();
-            while (co) {
-                co_active(co);
+            WaitResumeRPCRoutine *wr = curenv->_waitResumeQueue.pop();
+            while (wr) {
+                // 校验协程的expireTime是否一致
+                if (wr->expireTime) {
+                    TimeoutList::Node *node = curenv->_timeoutList.getNode(uint64_t(wr->co));
+                    if (node && node->expireTime == wr->expireTime) {
+                        if (wr->err) {
+                            node->rpcTask->controller->SetFailed(strerror(wr->err));
+                        } else {
+                            node->rpcTask->response->MergeFrom(*(node->rpcTask->response_1));
+                        }
 
-                co = curenv->_waitResumeQueue.pop();
+                        curenv->_timeoutList.remove(node);
+
+                        co_active(wr->co); // 激活协程（这里没有协程切换）
+                    }
+                } else {
+                    co_active(wr->co); // 激活协程（这里没有协程切换）
+                }
+                
+                delete wr;
+
+                wr = curenv->_waitResumeQueue.pop();
             }
         }
         
         return NULL;
+    }
+
+    void *RoutineEnvironment::timeoutRoutine( void *arg ) {
+        co_enable_hook_sys();
+        
+        RoutineEnvironment *curenv = (RoutineEnvironment *)arg;
+
+        // 每秒监测一次超时
+        while (true) {
+            sleep(1);
+
+            TimeoutList::Node* node = curenv->_timeoutList.getLast();
+            if (node != nullptr) {
+                struct timeval t;
+                gettimeofday(&t, NULL);
+
+                uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000;
+
+                while (node != nullptr && node->expireTime <= now) {
+                    // 唤醒超时任务处理
+                    node->rpcTask->controller->SetFailed(strerror(ETIMEDOUT));
+                    stCoRoutine_t *co = node->rpcTask->co;
+                    curenv->_timeoutList.remove(node);
+                    co_active(co);
+                    node = curenv->_timeoutList.getLast();
+                }
+            }
+        }
     }
     
 #ifdef MONITOR_ROUTINE

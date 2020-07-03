@@ -19,6 +19,7 @@
 
 #include "co_routine.h"
 #include "corpc_define.h"
+#include "corpc_timeout_list.h"
 
 #include <list>
 
@@ -26,6 +27,12 @@ namespace corpc {
     struct RoutineContext {
         pfn_co_routine_t pfn;
         void *arg;
+    };
+
+    struct WaitResumeRPCRoutine {
+        stCoRoutine_t* co;
+        uint64_t expireTime;
+        int err;
     };
     
     // 协程环境是否应该与线程绑定，约定每个线程只有一个协程环境
@@ -35,9 +42,9 @@ namespace corpc {
         static const unsigned int SHARE_STACK_SIZE = 128 * 1024;
         
 #ifdef USE_NO_LOCK_QUEUE
-        typedef Co_MPSC_NoLockQueue<stCoRoutine_t*> WaitResumeQueue;
+        typedef Co_MPSC_NoLockQueue<WaitResumeRPCRoutine *> WaitResumeQueue;
 #else
-        typedef CoSyncQueue<stCoRoutine_t*> WaitResumeQueue;
+        typedef CoSyncQueue<WaitResumeRPCRoutine *> WaitResumeQueue;
 #endif
         
     public:
@@ -59,7 +66,7 @@ namespace corpc {
         //void destroy(); // 清理当前线程协程环境
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
         static stCoRoutine_t *startKeyCoroutine(pfn_co_routine_t pfn,void *arg);
-        static void resumeCoroutine( pid_t pid, stCoRoutine_t *co ); // 用于跨线程唤醒协程
+        static void resumeCoroutine( pid_t pid, stCoRoutine_t *co, uint64_t expireTime = 0, int err = 0 ); // 用于跨线程唤醒RPC协程
         static void runEventLoop(); // 事件循环
         
         static RoutineEnvironment *getEnv();    // 获取线程相关的协程环境
@@ -67,6 +74,8 @@ namespace corpc {
         
         static void quit();
         
+        static void addTimeoutTask( std::shared_ptr<RpcClientTask>& rpcTask );
+
     private:
         RoutineEnvironment();
         ~RoutineEnvironment();
@@ -80,6 +89,8 @@ namespace corpc {
         static void *cleanRoutine( void *arg ); // 协程清理协程
         
         static void *resumeRoutine( void *arg ); // 协程唤醒协程
+
+        static void *timeoutRoutine( void *arg ); // RPC超时处理协程
         
         static void *safeQuitRoutine( void *arg ); // 安全退出程序协程（等待_keyRoutineNum计数为0时退出程序）
         
@@ -92,6 +103,8 @@ namespace corpc {
         std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）
         
         WaitResumeQueue _waitResumeQueue; // 用于跨线程唤醒协程
+
+        TimeoutList _timeoutList; // 管理本线程中的RPC请求协程超时
         
         static std::atomic<uint32_t> _keyRoutineNum;
         

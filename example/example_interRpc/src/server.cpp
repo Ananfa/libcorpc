@@ -18,16 +18,19 @@
 #include "corpc_rpc_server.h"
 
 #include <signal.h>
+#include <stdlib.h>
 
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
+#include "qux.pb.h"
 
 using namespace corpc;
 
 static int iFooCnt = 0;
 static int iBarCnt = 0;
 static int iBazCnt = 0;
+static int iQuxCnt = 0;
 
 static void *log_routine( void *arg )
 {
@@ -41,7 +44,7 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        total += iFooCnt + iBarCnt + iBazCnt;
+        total += iFooCnt + iBarCnt + iBazCnt + iQuxCnt;
         
         if (total == 0) {
             startAt = time(NULL);
@@ -57,11 +60,12 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        LOG("time %ld seconds, foo: %d, bar: %d, baz: %d, average: %d, total: %d\n", difTime, iFooCnt, iBarCnt, iBazCnt, average, total);
+        LOG("time %ld seconds, foo: %d, bar: %d, baz: %d, qux: %d, average: %d, total: %d\n", difTime, iFooCnt, iBarCnt, iBazCnt, iQuxCnt, average, total);
         
         iFooCnt = 0;
         iBarCnt = 0;
         iBazCnt = 0;
+        iQuxCnt = 0;
     }
     
     return NULL;
@@ -117,9 +121,33 @@ public:
     }
 };
 
+class QuxServiceImpl : public QuxService {
+public:
+    QuxServiceImpl() {}
+    virtual void Qux(::google::protobuf::RpcController* controller,
+                     const ::QuxRequest* request,
+                     ::QuxResponse* response,
+                     ::google::protobuf::Closure* done) {
+        std::string str = request->text();
+        std::string tmp = str;
+        for (int i = 1; i < request->times(); i++)
+            str += (" " + tmp);
+        response->set_text(str);
+        response->set_result(true);
+
+        iQuxCnt++;
+
+        //int r = rand() % 2000 + 1;
+        //msleep(r);
+        
+        //LOG("BazServiceImpl::Baz: %s\n", str.c_str());
+    }
+};
+
 static FooServiceImpl g_fooService;
 static BarServiceImpl g_barService;
 static BazServiceImpl g_bazService;
+static QuxServiceImpl g_quxService;
 
 int main(int argc, char *argv[]) {
     co_start_hook();
@@ -144,6 +172,7 @@ int main(int argc, char *argv[]) {
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
+    server->registerService(&g_quxService);
     
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     

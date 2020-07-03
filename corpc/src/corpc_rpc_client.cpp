@@ -40,6 +40,8 @@ namespace corpc {
         respSize = be32toh(respSize);
         uint64_t callId = *(uint64_t *)(head + 4);
         callId = be64toh(callId);
+        uint64_t expireTime = *(uint64_t *)(head + 12);
+        expireTime = be64toh(expireTime);
         assert(respSize == size);
         std::shared_ptr<ClientTask> task;
         // 注意: _waitResultCoMap需进行线程同步
@@ -48,11 +50,12 @@ namespace corpc {
             Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(callId);
             
             if (itor == conn->_waitResultCoMap.end()) {
-                // 打印出错信息
-                ERROR_LOG("RpcClient::decode can't find task : %llu\n", callId);
-                assert(false);
-                
-                // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
+                // 注意：RPC超时机制会出现找不到等待结果任务的情况
+                return nullptr;
+            }
+
+            // 校验RPC任务，由于RPC任务ID是用协程对象的指针值，协程超时机制会让协程返回之前结束，新协程指针值可能与老协程指针相同导致错误唤醒，因此需要通过expireTime校验
+            if (itor->second->rpcTask->expireTime != expireTime) {
                 return nullptr;
             }
             
@@ -62,17 +65,19 @@ namespace corpc {
             conn->_waitResultCoMap.erase(itor);
         }
         
+        // 注意：这里操作的是response_1对象而不是response对象（因为有多线程同步问题），在调用线程中再通过Swap方法将结果交换到response中
         // 解析包体（RpcResponseData）
-        if (!task->rpcTask->response->ParseFromArray(body, respSize)) {
+        if (!task->rpcTask->response_1->ParseFromArray(body, respSize)) {
             ERROR_LOG("RpcClient::decode -- parse response body fail\n");
             assert(false);
-            
-            // 注意：此时rpc调用协程将得不到唤醒执行且产生内存泄露。这属于服务器严重错误，应该在开发阶段发现并解决。
+            // 什么情况会导致proto消息解析失败？
+            RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, expireTime, EBADMSG);
+
             return nullptr;
         }
         
         // 注意：在这直接进行跨线程协程唤醒，而不是返回后再处理
-        RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
+        RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, expireTime);
         
         return nullptr;
     }
@@ -80,7 +85,7 @@ namespace corpc {
     bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
         std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
         
-        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        std::shared_ptr<RpcClientTask> rpcTask = std::static_pointer_cast<RpcClientTask>(data);
         int msgSize = rpcTask->request->GetCachedSize();
         if (msgSize == 0) {
             msgSize = rpcTask->request->ByteSize();
@@ -96,7 +101,8 @@ namespace corpc {
         *(uint32_t *)(buf + 8) = htobe32(rpcTask->methodId);
         uint64_t callId = uint64_t(rpcTask->co);
         *(uint64_t *)(buf + 12) = htobe64(callId);
-        
+        *(uint64_t *)(buf + 20) = htobe64(rpcTask->expireTime);
+
         int spaceleft = space - CORPC_REQUEST_HEAD_SIZE;
         if (spaceleft >= msgSize) {
             if (msgSize > 0) {
@@ -138,7 +144,7 @@ namespace corpc {
     }
     
     void RpcClient::Connection::cleanDataOnClosing(std::shared_ptr<void>& data) {
-        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        std::shared_ptr<RpcClientTask> rpcTask = std::static_pointer_cast<RpcClientTask>(data);
         
         // not_care_response类型rpc调用需要通过回调清理request
         if (!rpcTask->response) {
@@ -196,21 +202,41 @@ namespace corpc {
     void RpcClient::ChannelCore::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
         std::shared_ptr<ClientTask> clientTask(new ClientTask);
         clientTask->channel = shared_from_this();
-        clientTask->rpcTask = std::make_shared<RpcTask>();
+        clientTask->rpcTask = std::make_shared<RpcClientTask>();
         clientTask->rpcTask->pid = GetPid();
         clientTask->rpcTask->co = co_self();
         clientTask->rpcTask->request = request;
-        
-        bool care_response = !method->options().GetExtension(corpc::not_care_response);
-        assert(care_response || done); // not_care_response need done
-        clientTask->rpcTask->response = care_response ? response : NULL;
         clientTask->rpcTask->controller = controller;
         clientTask->rpcTask->done = done;
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();
-        
+
+        bool care_response = !method->options().GetExtension(corpc::not_care_response);
+        uint32_t timeout = method->options().GetExtension(corpc::timeout);
+        assert(care_response || done); // not_care_response need done
+        if (care_response) {
+            assert(response != NULL);
+            clientTask->rpcTask->response = response;
+            if (timeout > 0) {
+                clientTask->rpcTask->response_1 = response->New();
+                struct timeval t;
+                gettimeofday(&t, NULL);
+                uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000;
+                clientTask->rpcTask->expireTime = now + timeout;
+                RoutineEnvironment::addTimeoutTask(clientTask->rpcTask);
+            } else {
+                clientTask->rpcTask->response_1 = response;
+                clientTask->rpcTask->expireTime = 0;
+            }
+        } else {
+            assert(timeout == 0);
+            clientTask->rpcTask->response = NULL;
+            clientTask->rpcTask->response_1 = NULL;
+            clientTask->rpcTask->expireTime = 0;
+        }
+
         _client->_taskQueue.push(std::move(clientTask));
-        
+
         if (care_response) {
             co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
             
@@ -303,16 +329,18 @@ namespace corpc {
                                 std::shared_ptr<ClientTask> task = std::move(itor->second);
                                 connection->_waitResultCoMap.erase(itor);
                                 
-                                task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                                if (!task->rpcTask->expireTime) {
+                                    task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                                }
                                 
-                                RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
+                                RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, task->rpcTask->expireTime, ENETDOWN);
                             }
                         }
                         
                         // 注意：连接断开时，需要调用回调
                         std::list<std::shared_ptr<void>>& datas = connection->_datas;
                         for (auto& data : datas) {
-                            std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+                            std::shared_ptr<RpcClientTask> rpcTask = std::static_pointer_cast<RpcClientTask>(data);
                             
                             // 对于not_care_response类型的rpc需要在这里调用回调处理
                             if (!rpcTask->response) {
@@ -401,9 +429,12 @@ namespace corpc {
                                 std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                                 connection->_waitSendTaskCoList.pop_front();
                                 
-                                task->rpcTask->controller->SetFailed("Connect fail");
+                                if (!task->rpcTask->expireTime) {
+                                    task->rpcTask->controller->SetFailed(strerror(errno));
+                                }
+                                
                                 if (task->rpcTask->response) {
-                                    RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
+                                    RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, task->rpcTask->expireTime, errno);
                                 } else {
                                     // not_care_response类型的rpc需要在这里触发回调清理request
                                     assert(task->rpcTask->done);
@@ -423,19 +454,32 @@ namespace corpc {
                         std::shared_ptr<corpc::Connection> ioConnection = std::static_pointer_cast<corpc::Connection>(connection);
                         io->addConnection(ioConnection);
                         
+                        struct timeval t;
+                        gettimeofday(&t, NULL);
+                        uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000; // 当前时间（毫秒精度）
                         // 发送等待发送队列中的任务
                         while (!connection->_waitSendTaskCoList.empty()) {
                             std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                             connection->_waitSendTaskCoList.pop_front();
                             
                             std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(connection);
-                            
+
                             if (task->rpcTask->response) {
-                                std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
-                                connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                                // 若rpc任务已超时就不需发给服务器
+                                if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
+                                    {
+                                        std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
+
+                                        // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
+                                        //connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                                        connection->_waitResultCoMap[uint64_t(task->rpcTask->co)] = task;
+                                    }
+
+                                    sender->send(ioConn, task->rpcTask);
+                                }
+                            } else {
+                                sender->send(ioConn, task->rpcTask);
                             }
-                            
-                            sender->send(ioConn, task->rpcTask);
                         }
                         
                         break;
@@ -483,6 +527,7 @@ namespace corpc {
             
             struct timeval t1,t2;
             gettimeofday(&t1, NULL);
+            uint64_t now = t1.tv_sec * 1000 + t1.tv_usec / 1000; // 当前时间（毫秒精度）
             int count = 0;
             
             // 处理任务队列
@@ -493,12 +538,19 @@ namespace corpc {
                 assert(conn->_st != Connection::CLOSED);
                 
                 if (!conn) {
-                    // 若连接为空，需要应直接唤醒rpc任务对应的协程进行出错处理
-                    task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
-                    
-                    RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co);
+                    // 若连接为空，需要应直接唤醒rpc任务对应的协程进行出错处理。注意：not_care_response类型的请求不需要唤醒
+                    if (task->rpcTask->response) {
+                        if (!task->rpcTask->expireTime) {
+                            task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                        }
+                        
+                        RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, task->rpcTask->expireTime, ENETDOWN);
+                    } else {
+                        // not_care_response类型的rpc需要在这里触发回调清理request
+                        assert(task->rpcTask->done);
+                        task->rpcTask->done->Run();
+                    }
                 } else {
-                    
                     // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
                     // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
                     if (conn->_st == Connection::CONNECTING) {
@@ -507,11 +559,21 @@ namespace corpc {
                         std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(conn);
                         
                         if (task->rpcTask->response) {
-                            std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
-                            conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                            // 若rpc任务已超时就不需发给服务器
+                            if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
+                                {
+                                    std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
+
+                                    // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
+                                    //conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                                    conn->_waitResultCoMap[uint64_t(task->rpcTask->co)] = task;
+                                }
+                            
+                                sender->send(ioConn, task->rpcTask);
+                            }
+                        } else {
+                            sender->send(ioConn, task->rpcTask);
                         }
-                        
-                        sender->send(ioConn, task->rpcTask);
                     }
                 }
                 
@@ -523,6 +585,7 @@ namespace corpc {
                         msleep(1);
                         
                         gettimeofday(&t1, NULL);
+                        now = t1.tv_sec * 1000 + t1.tv_usec / 1000;
                     }
                     count = 0;
                 }

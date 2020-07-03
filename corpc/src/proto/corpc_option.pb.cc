@@ -84,7 +84,8 @@ void protobuf_AddDesc_corpc_5foption_2eproto() {
     "ons\030\220N \001(\r:7\n\016need_coroutine\022\036.google.pr"
     "otobuf.MethodOptions\030\222N \001(\010::\n\021not_care_"
     "response\022\036.google.protobuf.MethodOptions"
-    "\030\223N \001(\010", 247);
+    "\030\223N \001(\010:0\n\007timeout\022\036.google.protobuf.Met"
+    "hodOptions\030\224N \001(\r", 297);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "corpc_option.proto", &protobuf_RegisterTypes);
   Void::default_instance_ = new Void();
@@ -97,6 +98,9 @@ void protobuf_AddDesc_corpc_5foption_2eproto() {
   ::google::protobuf::internal::ExtensionSet::RegisterExtension(
     &::google::protobuf::MethodOptions::default_instance(),
     10003, 8, false, false);
+  ::google::protobuf::internal::ExtensionSet::RegisterExtension(
+    &::google::protobuf::MethodOptions::default_instance(),
+    10004, 13, false, false);
   Void::default_instance_->InitAsDefaultInstance();
   ::google::protobuf::internal::OnShutdown(&protobuf_ShutdownFile_corpc_5foption_2eproto);
 }
@@ -290,6 +294,9 @@ void Void::Swap(Void* other) {
 ::google::protobuf::internal::ExtensionIdentifier< ::google::protobuf::MethodOptions,
     ::google::protobuf::internal::PrimitiveTypeTraits< bool >, 8, false >
   not_care_response(kNotCareResponseFieldNumber, false);
+::google::protobuf::internal::ExtensionIdentifier< ::google::protobuf::MethodOptions,
+    ::google::protobuf::internal::PrimitiveTypeTraits< ::google::protobuf::uint32 >, 13, false >
+  timeout(kTimeoutFieldNumber, 0u);
 
 // @@protoc_insertion_point(namespace_scope)
 

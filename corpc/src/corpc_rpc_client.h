@@ -18,6 +18,7 @@
 #define corpc_rpc_client_h
 
 #include "corpc_io.h"
+#include "corpc_rpc_common.h"
 
 #include <list>
 #include <map>
@@ -64,20 +65,9 @@ namespace corpc {
             friend class Encoder;
         };
         
-        struct RpcTask {
-            pid_t pid;
-            stCoRoutine_t *co;
-            const google::protobuf::Message* request;
-            google::protobuf::Message* response;
-            google::protobuf::RpcController *controller;
-            google::protobuf::Closure *done;
-            uint32_t serviceId;
-            uint32_t methodId;
-        };
-        
         struct ClientTask {
             std::shared_ptr<ChannelCore> channel;
-            std::shared_ptr<RpcTask> rpcTask;
+            std::shared_ptr<RpcClientTask> rpcTask;
         };
         
         class Connection: public corpc::Connection {

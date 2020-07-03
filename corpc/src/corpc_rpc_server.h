@@ -18,6 +18,7 @@
 #define corpc_rpc_server_h
 
 #include "corpc_io.h"
+#include "corpc_rpc_common.h"
 
 #include <vector>
 #include <list>
@@ -69,24 +70,10 @@ namespace corpc {
         private:
             RpcServer *_server;
         };
-        
-        class RpcTask {
-        public:
-            RpcTask();
-            ~RpcTask();
-            
-        public:
-            google::protobuf::Service *service;
-            const google::protobuf::MethodDescriptor *method_descriptor;
-            const google::protobuf::Message* request;
-            google::protobuf::Message* response;
-            google::protobuf::RpcController *controller;
-            uint64_t callId;
-        };
-        
+
         struct WorkerTask {
             std::shared_ptr<corpc::Connection> connection;
-            std::shared_ptr<RpcTask> rpcTask;
+            std::shared_ptr<RpcServerTask> rpcTask;
         };
         
     public:

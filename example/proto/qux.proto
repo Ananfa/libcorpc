@@ -1,0 +1,23 @@
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message QuxRequest {
+    required string text = 1;
+    optional int32 times = 2;
+}
+
+message QuxResponse {
+    required string text = 1;
+    optional bool result = 2;
+}
+
+service QuxService {
+    option (corpc.global_service_id) = 4;
+
+    rpc Qux(QuxRequest) returns(QuxResponse)
+    {
+    	option (corpc.need_coroutine) = true; // default is false
+        option (corpc.timeout) = 1000; // default is 0
+    }
+}

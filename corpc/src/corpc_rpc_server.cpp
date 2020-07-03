@@ -49,16 +49,6 @@ namespace corpc {
         _server->onClose(self);
     }
     
-    RpcServer::RpcTask::RpcTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {
-        
-    }
-    
-    RpcServer::RpcTask::~RpcTask() {
-        delete request;
-        delete response;
-        delete controller;
-    }
-    
     void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
         WorkerTask *task = (WorkerTask *)arg;
         
@@ -167,6 +157,8 @@ namespace corpc {
         methodId = be32toh(methodId);
         uint64_t callId = *(uint64_t *)(head + 12);
         callId = be64toh(callId);
+        uint64_t expireTime = *(uint64_t *)(head + 20);
+        expireTime = be64toh(expireTime);
         
         // 生成ServerRpcTask
         // 根据serverId和methodId查表
@@ -187,13 +179,14 @@ namespace corpc {
             // 将收到的请求传给worker
             WorkerTask *task = new WorkerTask;
             task->connection = conn;
-            task->rpcTask = std::shared_ptr<RpcTask>(new RpcTask);
+            task->rpcTask = std::shared_ptr<RpcServerTask>(new RpcServerTask);
             task->rpcTask->service = server->getService(serviceId);
             task->rpcTask->method_descriptor = method_descriptor;
             task->rpcTask->request = request;
             task->rpcTask->response = response;
             task->rpcTask->controller = controller;
             task->rpcTask->callId = callId;
+            task->rpcTask->expireTime = expireTime;
             
             return task;
         } else {
@@ -205,7 +198,7 @@ namespace corpc {
     }
     
     bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
-        std::shared_ptr<RpcTask> rpcTask = std::static_pointer_cast<RpcTask>(data);
+        std::shared_ptr<RpcServerTask> rpcTask = std::static_pointer_cast<RpcServerTask>(data);
         uint32_t msgSize = rpcTask->response->GetCachedSize();
         if (msgSize == 0) {
             msgSize = rpcTask->response->ByteSize();
@@ -218,6 +211,7 @@ namespace corpc {
         
         *(uint32_t *)buf = htobe32(msgSize);
         *(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
+        *(uint64_t *)(buf + 12) = htobe64(rpcTask->expireTime);
         
         int spaceleft = space - CORPC_RESPONSE_HEAD_SIZE;
         if (spaceleft >= msgSize) {

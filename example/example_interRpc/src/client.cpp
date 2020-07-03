@@ -27,6 +27,7 @@
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
+#include "qux.pb.h"
 
 using namespace corpc;
 
@@ -36,14 +37,20 @@ static int iBarSuccCnt = 0;
 static int iBarFailCnt = 0;
 static int iBazSuccCnt = 0;
 static int iBazFailCnt = 0;
+static int iQuxSuccCnt = 0;
+static int iQuxFailCnt = 0;
 
 static int iTotalBazSend = 0;
 static int iTotalBazDone = 0;
+
+static int iTotalQuxSend = 0;
+static int iTotalQuxResp = 0;
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
     BarService::Stub *bar_clt;
     BazService::Stub *baz_clt;
+    QuxService::Stub *qux_clt;
 };
 
 Test_Stubs g_stubs;
@@ -61,8 +68,8 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt;
-        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt;
+        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt + iQuxSuccCnt;
+        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt + iQuxFailCnt;
         
         time_t now = time(NULL);
         
@@ -73,7 +80,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
+        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, qux:Succ %d Fail %d Send %d Resp %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, iQuxSuccCnt, iQuxFailCnt, iTotalQuxSend, iTotalQuxResp, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -81,6 +88,8 @@ static void *log_routine( void *arg )
         iBarFailCnt = 0;
         iBazSuccCnt = 0;
         iBazFailCnt = 0;
+        iQuxSuccCnt = 0;
+        iQuxFailCnt = 0;
     }
     
     return NULL;
@@ -109,7 +118,7 @@ static void *rpc_routine( void *arg )
     // 注意：用于rpc调用参数的request,response和controller对象不能在栈中分配，必须在堆中分配，
     //      这是由于共享栈协程模式下，协程切换时栈会被当前协程栈覆盖，导致指向栈中地址的指针已经不是原来的对象
     while (total > 0) {
-        int type = rand() % 3;
+        int type = rand() % 4;
         switch (type) {
             case 0: {
                 FooRequest *request = new FooRequest();
@@ -181,7 +190,35 @@ static void *rpc_routine( void *arg )
                 
                 iTotalBazSend++;
                 
+                // 注意：这里sleep会影响性能测试
                 msleep(1);
+                
+                break;
+            }
+            case 3: {
+                // 注意：由于超时测试会让当前协程等待一段时间，因此需要更多协程来提供测试性能数据
+                QuxRequest *request = new QuxRequest();
+                QuxResponse *response = new QuxResponse();
+                Controller *controller = new Controller();
+                
+                request->set_text("Hello Qux");
+                request->set_times(1);
+                
+                iTotalQuxSend++;
+                testStubs->qux_clt->Qux(controller, request, response, NULL);
+                iTotalQuxResp++;
+                
+                if (controller->Failed()) {
+                    //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                    iQuxFailCnt++;
+                } else {
+                    //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
+                    iQuxSuccCnt++;
+                }
+                
+                delete controller;
+                delete response;
+                delete request;
                 
                 break;
             }
@@ -226,7 +263,7 @@ int main(int argc, char *argv[]) {
                "rpccli [HOST] [PORT] [TEST_ROUTINE_COUNT]\n");
         return -1;
     }
-    
+
     std::string host = argv[1];
     unsigned short int port = atoi(argv[2]);
     test_routine_count = atoi( argv[3] );
@@ -243,6 +280,7 @@ int main(int argc, char *argv[]) {
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
+    g_stubs.qux_clt = new QuxService::Stub(channel);
     
     // 在主线程中直接开test_routine协程
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);

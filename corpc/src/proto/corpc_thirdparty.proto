@@ -19,6 +19,7 @@ service ThirdPartyService {
     rpc take(corpc.Void) returns(TakeResponse)
     {
         option (corpc.need_coroutine) = true; // default is false
+        option (corpc.timeout) = 10000; // default is 0
     }
 
     rpc put(PutRequest) returns(corpc.Void)

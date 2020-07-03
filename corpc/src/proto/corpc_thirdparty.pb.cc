@@ -108,11 +108,11 @@ void protobuf_AddDesc_corpc_5fthirdparty_2eproto() {
     "\n\026corpc_thirdparty.proto\022\020corpc.thirdpar"
     "ty\032\022corpc_option.proto\"\036\n\014TakeResponse\022\016"
     "\n\006handle\030\001 \002(\004\"+\n\nPutRequest\022\016\n\006handle\030\001"
-    " \002(\004\022\r\n\005error\030\002 \001(\0102\220\001\n\021ThirdPartyServic"
-    "e\0229\n\004take\022\013.corpc.Void\032\036.corpc.thirdpart"
-    "y.TakeResponse\"\004\220\361\004\001\022:\n\003put\022\034.corpc.thir"
-    "dparty.PutRequest\032\013.corpc.Void\"\010\220\361\004\001\230\361\004\001"
-    "\032\004\200\361\004\001B\003\200\001\001", 291);
+    " \002(\004\022\r\n\005error\030\002 \001(\0102\225\001\n\021ThirdPartyServic"
+    "e\022>\n\004take\022\013.corpc.Void\032\036.corpc.thirdpart"
+    "y.TakeResponse\"\t\220\361\004\001\240\361\004\220N\022:\n\003put\022\034.corpc"
+    ".thirdparty.PutRequest\032\013.corpc.Void\"\010\220\361\004"
+    "\001\230\361\004\001\032\004\200\361\004\001B\003\200\001\001", 296);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "corpc_thirdparty.proto", &protobuf_RegisterTypes);
   TakeResponse::default_instance_ = new TakeResponse();

@@ -38,8 +38,8 @@
 #define CORPC_MAX_REQUEST_SIZE 0x10000
 #define CORPC_MAX_RESPONSE_SIZE 0x100000
 
-#define CORPC_REQUEST_HEAD_SIZE 20
-#define CORPC_RESPONSE_HEAD_SIZE 12
+#define CORPC_REQUEST_HEAD_SIZE 28
+#define CORPC_RESPONSE_HEAD_SIZE 20
 
 #define CORPC_MESSAGE_HEAD_SIZE 8
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
@@ -57,6 +57,9 @@
 #define CORPC_HEARTBEAT_PERIOD 5000
 #define CORPC_MAX_NO_HEARTBEAT_TIME 15000
 
+#define CORPC_MAX_UINT64 0xFFFFFFFFFFFFFFFF
+#define CORPC_MIN_UINT64 0
+#define CORPC_SKIP_LIST_MAX_LEVEL 16
 
 #define bswap16(_x)        (uint16_t)((_x) << 8 | (_x) >> 8)
 
@@ -171,7 +174,7 @@ namespace corpc {
         google::protobuf::Service *rpcService;
         std::vector<MethodData> methods;
     };
-    
+
     struct SendMessageInfo {
         int32_t type;
         bool isRaw;
