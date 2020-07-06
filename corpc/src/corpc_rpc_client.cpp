@@ -206,7 +206,9 @@ namespace corpc {
         clientTask->rpcTask->pid = GetPid();
         clientTask->rpcTask->co = co_self();
         clientTask->rpcTask->request = request;
+        clientTask->rpcTask->request_1 = NULL; // 跨进程RPC调用不需要拷贝request
         clientTask->rpcTask->controller = controller;
+        clientTask->rpcTask->controller_1 = NULL;
         clientTask->rpcTask->done = done;
         clientTask->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         clientTask->rpcTask->methodId = method->index();

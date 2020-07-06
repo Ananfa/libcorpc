@@ -59,7 +59,7 @@ namespace corpc {
             Guard& operator=(Guard const&) = delete;       // assign op. delete
             Guard& operator=(Guard &&) = delete;           // move assign op. delete
             
-            void* operator new (std::size_t size) throw (std::bad_alloc) = delete;
+            void* operator new (std::size_t size) = delete;
         };
         
     public:

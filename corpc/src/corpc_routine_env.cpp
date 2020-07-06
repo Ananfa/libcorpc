@@ -278,6 +278,8 @@ namespace corpc {
                     if (node && node->expireTime == wr->expireTime) {
                         if (wr->err) {
                             node->rpcTask->controller->SetFailed(strerror(wr->err));
+                        } else if (node->rpcTask->controller_1 != NULL && node->rpcTask->controller_1->Failed()) {
+                            node->rpcTask->controller->SetFailed(node->rpcTask->controller_1->ErrorText());
                         } else {
                             node->rpcTask->response->MergeFrom(*(node->rpcTask->response_1));
                         }

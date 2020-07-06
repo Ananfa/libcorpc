@@ -29,9 +29,11 @@ namespace corpc {
         pid_t pid;
         stCoRoutine_t *co;
         const google::protobuf::Message* request;
+        google::protobuf::Message* request_1;
         google::protobuf::Message* response;
         google::protobuf::Message* response_1;
         google::protobuf::RpcController *controller;
+        google::protobuf::RpcController *controller_1;
         google::protobuf::Closure *done;
         uint32_t serviceId;
         uint32_t methodId;
@@ -39,9 +41,11 @@ namespace corpc {
 
     public:
     	~RpcClientTask() {
-    		if (expireTime > 0 && response_1 != NULL) {
+    		if (expireTime > 0) {
     			delete response_1;
     		}
+            delete request_1;
+            delete controller_1;
     	}
     };
 

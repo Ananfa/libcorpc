@@ -18,6 +18,7 @@
 
 #include "corpc_inner_rpc.h"
 #include "corpc_utils.h"
+#include "corpc_controller.h"
 
 #include <google/protobuf/service.h>
 #include <google/protobuf/descriptor.h>
@@ -31,18 +32,42 @@ namespace corpc {
     void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
         InnerRpcRequest *req = new InnerRpcRequest;
         req->server = _server;
-        req->pid = GetPid();
-        req->co = co_self();
-        req->request = request;
+        req->rpcTask = std::make_shared<RpcClientTask>();
+        req->rpcTask->pid = GetPid();
+        req->rpcTask->co = co_self();
+        req->rpcTask->request = request;
+        req->rpcTask->request_1 = request->New();
+        req->rpcTask->request_1->CopyFrom(*request);
+        req->rpcTask->controller = controller;
+        req->rpcTask->controller_1 = new Controller();
+        req->rpcTask->done = done;
+        req->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
+        req->rpcTask->methodId = method->index();
         
         bool care_response = !method->options().GetExtension(corpc::not_care_response);
+        uint32_t timeout = method->options().GetExtension(corpc::timeout);
         assert(care_response || done); // not_care_response need done
-        req->response = care_response ? response : NULL;
-        req->controller = controller;
-        req->done = done;
-        req->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
-        req->methodId = method->index();
-        
+        if (care_response) {
+            assert(response != NULL);
+            req->rpcTask->response = response;
+            if (timeout > 0) {
+                req->rpcTask->response_1 = response->New();
+                struct timeval t;
+                gettimeofday(&t, NULL);
+                uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000;
+                req->rpcTask->expireTime = now + timeout;
+                RoutineEnvironment::addTimeoutTask(req->rpcTask);
+            } else {
+                req->rpcTask->response_1 = response;
+                req->rpcTask->expireTime = 0;
+            }
+        } else {
+            assert(timeout == 0);
+            req->rpcTask->response = NULL;
+            req->rpcTask->response_1 = NULL;
+            req->rpcTask->expireTime = 0;
+        }
+
         _server->_queue.push(req);
         
         if (care_response) {
@@ -155,33 +180,43 @@ namespace corpc {
             
             struct timeval t1,t2;
             gettimeofday(&t1, NULL);
+            uint64_t now = t1.tv_sec * 1000 + t1.tv_usec / 1000; // 当前时间（毫秒精度）
             int count = 0;
             
             // 处理任务队列
             InnerRpcRequest *request = queue.pop();
             while (request) {
-                const MethodData *methodData = server->getMethod(request->serviceId, request->methodId);
-                
-                bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
-                
-                if (needCoroutine) {
-                    // 启动协程进行rpc处理
-                    RoutineEnvironment::startCoroutine(requestRoutine, request);
-                } else {
-                    // rpc处理方法调用
-                    server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
-                    
-                    if (request->response) {
-                        // 唤醒协程处理结果
-                        RoutineEnvironment::resumeCoroutine(request->pid, request->co);
-                    } else {
-                        // not_care_response类型的rpc需要在这里触发回调清理request
-                        assert(request->done);
-                        request->done->Run();
-                    }
-                    
+                if (request->rpcTask->expireTime != 0 && now >= request->rpcTask->expireTime) {
+                    assert(request->rpcTask->response);
+                    // 超时
+                    RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime, ETIMEDOUT);
+
                     delete request;
+                } else {
+                    const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
+                    
+                    bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
+                    
+                    if (needCoroutine) {
+                        // 启动协程进行rpc处理
+                        RoutineEnvironment::startCoroutine(requestRoutine, request);
+                    } else {
+                        // rpc处理方法调用
+                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+                        
+                        if (request->rpcTask->response) {
+                            // 唤醒协程处理结果
+                            RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
+                        } else {
+                            // not_care_response类型的rpc需要在这里触发回调清理request
+                            assert(request->rpcTask->done);
+                            request->rpcTask->done->Run();
+                        }
+                        
+                        delete request;
+                    }
                 }
+
 
                 // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，让其他协程处理一下
                 count++;
@@ -191,6 +226,7 @@ namespace corpc {
                         msleep(1);
                         
                         gettimeofday(&t1, NULL);
+                        now = t1.tv_sec * 1000 + t1.tv_usec / 1000;
                     }
                     count = 0;
                 }
@@ -206,17 +242,17 @@ namespace corpc {
         InnerRpcRequest *request = (InnerRpcRequest*)arg;
         InnerRpcServer *server = request->server;
         
-        const MethodData *methodData = server->getMethod(request->serviceId, request->methodId);
+        const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
         
-        server->getService(request->serviceId)->CallMethod(methodData->method_descriptor, request->controller, request->request, request->response, NULL);
+        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
         
-        if (request->response) {
+        if (request->rpcTask->response) {
             // 唤醒协程处理结果
-            RoutineEnvironment::resumeCoroutine(request->pid, request->co);
+            RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
         } else {
             // not_care_response类型的rpc需要在这里触发回调清理request
-            assert(request->done);
-            request->done->Run();
+            assert(request->rpcTask->done);
+            request->rpcTask->done->Run();
         }
         
         delete request;

@@ -137,6 +137,7 @@ public:
 
         iQuxCnt++;
 
+        // 注意：超时用例会影响benchmark数据
         int r = rand() % 1050 + 1;
         msleep(r);
         

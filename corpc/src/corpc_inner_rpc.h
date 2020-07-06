@@ -22,6 +22,7 @@
 #include <thread>
 #include <map>
 #include <google/protobuf/service.h>
+#include <google/protobuf/message.h>
 
 namespace corpc {
     
@@ -30,14 +31,7 @@ namespace corpc {
     
     struct InnerRpcRequest {
         InnerRpcServer *server;
-        pid_t pid;
-        stCoRoutine_t *co;
-        const google::protobuf::Message* request;
-        google::protobuf::Message* response;
-        google::protobuf::RpcController *controller;
-        google::protobuf::Closure *done;
-        uint32_t serviceId;
-        uint32_t methodId;
+        std::shared_ptr<RpcClientTask> rpcTask;
     };
     
 #ifdef USE_NO_LOCK_QUEUE
