@@ -137,10 +137,10 @@ public:
 
         iQuxCnt++;
 
-        //int r = rand() % 2000 + 1;
-        //msleep(r);
+        int r = rand() % 1050 + 1;
+        msleep(r);
         
-        //LOG("BazServiceImpl::Baz: %s\n", str.c_str());
+        //LOG("QuxServiceImpl::Qux: %s\n", str.c_str());
     }
 };
 

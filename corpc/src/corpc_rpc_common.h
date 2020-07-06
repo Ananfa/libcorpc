@@ -18,6 +18,7 @@
 #include "co_routine_inner.h"
 #include <google/protobuf/service.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/message.h>
 
 #ifndef corpc_rpc_common_h
 #define corpc_rpc_common_h
@@ -39,7 +40,7 @@ namespace corpc {
     public:
     	~RpcClientTask() {
     		if (expireTime > 0 && response_1 != NULL) {
-    			//delete response_1;
+    			delete response_1;
     		}
     	}
     };

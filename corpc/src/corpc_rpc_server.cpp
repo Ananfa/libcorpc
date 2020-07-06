@@ -172,6 +172,9 @@ namespace corpc {
             if (!request->ParseFromArray(body, size)) {
                 // 出错处理
                 ERROR_LOG("RpcServer::decode -- parse request body fail\n");
+                delete request;
+                delete response;
+                delete controller;
                 
                 return nullptr;
             }
