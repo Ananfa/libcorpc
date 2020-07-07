@@ -32,6 +32,7 @@ extend google.protobuf.ServiceOptions {
 extend google.protobuf.MethodOptions {
     optional bool need_coroutine = 10002;       // start new coroutine to call the method
     optional bool not_care_response = 10003;    // care response or not
+    optional uint32 timeout = 10004;            // rpc timeout duration, 0 means infinity
 }
 
 message Void {}
@@ -40,6 +41,7 @@ message Void {}
 ***
 
 ### HelloWorld
+This "HelloWorld" example shows a simple way using libcorpc to develop. In the "HelloWorld" example there are three files: helloworld.proto, server.cpp and client.cpp.
 
 - helloworld.proto
 
@@ -63,6 +65,8 @@ service HelloWorldService {
     rpc foo(FooRequest) returns(FooResponse);
 }
 ```
+
+The "helloworld.proto" file define a rpc service "HelloWorldService" with a rpc method "foo". The method has an argument with "FooRequest" message type and the return value type is "FooResponse"
 
 - server.cpp
 
@@ -110,6 +114,9 @@ int main(int argc, const char * argv[]) {
     RoutineEnvironment::runEventLoop();
 }
 ```
+
+The "server.cpp" file is a server implementation which show how to implement a rpc server. 
+The server implementation create a IO object before create the RpcServer object. The IO object is responsible for recv and send data efficiently. The RpcServer is responsible for providing rpc service in certain address by register a rpc service (HelloWorldServiceImpl) to the RpcServer. The "HelloWorldServiceImpl" class implement HelloWorldService, it combine msg1 and msg2 string from the request and return result by the response.
 
 - client.cpp
 
@@ -173,6 +180,8 @@ int main(int argc, const char * argv[]) {
 }
 
 ```
+
+The "client.cpp" file is the client side implementation which show how to call rpc server from rpc client. The client implementation also create an IO object, a RpcClient base on the IO object, a rpc channal connect to the rpc server and then create the service stub object base on the rpc channel. The rpc method "foo" can be call by the stub object. In this example it create a coroutine to call rpc.
 
 ***
 
