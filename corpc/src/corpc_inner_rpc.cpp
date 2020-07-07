@@ -36,10 +36,7 @@ namespace corpc {
         req->rpcTask->pid = GetPid();
         req->rpcTask->co = co_self();
         req->rpcTask->request = request;
-        req->rpcTask->request_1 = request->New();
-        req->rpcTask->request_1->CopyFrom(*request);
         req->rpcTask->controller = controller;
-        req->rpcTask->controller_1 = new Controller();
         req->rpcTask->done = done;
         req->rpcTask->serviceId = method->service()->options().GetExtension(corpc::global_service_id);
         req->rpcTask->methodId = method->index();
@@ -52,19 +49,27 @@ namespace corpc {
             req->rpcTask->response = response;
             if (timeout > 0) {
                 req->rpcTask->response_1 = response->New();
+                req->rpcTask->request_1 = request->New();
+                req->rpcTask->request_1->CopyFrom(*request);
+                req->rpcTask->controller_1 = new Controller();
+
                 struct timeval t;
                 gettimeofday(&t, NULL);
                 uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000;
                 req->rpcTask->expireTime = now + timeout;
                 RoutineEnvironment::addTimeoutTask(req->rpcTask);
             } else {
-                req->rpcTask->response_1 = response;
+                req->rpcTask->response_1 = NULL;
+                req->rpcTask->request_1 = NULL;
+                req->rpcTask->controller_1 = NULL;
                 req->rpcTask->expireTime = 0;
             }
         } else {
             assert(timeout == 0);
             req->rpcTask->response = NULL;
             req->rpcTask->response_1 = NULL;
+            req->rpcTask->request_1 = NULL;
+            req->rpcTask->controller_1 = NULL;
             req->rpcTask->expireTime = 0;
         }
 
@@ -202,7 +207,11 @@ namespace corpc {
                         RoutineEnvironment::startCoroutine(requestRoutine, request);
                     } else {
                         // rpc处理方法调用
-                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+                        if (request->rpcTask->expireTime == 0) {
+                            server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller, request->rpcTask->request, request->rpcTask->response, NULL);
+                        } else {
+                            server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+                        }
                         
                         if (request->rpcTask->response) {
                             // 唤醒协程处理结果
@@ -244,7 +253,11 @@ namespace corpc {
         
         const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
         
-        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+        if (request->rpcTask->expireTime == 0) {
+            server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller, request->rpcTask->request, request->rpcTask->response, NULL);
+        } else {
+            server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+        }
         
         if (request->rpcTask->response) {
             // 唤醒协程处理结果

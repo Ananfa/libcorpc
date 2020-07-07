@@ -43,9 +43,9 @@ namespace corpc {
     	~RpcClientTask() {
     		if (expireTime > 0) {
     			delete response_1;
+                delete request_1;
+                delete controller_1;
     		}
-            delete request_1;
-            delete controller_1;
     	}
     };
 

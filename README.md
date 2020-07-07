@@ -41,7 +41,7 @@ message Void {}
 ***
 
 ### HelloWorld
-This "HelloWorld" example shows a simple way using libcorpc to develop. In the "HelloWorld" example there are three files: helloworld.proto, server.cpp and client.cpp.
+This "HelloWorld" example shows a simple way using libcorpc to develop. There are three files in the "HelloWorld" example: helloworld.proto, server.cpp and client.cpp.
 
 - helloworld.proto
 
