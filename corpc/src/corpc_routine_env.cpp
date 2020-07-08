@@ -286,10 +286,10 @@ namespace corpc {
 
                         curenv->_timeoutList.remove(node);
 
-                        co_active(wr->co); // 激活协程（这里没有协程切换）
+                        co_activate(wr->co); // 激活协程（这里没有协程切换）
                     }
                 } else {
-                    co_active(wr->co); // 激活协程（这里没有协程切换）
+                    co_activate(wr->co); // 激活协程（这里没有协程切换）
                 }
                 
                 delete wr;
@@ -322,7 +322,7 @@ namespace corpc {
                     node->rpcTask->controller->SetFailed(strerror(ETIMEDOUT));
                     stCoRoutine_t *co = node->rpcTask->co;
                     curenv->_timeoutList.remove(node);
-                    co_active(co);
+                    co_activate(co);
                     node = curenv->_timeoutList.getLast();
                 }
             }

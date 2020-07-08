@@ -1,15 +1,17 @@
+syntax = "proto3";
+
 import "corpc_option.proto";
 
 option cc_generic_services = true;
 
 message QuxRequest {
-    required string text = 1;
-    optional int32 times = 2;
+    string text = 1;
+    int32 times = 2;
 }
 
 message QuxResponse {
-    required string text = 1;
-    optional bool result = 2;
+    string text = 1;
+    bool result = 2;
 }
 
 service QuxService {
