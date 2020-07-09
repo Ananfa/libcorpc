@@ -249,8 +249,8 @@ namespace corpc {
         }
         
     }
-    
-    RpcClient::Channel::~Channel() {
+
+    RpcClient::Channel::Guard::~Guard() {
         // 发消息给RpcClient线程来清理Channel
         // 注意：不能在这里清理，因为会产生多线程问题
         _channel->_client->_clearChannelQueue.push(_channel);

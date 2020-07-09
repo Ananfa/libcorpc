@@ -100,8 +100,23 @@ namespace corpc {
         
     public:
         class Channel : public google::protobuf::RpcChannel {
+        private:
+            class Guard {
+            public:
+                Guard(std::shared_ptr<ChannelCore> &channel): _channel(channel) {}
+                ~Guard();
+            private:
+                std::shared_ptr<ChannelCore> _channel;
+            };
+
         public:
-            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1): _channel(new ChannelCore(client, host, port, connectNum)) {}
+            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1): _channel(new ChannelCore(client, host, port, connectNum)) {
+                _guard = std::make_shared<Guard>(_channel);
+            }
+            Channel(const Channel& channel) {
+                _channel = channel._channel;
+                _guard = channel._guard;
+            }
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
                 _channel->CallMethod(method, controller, request, response, done);
             }
@@ -110,9 +125,10 @@ namespace corpc {
             uint32_t getPort() const { return _channel->_port; }
             
         private:
-            virtual ~Channel();
+            virtual ~Channel() {}
             
         private:
+            std::shared_ptr<Guard> _guard;
             std::shared_ptr<ChannelCore> _channel;
         };
         
