@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+import "corpc_option.proto";
+
+option cc_generic_services = true;
+
+message BazRequest {
+    string text = 1;
+}
+
+service BazService {
+    option (corpc.global_service_id) = 3;
+
+    rpc Baz(BazRequest) returns(corpc.Void)
+    {
+        option (corpc.not_care_response) = true; // default is false
+    }
+}

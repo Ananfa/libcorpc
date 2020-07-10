@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(example_interRpc)
+project(example_release_channel)
 
 # Check dependency libraries
 find_library(PROTOBUF_LIB protobuf)
@@ -55,9 +55,9 @@ include_directories(/usr/local/include/corpc/proto)
 include_directories(${PROJECT_SOURCE_DIR}/../proto)
 
 # Add target
-add_executable(interRpcS ${SERVER_SOURCE_FILES})
-add_executable(interRpcC ${CLIENT_SOURCE_FILES})
+add_executable(testS ${SERVER_SOURCE_FILES})
+add_executable(testC ${CLIENT_SOURCE_FILES})
 
 set(MY_LINK_LIBRARIES -L/usr/local/lib -lprotobuf -lcorpc -lco -ldl)
-target_link_libraries(interRpcS ${MY_LINK_LIBRARIES})
-target_link_libraries(interRpcC ${MY_LINK_LIBRARIES})
+target_link_libraries(testS ${MY_LINK_LIBRARIES})
+target_link_libraries(testC ${MY_LINK_LIBRARIES})

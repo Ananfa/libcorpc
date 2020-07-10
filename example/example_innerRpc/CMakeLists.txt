@@ -29,7 +29,6 @@ set(SOURCE_FILES
     ../proto/foo.pb.cc
     ../proto/bar.pb.cc
     ../proto/baz.pb.cc
-    ../proto/qux.pb.cc
     src/main.cpp)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)

@@ -27,7 +27,6 @@
 #include "foo.pb.h"
 #include "bar.pb.h"
 #include "baz.pb.h"
-#include "qux.pb.h"
 
 using namespace corpc;
 
@@ -37,20 +36,14 @@ static int iBarSuccCnt = 0;
 static int iBarFailCnt = 0;
 static int iBazSuccCnt = 0;
 static int iBazFailCnt = 0;
-static int iQuxSuccCnt = 0;
-static int iQuxFailCnt = 0;
 
 static int iTotalBazSend = 0;
 static int iTotalBazDone = 0;
-
-static int iTotalQuxSend = 0;
-static int iTotalQuxResp = 0;
 
 struct Test_Stubs {
     FooService::Stub *foo_clt;
     BarService::Stub *bar_clt;
     BazService::Stub *baz_clt;
-    QuxService::Stub *qux_clt;
 };
 
 Test_Stubs g_stubs;
@@ -68,8 +61,8 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt + iQuxSuccCnt;
-        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt + iQuxFailCnt;
+        totalSucc += iFooSuccCnt + iBarSuccCnt + iBazSuccCnt;
+        totalFail += iFooFailCnt + iBarFailCnt + iBazFailCnt;
         
         time_t now = time(NULL);
         
@@ -80,7 +73,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, qux:Succ %d Fail %d Send %d Resp %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, iQuxSuccCnt, iQuxFailCnt, iTotalQuxSend, iTotalQuxResp, averageSucc, totalSucc + totalFail);
+        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -88,8 +81,6 @@ static void *log_routine( void *arg )
         iBarFailCnt = 0;
         iBazSuccCnt = 0;
         iBazFailCnt = 0;
-        iQuxSuccCnt = 0;
-        iQuxFailCnt = 0;
     }
     
     return NULL;
@@ -108,139 +99,127 @@ static void callDoneHandle(::google::protobuf::Message *request, corpc::Controll
     delete request;
 }
 
-static void *rpc_routine( void *arg )
+static void *foo_routine( void *arg )
 {
     co_enable_hook_sys();
     
     Test_Stubs *testStubs = (Test_Stubs*)arg;
-    
-    int total = 100000;
-    // 注意：用于rpc调用参数的request,response和controller对象不能在栈中分配，必须在堆中分配，
-    //      这是由于共享栈协程模式下，协程切换时栈会被当前协程栈覆盖，导致指向栈中地址的指针已经不是原来的对象
-    while (total > 0) {
-        int type = rand() % 4;
-        switch (type) {
-            case 0: {
-                FooRequest *request = new FooRequest();
-                FooResponse *response = new FooResponse();
-                Controller *controller = new Controller();
-                
-                request->set_text("Hello Foo");
-                request->set_times(1);
-                
-                do {
-                    controller->Reset();
-                    testStubs->foo_clt->Foo(controller, request, response, NULL);
-                    
-                    if (controller->Failed()) {
-                        //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                        iFooFailCnt++;
-                        
-                        msleep(100);
-                    } else {
-                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
-                        iFooSuccCnt++;
-                    }
-                } while (controller->Failed());
-                
-                delete controller;
-                delete response;
-                delete request;
-                break;
-            }
-            case 1: {
-                BarRequest *request = new BarRequest();
-                BarResponse *response = new BarResponse();
-                Controller *controller = new Controller();
-                
-                request->set_text("Hello Bar");
-                request->set_times(1);
-                
-                do {
-                    controller->Reset();
-                    testStubs->bar_clt->Bar(controller, request, response, NULL);
-                    
-                    if (controller->Failed()) {
-                        //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                        iBarFailCnt++;
-                        
-                        msleep(100);
-                    } else {
-                        //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
-                        iBarSuccCnt++;
-                    }
-                } while (controller->Failed());
-                
-                delete controller;
-                delete response;
-                delete request;
-                
-                break;
-            }
-            case 2: {
-                BazRequest *request = new BazRequest();
-                Controller *controller = new Controller();
-                
-                request->set_text("Hello Baz");
-                
-                // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递。
-                // 注意：not_care_response类型的rpc调用是异步的，request和controller对象在回调处理中才能删除，不能在调用语句后面马上删除。
-                // 因此not_care_response类型的rpc调用必须提供回调对象
-                testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
-                
-                iTotalBazSend++;
-                
-                // 注意：这里sleep会影响性能测试
-                msleep(1);
-                
-                break;
-            }
-            case 3: {
-                // 注意：由于超时测试会让当前协程等待一段时间，因此需要更多协程来提供测试性能数据
-                QuxRequest *request = new QuxRequest();
-                QuxResponse *response = new QuxResponse();
-                Controller *controller = new Controller();
-                
-                request->set_text("Hello Qux");
-                request->set_times(1);
-                
-                iTotalQuxSend++;
-                testStubs->qux_clt->Qux(controller, request, response, NULL);
-                iTotalQuxResp++;
-                
-                if (controller->Failed()) {
-                    //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
-                    iQuxFailCnt++;
-                } else {
-                    //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
-                    iQuxSuccCnt++;
-                }
-                
-                delete controller;
-                delete response;
-                delete request;
-                
-                break;
-            }
-            default:
-                break;
-        }
+
+    while (true) {
+        FooRequest *request = new FooRequest();
+        FooResponse *response = new FooResponse();
+        Controller *controller = new Controller();
         
-        //total--;
+        request->set_text("Hello Foo");
+        request->set_times(1);
+        
+        do {
+            controller->Reset();
+            testStubs->foo_clt->Foo(controller, request, response, NULL);
+            
+            if (controller->Failed()) {
+                //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                iFooFailCnt++;
+                
+                msleep(100);
+            } else {
+                //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
+                iFooSuccCnt++;
+            }
+        } while (controller->Failed());
+        
+        delete controller;
+        delete response;
+        delete request;
     }
-    
+
     return NULL;
 }
 
-int test_routine_count = 1000;
+static void *bar_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    Test_Stubs *testStubs = (Test_Stubs*)arg;
+
+    while (true) {
+        BarRequest *request = new BarRequest();
+        BarResponse *response = new BarResponse();
+        Controller *controller = new Controller();
+        
+        request->set_text("Hello Bar");
+        request->set_times(1);
+        
+        do {
+            controller->Reset();
+            testStubs->bar_clt->Bar(controller, request, response, NULL);
+            
+            if (controller->Failed()) {
+                //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                iBarFailCnt++;
+                
+                msleep(100);
+            } else {
+                //LOG("++++++ Rpc Response is %s\n", response->text().c_str());
+                iBarSuccCnt++;
+            }
+        } while (controller->Failed());
+        
+        delete controller;
+        delete response;
+        delete request;
+    }
+
+    return NULL;
+}
+
+static void *baz_routine( void *arg )
+{
+    co_enable_hook_sys();
+    
+    Test_Stubs *testStubs = (Test_Stubs*)arg;
+
+    while (true) {
+        BazRequest *request = new BazRequest();
+        Controller *controller = new Controller();
+        
+        request->set_text("Hello Baz");
+        
+        // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递。
+        // 注意：not_care_response类型的rpc调用是异步的，request和controller对象在回调处理中才能删除，不能在调用语句后面马上删除。
+        // 因此not_care_response类型的rpc调用必须提供回调对象
+        testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
+        
+        iTotalBazSend++;
+        
+        // 注意：这里sleep会影响性能测试
+        //if (iTotalBazSend % 10 == 0) {
+            msleep(1);
+        //}
+    }
+
+    return NULL;
+}
+
+int foo_routine_num = 1000;
+int bar_routine_num = 1000;
+int baz_routine_num = 1000;
 static void *test_routine( void *arg )
 {
     co_enable_hook_sys();
     
     LOG("test_routine begin\n");
     
-    for (int i=0; i<test_routine_count; i++) {
-        RoutineEnvironment::startCoroutine(rpc_routine, arg);
+    for (int i=0; i<foo_routine_num; i++) {
+        RoutineEnvironment::startCoroutine(foo_routine, arg);
+    }
+    
+    for (int i=0; i<bar_routine_num; i++) {
+        RoutineEnvironment::startCoroutine(bar_routine, arg);
+    }
+    
+    for (int i=0; i<baz_routine_num; i++) {
+        RoutineEnvironment::startCoroutine(baz_routine, arg);
     }
     
     return NULL;
@@ -258,15 +237,17 @@ void clientThread() {
 int main(int argc, char *argv[]) {
     co_start_hook();
     
-    if(argc<4){
+    if(argc<6){
         LOG("Usage:\n"
-               "rpccli [HOST] [PORT] [TEST_ROUTINE_COUNT]\n");
+               "rpccli [HOST] [PORT] [FOO_ROUTINE_NUM] [BAR_ROUTINE_NUM] [BAZ_ROUTINE_NUM]\n");
         return -1;
     }
 
     std::string host = argv[1];
     unsigned short int port = atoi(argv[2]);
-    test_routine_count = atoi( argv[3] );
+    foo_routine_num = atoi( argv[3] );
+    bar_routine_num = atoi( argv[4] );
+    baz_routine_num = atoi( argv[5] );
     
     struct sigaction sa;
     sa.sa_handler = SIG_IGN;
@@ -280,7 +261,6 @@ int main(int argc, char *argv[]) {
     g_stubs.foo_clt = new FooService::Stub(channel);
     g_stubs.bar_clt = new BarService::Stub(channel);
     g_stubs.baz_clt = new BazService::Stub(channel);
-    g_stubs.qux_clt = new QuxService::Stub(channel);
     
     // 在主线程中直接开test_routine协程
     RoutineEnvironment::startCoroutine(test_routine, &g_stubs);
