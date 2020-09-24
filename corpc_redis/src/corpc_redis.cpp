@@ -43,7 +43,12 @@ redisContext* RedisConnectPool::Proxy::take() {
     _stub->take(controller, request, response, NULL);
     
     if (controller->Failed()) {
-        fprintf(stderr, "Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        
+        delete controller;
+        delete response;
+        delete request;
+        
         return NULL;
     }
     
@@ -223,7 +228,7 @@ void *RedisConnectPool::clearIdleRoutine( void *arg ) {
         time(&now);
         
         while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
-            DEBUG_LOG("RedisConnectPool::clearIdleRoutine -- disconnect a redis connection");
+            DEBUG_LOG("RedisConnectPool::clearIdleRoutine -- disconnect a redis connection\n");
             redisContext *handle = self->_idleList.front().handle;
             self->_idleList.pop_front();
             self->_realConnectCount--;

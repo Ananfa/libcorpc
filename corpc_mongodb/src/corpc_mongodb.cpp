@@ -46,7 +46,12 @@ mongoc_client_t* MongodbConnectPool::Proxy::take() {
     _stub->take(controller, request, response, NULL);
     
     if (controller->Failed()) {
-        fprintf(stderr, "Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        
+        delete controller;
+        delete response;
+        delete request;
+        
         return NULL;
     }
     

@@ -140,12 +140,12 @@ namespace corpc {
         
 #ifdef USE_NO_LOCK_QUEUE
         typedef Co_MPSC_NoLockQueue<ConnectionTask*> ConnectionTaskQueue;
-        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ClientTask> > ClientTaskQueue;
-        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ChannelCore> > ClearChannelQueue;
+        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ClientTask>> ClientTaskQueue;
+        typedef Co_MPSC_NoLockQueue<std::shared_ptr<ChannelCore>> ClearChannelQueue;
 #else
         typedef CoSyncQueue<ConnectionTask*> ConnectionTaskQueue;
-        typedef CoSyncQueue<std::shared_ptr<ClientTask> > ClientTaskQueue;
-        typedef CoSyncQueue<std::shared_ptr<ChannelCore> > ClearChannelQueue;
+        typedef CoSyncQueue<std::shared_ptr<ClientTask>> ClientTaskQueue;
+        typedef CoSyncQueue<std::shared_ptr<ChannelCore>> ClearChannelQueue;
 #endif
        
     public:

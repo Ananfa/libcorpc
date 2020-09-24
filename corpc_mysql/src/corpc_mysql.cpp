@@ -45,6 +45,11 @@ MYSQL* MysqlConnectPool::Proxy::take() {
     
     if (controller->Failed()) {
         ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        
+        delete controller;
+        delete response;
+        delete request;
+        
         return NULL;
     }
     

@@ -27,6 +27,7 @@
 #include <google/protobuf/message.h>
 
 namespace corpc {
+    // 由于需要线程间通信，这里没有使用__thread来实现线程相关变量，而是全局数组，风险点是pid超出204800导致数组越界（一般也不会在系统中启动那么多线程）
     static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
     std::atomic<uint32_t> RoutineEnvironment::_keyRoutineNum(0);
     

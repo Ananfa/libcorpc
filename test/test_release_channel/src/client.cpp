@@ -40,6 +40,8 @@ static int iBazFailCnt = 0;
 static int iTotalBazSend = 0;
 static int iTotalBazDone = 0;
 
+static int iTotalSend = 0;
+
 static void *log_routine( void *arg )
 {
     co_enable_hook_sys();
@@ -65,7 +67,7 @@ static void *log_routine( void *arg )
             averageSucc = totalSucc;
         }
         
-        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, total: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, totalSucc + totalFail);
+        LOG("time %ld seconds, foo:Succ %d Fail %d, bar:Succ %d Fail %d, baz:Succ %d Fail %d Send %d Done %d, average:Succ %d, totalSend: %d, totalRecv: %d\n", difTime, iFooSuccCnt, iFooFailCnt, iBarSuccCnt, iBarFailCnt, iBazSuccCnt, iBazFailCnt, iTotalBazSend, iTotalBazDone, averageSucc, iTotalSend, totalSucc + totalFail);
         
         iFooSuccCnt = 0;
         iFooFailCnt = 0;
@@ -100,9 +102,12 @@ static void *foo_routine( void *arg )
     FooRequest *request = new FooRequest();
     FooResponse *response = new FooResponse();
     Controller *controller = new Controller();
-    
+
     request->set_text("Hello Foo");
     request->set_times(1);
+
+    iTotalSend++;
+
     stub->Foo(controller, request, response, NULL);
     
     if (controller->Failed()) {
@@ -137,7 +142,8 @@ static void *bar_routine( void *arg )
     request->set_text("Hello Bar");
     request->set_times(1);
     
-    controller->Reset();
+    iTotalSend++;
+
     stub->Bar(controller, request, response, NULL);
     
     if (controller->Failed()) {
@@ -170,6 +176,8 @@ static void *baz_routine( void *arg )
     
     request->set_text("Hello Baz");
     
+    iTotalSend++;
+
     // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递。
     // 注意：not_care_response类型的rpc调用是异步的，request和controller对象在回调处理中才能删除，不能在调用语句后面马上删除。
     // 因此not_care_response类型的rpc调用必须提供回调对象
@@ -181,10 +189,6 @@ static void *baz_routine( void *arg )
 
     return NULL;
 }
-
-int foo_routine_num = 1000;
-int bar_routine_num = 1000;
-int baz_routine_num = 1000;
 
 std::string host;
 unsigned short int port;
@@ -200,6 +204,7 @@ static void *test_routine( void *arg )
     
     int i = 0;
     while (true) {
+        // 其中的channel会在stub销毁的时候进行清理
         FooService::Stub *foo_clt = new FooService::Stub(new RpcClient::Channel(client, host, port, 1), google::protobuf::Service::STUB_OWNS_CHANNEL);
         BarService::Stub *bar_clt = new BarService::Stub(new RpcClient::Channel(static_cast<RpcClient::Channel&>(*foo_clt->channel())), google::protobuf::Service::STUB_OWNS_CHANNEL);
         BazService::Stub *baz_clt = new BazService::Stub(new RpcClient::Channel(static_cast<RpcClient::Channel&>(*foo_clt->channel())), google::protobuf::Service::STUB_OWNS_CHANNEL);
@@ -209,7 +214,7 @@ static void *test_routine( void *arg )
         RoutineEnvironment::startCoroutine(baz_routine, baz_clt);
 
         i++;
-        if (i % 2 == 0) {
+        if (i % 3 == 0) {
             msleep(1);
             i = 0;
         }
