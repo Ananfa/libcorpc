@@ -604,7 +604,7 @@ ssize_t recv( int socket, void *buffer, size_t length, int flags )
 
 	if( readret < 0 )
 	{
-		co_log_err("CO_ERR: read fd %d ret %ld errno %d poll ret %d timeout %d\n",
+		co_log_err("CO_ERR: recv fd %d ret %ld errno %d poll ret %d timeout %d\n",
 					socket,readret,errno,pollret,timeout);
 	}
 

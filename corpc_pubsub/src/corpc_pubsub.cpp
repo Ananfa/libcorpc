@@ -15,25 +15,26 @@
  */
 
 #include "corpc_pubsub.h"
+#include "corpc_routine_env.h"
 #include <string.h>
 
 using namespace corpc;
 
 PubsubService* PubsubService::_service = nullptr;
 
-PubsubService::PubsubService(RedisConnectPool *redisPool, const std::list<const std::string topic>& subTopics): _redisPool(redisPool), _subCon(nullptr), _pubCon(nullptr) {
+PubsubService::PubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics): _redisPool(redisPool), _subCon(nullptr) {
     for (auto it = subTopics.cbegin(); it != subTopics.cend(); ++it) {
         _subTopicMap[*it] = true;
     }
 }
 
-bool PubsubService::StartPubsubService(RedisConnectPool *redisPool, const std::list<const std::string topic>& subTopics) {
+bool PubsubService::StartPubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics) {
     if (_service != nullptr) {
         return false;
     }
 
     _service = new PubsubService(redisPool, subTopics);
-    _service->start();
+    _service->_start();
 
     return true;
 }
@@ -63,36 +64,37 @@ void PubsubService::threadEntry(PubsubService *self) {
 void *PubsubService::subscribeRoutine(void *arg) {
     PubsubService *self = (PubsubService *)arg;
     
-    std::string topicStr;
-    for (auto it = self->_subTopics.cbegin(); it != self->_subTopics.cend(); ++it) {
-        topicStr += *it;
-        topicStr += " ";
+    std::string commandStr = "SUBSCRIBE";
+    for (auto it = self->_subTopicMap.begin(); it != self->_subTopicMap.end(); ++it) {
+        commandStr += " ";
+        commandStr += it->first;
     }
 
-    RedisConnectPool::Proxy* proxy = self->_redisPool->proxy;
+    RedisConnectPool::Proxy& proxy = self->_redisPool->proxy;
     // Get redisContext from pool
     while (true) {
-        redisContext *redis = proxy->take();
-        redisReply *reply = (redisReply *)redisCommand(redis, "SUBSCRIBE %s", topicStr.c_str());
+        redisContext *redis = proxy.take();
+        redisReply *reply = (redisReply *)redisCommand(redis, commandStr.c_str());
+        co_set_timeout(redis->fd, -1, 1000);
         freeReplyObject(reply);
-        while (redisGetReply(redis, &reply) == REDIS_OK) {
+        while (redisGetReply(redis, (void**)&reply) == REDIS_OK) {
             // 向订阅主题环境发消息
             assert(reply->elements == 3);
             if (strcmp(reply->element[0]->str, "message") == 0) {
-                auto it = _topicToEnvsMap.find(reply->element[1]->str);
-                if (it != _topicToEnvsMap.end()) {
+                auto it = self->_topicToEnvsMap.find(reply->element[1]->str);
+                if (it != self->_topicToEnvsMap.end()) {
                     std::shared_ptr<TopicMessage> tmsg(new TopicMessage());
                     tmsg->topic.assign(reply->element[1]->str, reply->element[1]->len);
                     tmsg->message.assign(reply->element[2]->str, reply->element[2]->len);
-                    for (auto it1 = it->begin(); it1 != it->end(); ++it1) {
-                        it1->_queue.push(tmsg);
+                    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
+                        (*it1)->_queue.push(tmsg);
                     }
                 }
             }
             
             freeReplyObject(reply);
         }
-        proxy->put(redis, true);
+        proxy.put(redis, true);
         // 出错后等待1秒重连
         sleep(1);
     }
@@ -106,7 +108,6 @@ void *PubsubService::registerRoutine(void *arg) {
     int readFd = queue.getReadFd();
     co_register_fd(readFd);
     co_set_timeout(readFd, -1, 1000);
-
     int ret;
     std::vector<char> buf(1024);
     while (true) {
@@ -130,15 +131,15 @@ void *PubsubService::registerRoutine(void *arg) {
         // 登记主题订阅环境
         TopicRegisterMessage *msg = queue.pop();
         while (msg) {
-            _topicToEnvsMap[msg->topic].push_back(msg->env);
+            self->_topicToEnvsMap[msg->topic].push_back(msg->env);
             delete msg;
             msg = queue.pop();
         }
     }
 }
 
-void PubsubService::start() {
-    if (_subTopics.size() > 0) {
+void PubsubService::_start() {
+    if (_subTopicMap.size() > 0) {
         // 启动处理线程
         _t = std::thread(threadEntry, this);
     }
@@ -151,8 +152,8 @@ bool PubsubService::_subscribe(const std::string& topic, bool needCoroutine, Sub
     }
 
     // 判断主题是否在主题表中
-    auto it = self->_subTopicMap.find(*it);
-    if (it == self->_subTopicMap.end()) {
+    auto it = _subTopicMap.find(topic);
+    if (it == _subTopicMap.end()) {
         ERROR_LOG("PubsubService::_subscribe -- topic invalid\n");
         return false;
     }
@@ -163,8 +164,8 @@ bool PubsubService::_subscribe(const std::string& topic, bool needCoroutine, Sub
 }
 
 bool PubsubService::_publish(const std::string& topic, const std::string& msg) {
-    RedisConnectPool::Proxy* proxy = _redisPool->proxy;
-    redisContext *redis = proxy->take();
+    RedisConnectPool::Proxy& proxy = _redisPool->proxy;
+    redisContext *redis = proxy.take();
     if (redis == nullptr) {
         return false;
     }
@@ -175,9 +176,9 @@ bool PubsubService::_publish(const std::string& topic, const std::string& msg) {
             freeReplyObject(reply);
         }
 
-        proxy->put(redis, true);
+        proxy.put(redis, true);
     } else {
-        proxy->put(redis, false);
+        proxy.put(redis, false);
     }
 }
 
@@ -205,7 +206,7 @@ void SubscribeEnv::addSubscribeCallback(const std::string& topic, bool needCorou
         TopicRegisterMessage *msg = new TopicRegisterMessage();
         msg->topic = topic;
         msg->env = this;
-        _service->_queue.push(msg);
+        PubsubService::_service->_queue.push(msg);
     }
 }
 
@@ -217,7 +218,6 @@ void *SubscribeEnv::deamonRoutine(void *arg) {
     int readFd = queue.getReadFd();
     co_register_fd(readFd);
     co_set_timeout(readFd, -1, 1000);
-
     int ret;
     std::vector<char> buf(1024);
     while (true) {
@@ -277,8 +277,7 @@ void *SubscribeEnv::deamonRoutine(void *arg) {
 
 void *SubscribeEnv::callbackRoutine(void * arg) {
     TopicMessageTask *task = (TopicMessageTask*)arg;
-
     task->callback(task->msg->topic, task->msg->message);
-
     delete task;
+    return NULL;
 }

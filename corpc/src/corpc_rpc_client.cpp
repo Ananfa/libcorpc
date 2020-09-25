@@ -494,6 +494,8 @@ namespace corpc {
             }
             
         }
+
+        return NULL;
     }
     
     void *RpcClient::taskHandleRoutine(void *arg) {

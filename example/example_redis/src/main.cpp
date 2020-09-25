@@ -30,7 +30,6 @@ static void *log_routine( void *arg )
     
     while (true) {
         sleep(1);
-        
         total += g_cnt;
         
         if (total == 0) {
@@ -60,13 +59,13 @@ static void *redis_routine( void *arg )
     co_enable_hook_sys();
     
     RedisConnectPool *redisPool = (RedisConnectPool*)arg;
-    RedisConnectPool::Proxy* proxy = redisPool->getProxy();
+    RedisConnectPool::Proxy& proxy = redisPool->proxy;
     
     redisReply *reply;
     while (1)
     {
         // 获取连接
-        redisContext *redis = proxy->take();
+        redisContext *redis = proxy.take();
         
         if (!redis) {
             ERROR_LOG("can't take redis handle\n");
@@ -124,7 +123,7 @@ static void *redis_routine( void *arg )
         g_cnt++;
         
         // 归还连接
-        proxy->put(redis, false);
+        proxy.put(redis, false);
     }
     
     return NULL;
@@ -139,15 +138,16 @@ struct TestStruct {
 static void *redis_routine1( void *arg )
 {
     co_enable_hook_sys();
-    
+    LOG("1\n");
     RedisConnectPool *redisPool = (RedisConnectPool*)arg;
-    RedisConnectPool::Proxy* proxy = redisPool->getProxy();
+    RedisConnectPool::Proxy& proxy = redisPool->proxy;
     
     redisReply *reply;
     
     // 获取连接
-    redisContext *redis = proxy->take();
+    redisContext *redis = proxy.take();
     
+    LOG("2\n");
     if (!redis) {
         ERROR_LOG("can't take redis handle\n");
         return NULL;
@@ -155,6 +155,7 @@ static void *redis_routine1( void *arg )
     
     sleep(10);
     
+    LOG("3\n");
     reply = (redisReply *)redisCommand(redis,"WATCH hahaha");
     LOG("WATCH: %d\n", reply->type);
     freeReplyObject(reply);
@@ -192,7 +193,7 @@ static void *redis_routine1( void *arg )
      */
     
     // 归还连接
-    proxy->put(redis, false);
+    proxy.put(redis, false);
     
     
     return NULL;
@@ -228,7 +229,7 @@ void clientThread(RedisConnectPool *redisPool) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    RedisConnectPool *redisPool = RedisConnectPool::create("127.0.0.1", 6379, 8, 4);
+    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.3", 6379, 8);
     
     /*
     // 开两个线程进行多线程访问
@@ -239,6 +240,7 @@ int main(int argc, const char * argv[]) {
     */
     
     RoutineEnvironment::startCoroutine(redis_routine1, redisPool);
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
     
     RoutineEnvironment::runEventLoop();
     
