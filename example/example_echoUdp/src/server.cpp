@@ -21,6 +21,7 @@
 #include <signal.h>
 
 #include <google/protobuf/message.h>
+#include "corpc_crypter.h"
 #include "echo.pb.h"
 
 static int g_cnt = 0;
@@ -77,13 +78,31 @@ int main(int argc, const char * argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
+    std::string key = "1234567fvxcvc";
+    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+
+    std::map<int, uint16_t> clients;
+    
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
     
-    corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, ip, port);
+    corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, true, true, false, ip, port);
     server->start();
     
-    server->registerMessage(1, new FooRequest, false, [](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [crypter, &clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+        conn->setCrypter(crypter);
+        int fd = conn->getfd();
+        assert(clients.find(fd) == clients.end());
+        clients[fd] = 0;
+    });
+
+    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+        int fd = conn->getfd();
+        assert(clients.find(fd) != clients.end());
+        clients.erase(fd);
+    });
+
+    server->registerMessage(1, new FooRequest, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -94,13 +113,11 @@ int main(int argc, const char * argv[]) {
         for (int i = 1; i < request->times(); i++)
             str += (" " + tmp);
         response->set_text(str);
+
+        int fd = conn->getfd();
+        assert(clients.find(fd) != clients.end());
         
-        std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
-        sendInfo->type = 1;
-        sendInfo->isRaw = false;
-        sendInfo->msg = response;
-        
-        conn->send(sendInfo);
+        conn->send(1, false, true, ++clients[fd], response);
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

@@ -10,6 +10,7 @@
 #include <thread>
 #include <list>
 #include <mutex>
+#include <memory.h>
 #include <stdio.h> //printf
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -18,11 +19,14 @@
 #include <sys/time.h>
 
 #include <google/protobuf/message.h>
+#include "corpc_crypter.h"
+#include "corpc_crc.h"
 #include "echo.pb.h"
 
 #define CORPC_MSG_TYPE_HEARTBEAT -115
+#define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
-#define CORPC_MESSAGE_HEAD_SIZE 8
+#define CORPC_MESSAGE_HEAD_SIZE 12
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 
 #define CORPC_HEARTBEAT_PERIOD 5000
@@ -75,12 +79,12 @@ private:
 
 class TcpClient {
     struct MessageInfo {
-        int32_t type;
+        int16_t type;
         google::protobuf::Message *proto;
     };
     
 public:
-    TcpClient(const std::string& host, uint16_t port, bool needHB): _host(host), _port(port), _needHB(needHB), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, corpc::Crypter *crypter): _host(host), _port(port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~TcpClient() {}
     
     bool start();
@@ -100,8 +104,13 @@ private:
     std::string _host;
     uint16_t _port;
     
-    bool _needHB;
+    bool _needHB;        // 是否需要心跳
+    bool _enableSendCRC; // 是否需要发包时校验CRC码
+    bool _enableRecvCRC; // 是否需要收包时校验CRC码
+    bool _enableSerial;  // 是否需要消息序号
     
+    corpc::Crypter *_crypter;
+
     int _s;
     std::thread _t;
     
@@ -152,8 +161,8 @@ void TcpClient::threadEntry( TcpClient *self ) {
     uint8_t buf[CORPC_MAX_MESSAGE_SIZE];
     
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
-    *(uint32_t *)heartbeatmsg = htonl(0);
-    *(uint32_t *)(heartbeatmsg + 4) = htonl(CORPC_MSG_TYPE_HEARTBEAT);
+    memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
     
     int s = self->_s;
     struct pollfd fd_in, fd_out;
@@ -173,7 +182,11 @@ void TcpClient::threadEntry( TcpClient *self ) {
     int bodyNum = 0;
     
     uint32_t bodySize = 0;
-    int32_t msgType = 0;
+    int16_t msgType = 0;
+    uint16_t flag = 0;
+
+    uint16_t lastRecvSerial = 0;
+    uint16_t lastSendSerial = 0;
     
     uint64_t nowms = 0;
     // 开始定时心跳，以及接收／发送数据包
@@ -203,7 +216,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
             }
             
             // 一次性读取尽可能多的数据
-            ret = (int)read(s, buf, CORPC_MAX_MESSAGE_SIZE);
+            ret = (int)read(s, buf, CORPC_MESSAGE_HEAD_SIZE + CORPC_MAX_MESSAGE_SIZE);
             if (ret <= 0) {
                 // ret 0 mean disconnected
                 if (ret < 0 && errno == EAGAIN) {
@@ -235,9 +248,11 @@ void TcpClient::threadEntry( TcpClient *self ) {
                     
                     if (headNum == CORPC_MESSAGE_HEAD_SIZE) {
                         bodySize = *(uint32_t *)buf;
-                        bodySize = ntohl(bodySize);
-                        msgType = *(int32_t *)(buf + 4);
-                        msgType = ntohl(msgType);
+                        bodySize = be32toh(bodySize);
+                        msgType = *(int16_t *)(buf + 4);
+                        msgType = be16toh(msgType);
+                        flag = *(uint16_t *)(buf + 6);
+                        flag = be16toh(flag);
                     } else {
                         assert(remainNum == 0);
                         break;
@@ -266,8 +281,47 @@ void TcpClient::threadEntry( TcpClient *self ) {
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                         assert(bodySize == 0);
                         self->_lastRecvHBTime = nowms;
+                    } else if (msgType < 0) {
+                        // 其他连接控制消息，不做处理
                     } else {
                         assert(bodySize > 0);
+                        // 校验序列号
+                        if (self->_enableSerial) {
+                            uint16_t serial = *(uint16_t *)(buf + 8);
+                            serial = be16toh(serial);
+
+                            if (serial != ++lastRecvSerial) {
+                                printf("ERROR: serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
+                                close(s);
+                                return;
+                            }
+
+                        }
+
+                        // 校验CRC
+                        if (self->_enableRecvCRC) {
+                            uint16_t crc = *(uint16_t *)(buf + 10);
+                            crc = be16toh(crc);
+
+                            uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
+
+                            if (crc != crc1) {
+                                printf("ERROR: crc check failed, recv:%d, cal:%d\n", crc, crc1);
+                                close(s);
+                                return;
+                            }
+                        }
+
+                        // 解密
+                        if (flag & CORPC_MESSAGE_FLAG_CRYPT != 0) {
+                            if (self->_crypter == nullptr) {
+                                printf("ERROR: cant decrypt message for crypter not exist\n");
+                                close(s);
+                                return;
+                            }
+
+                            self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                        }
                         
                         // 解码数据
                         auto iter = self->_registerMessageMap.find(msgType);
@@ -333,16 +387,33 @@ void TcpClient::threadEntry( TcpClient *self ) {
             }
             
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE > CORPC_MAX_MESSAGE_SIZE) {
-                printf("message size too large");
+                printf("message size too large\n");
                 close(s);
                 return;
             }
             
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE <= CORPC_MAX_MESSAGE_SIZE - sendNum) {
                 info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
+
+                if (self->_crypter != nullptr) {
+                    self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+
+                    uint16_t flag = CORPC_MESSAGE_FLAG_CRYPT;
+                    *(uint16_t *)(buf + sendNum + 6) = htobe16(flag);
+                }
                 
-                *(uint32_t *)(buf + sendNum) = htonl(msgSize);
-                *(uint32_t *)(buf + sendNum + 4) = htonl(info->type);
+                *(uint32_t *)(buf + sendNum) = htobe32(msgSize);
+                *(int16_t *)(buf + sendNum + 4) = htobe16(info->type);
+
+                if (self->_enableSerial) {
+                    *(uint16_t *)(buf + sendNum + 8) = htobe16(++lastSendSerial);
+                }
+
+                if (self->_enableSendCRC) {
+                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum + 8, 0xFFFF, 2);
+                    crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
+                    *(uint16_t *)(buf + sendNum + 10) = htobe16(crc);
+                }
                 
                 sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
                 
@@ -419,8 +490,10 @@ bool TcpClient::registerMessage(int type, google::protobuf::Message *proto) {
     return false;
 }
 
-void testThread(std::string host, uint16_t port, bool needHB) {
-    TcpClient client(host, port, needHB);
+void testThread(std::string host, uint16_t port) {
+    std::string key("1234567fvxcvc");
+    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+    TcpClient client(host, port, true, true, true, true, crypter);
     client.registerMessage(1, new FooResponse);
     
     client.start();
@@ -460,10 +533,10 @@ int main(int argc, const char * argv[])
     uint16_t port = atoi(argv[2]);
     
     // 启动多个线程创建client
-    int clientNum = 20;
+    int clientNum = 10;
     std::vector<std::thread> threads;
     for (int i = 0; i < clientNum; i++) {
-        threads.push_back(std::thread(testThread, host, port, false));
+        threads.push_back(std::thread(testThread, host, port));
     }
     
     for (int i = 0; i < clientNum; i++) {

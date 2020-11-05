@@ -26,6 +26,8 @@
 #include <sys/time.h>
 
 #include <google/protobuf/message.h>
+#include "corpc_crypter.h"
+#include "corpc_crc.h"
 #include "echo.pb.h"
 
 #define LOCAL_PORT 20000
@@ -35,8 +37,9 @@
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
 #define CORPC_MSG_TYPE_HEARTBEAT -115
+#define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
-#define CORPC_MESSAGE_HEAD_SIZE 8
+#define CORPC_MESSAGE_HEAD_SIZE 12
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
 
 #define CORPC_HEARTBEAT_PERIOD 5000
@@ -94,7 +97,7 @@ class UdpClient {
     };
 
 public:
-    UdpClient(const std::string& host, uint16_t port, uint16_t local_port): _host(host), _port(port), _local_port(local_port), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, corpc::Crypter *crypter): _host(host), _port(port), _local_port(local_port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~UdpClient() {}
     
     bool start();
@@ -115,6 +118,13 @@ private:
     uint16_t _port;
     uint16_t _local_port;
     
+    bool _needHB;        // 是否需要心跳
+    bool _enableSendCRC; // 是否需要发包时校验CRC码
+    bool _enableRecvCRC; // 是否需要收包时校验CRC码
+    bool _enableSerial;  // 是否需要消息序号
+    
+    corpc::Crypter *_crypter;
+
     int _s;
     std::thread _t;
     
@@ -175,11 +185,11 @@ bool UdpClient::start() {
     char handshake1msg[CORPC_MESSAGE_HEAD_SIZE];
     char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
     
-    *(uint32_t *)handshake1msg = htonl(0);
-    *(uint32_t *)(handshake1msg + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
+    memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(handshake1msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     
-    *(uint32_t *)handshake3msg = htonl(0);
-    *(uint32_t *)(handshake3msg + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+    memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(handshake3msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
@@ -201,14 +211,14 @@ bool UdpClient::start() {
                 continue; // 回阶段一
             default: {
                 ret = (int)read(_s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != 8) {
+                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                     perror("recv data size error");
                     close(_s);
                     return false;
                 }
                 
-                int32_t msgtype = *(int32_t *)(buf + 4);
-                msgtype = ntohl(msgtype);
+                int16_t msgtype = *(int16_t *)(buf + 4);
+                msgtype = be16toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     perror("recv data not handshake2");
@@ -227,13 +237,15 @@ bool UdpClient::start() {
             return false;
         }
         
-        struct timeval now = { 0 };
-        gettimeofday( &now,NULL );
-        _lastRecvHBTime = now.tv_sec;
-        _lastRecvHBTime *= 1000;
-        _lastRecvHBTime += now.tv_usec / 1000;
-        
-        _lastSendHBTime = _lastRecvHBTime;
+        if (_needHB) {
+            struct timeval now = { 0 };
+            gettimeofday( &now,NULL );
+            _lastRecvHBTime = now.tv_sec;
+            _lastRecvHBTime *= 1000;
+            _lastRecvHBTime += now.tv_usec / 1000;
+            
+            _lastSendHBTime = _lastRecvHBTime;
+        }
         
         // 启动数据收发线程
         _t = std::thread(threadEntry, this);
@@ -245,15 +257,22 @@ bool UdpClient::start() {
 void UdpClient::threadEntry( UdpClient *self ) {
     uint8_t buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
-    *(uint32_t *)heartbeatmsg = htonl(0);
-    *(uint32_t *)(heartbeatmsg + 4) = htonl(CORPC_MSG_TYPE_HEARTBEAT);
+    memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
     
+    char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
+    memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(handshake3msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+
     int s = self->_s;
     struct pollfd fd;
     fd.fd = s;
     fd.events = POLLIN;
     
     int ret;
+    
+    uint16_t lastRecvSerial = 0;
+    uint16_t lastSendSerial = 0;
     
     // 开始定时心跳，以及接收／发送数据包
     // 逻辑：采用轮询机制
@@ -291,9 +310,11 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 return;
             } else {
                 uint32_t bodySize = *(uint32_t *)buf;
-                bodySize = ntohl(bodySize);
-                int32_t msgType = *(int32_t *)(buf + 4);
-                msgType = ntohl(msgType);
+                bodySize = be32toh(bodySize);
+                int16_t msgType = *(int16_t *)(buf + 4);
+                msgType = be16toh(msgType);
+                uint16_t flag = *(uint16_t *)(buf + 6);
+                flag = be16toh(flag);
                 
                 if (msgType < 0) {
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
@@ -301,10 +322,6 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         self->_lastRecvHBTime = nowms;
                     } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                         // 重发handshake_3
-                        char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
-                        *(uint32_t *)handshake3msg = htonl(0);
-                        *(uint32_t *)(handshake3msg + 4) = htonl(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
-                        
                         if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
                             perror("can't send handshake3");
                             close(s);
@@ -316,6 +333,45 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         return;
                     }
                 } else {
+                    assert(bodySize > 0);
+                    // 校验序列号
+                    if (self->_enableSerial) {
+                        uint16_t serial = *(uint16_t *)(buf + 8);
+                        serial = be16toh(serial);
+
+                        if (serial != ++lastRecvSerial) {
+                            printf("ERROR: serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
+                            close(s);
+                            return;
+                        }
+
+                    }
+
+                    // 校验CRC
+                    if (self->_enableRecvCRC) {
+                        uint16_t crc = *(uint16_t *)(buf + 10);
+                        crc = be16toh(crc);
+
+                        uint16_t crc1 = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, bodySize);
+
+                        if (crc != crc1) {
+                            printf("ERROR: crc check failed, recv:%d, cal:%d\n", crc, crc1);
+                            close(s);
+                            return;
+                        }
+                    }
+
+                    // 解密
+                    if (flag & CORPC_MESSAGE_FLAG_CRYPT != 0) {
+                        if (self->_crypter == nullptr) {
+                            printf("ERROR: cant decrypt message for crypter not exist\n");
+                            close(s);
+                            return;
+                        }
+
+                        self->_crypter->decrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, bodySize);
+                    }
+
                     // 解码数据
                     auto iter = self->_registerMessageMap.find(msgType);
                     if (iter == self->_registerMessageMap.end()) {
@@ -373,8 +429,25 @@ void UdpClient::threadEntry( UdpClient *self ) {
             
             info->proto->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
             
-            *(uint32_t *)buf = htonl(msgSize);
-            *(uint32_t *)(buf + 4) = htonl(info->type);
+            if (self->_crypter != nullptr) {
+                self->_crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+
+                uint16_t flag = CORPC_MESSAGE_FLAG_CRYPT;
+                *(uint16_t *)(buf + 6) = htobe16(flag);
+            }
+
+            *(uint32_t *)buf = htobe32(msgSize);
+            *(int16_t *)(buf + 4) = htobe16(info->type);
+
+            if (self->_enableSerial) {
+                *(uint16_t *)(buf + 8) = htobe16(++lastSendSerial);
+            }
+
+            if (self->_enableSendCRC) {
+                uint16_t crc = corpc::CRC::CheckSum(buf + 8, 0xFFFF, 2);
+                crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
+                *(uint16_t *)(buf + 10) = htobe16(crc);
+            }
             
             int size = msgSize + CORPC_MESSAGE_HEAD_SIZE;
             if (write(s, buf, size) != size) {
@@ -427,7 +500,9 @@ bool UdpClient::registerMessage(int type, google::protobuf::Message *proto) {
 }
 
 void testThread(std::string host, uint16_t port, uint16_t local_port) {
-    UdpClient client(host, port, local_port);
+    std::string key("1234567fvxcvc");
+    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+    UdpClient client(host, port, local_port, true, true, true, false, crypter);
     client.registerMessage(1, new FooResponse);
     
     client.start();

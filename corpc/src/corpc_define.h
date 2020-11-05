@@ -33,7 +33,6 @@
 #define USE_NO_LOCK_QUEUE
 
 //#define MONITOR_ROUTINE
-
 #define CORPC_MAX_BUFFER_SIZE 0x10000
 #define CORPC_MAX_REQUEST_SIZE 0x10000
 #define CORPC_MAX_RESPONSE_SIZE 0x100000
@@ -41,10 +40,13 @@
 #define CORPC_REQUEST_HEAD_SIZE 28
 #define CORPC_RESPONSE_HEAD_SIZE 20
 
-#define CORPC_MESSAGE_HEAD_SIZE 8
+// message head format
+// |body size(4 bytes)|message type(2 bytes)|flag(2 bytes)|serial number(2 bytes)|crc(2 bytes)|
+#define CORPC_MESSAGE_HEAD_SIZE 12
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
-
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
+
+#define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
 #define CORPC_MSG_TYPE_CONNECT -1
 #define CORPC_MSG_TYPE_CLOSE -2
@@ -176,8 +178,10 @@ namespace corpc {
     };
 
     struct SendMessageInfo {
-        int32_t type;
+        int16_t type;
         bool isRaw;
+        bool needCrypt;
+        uint16_t serial;
         std::shared_ptr<void> msg;  // 当isRaw为true时，msg中存的是std::string指针，当isRaw为false时，msg中存的是google::protobuf::Message指针。这是为了广播或转发消息给玩家时不需要对数据进行protobuf编解码
     };
     
