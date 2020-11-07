@@ -97,7 +97,7 @@ class UdpClient {
     };
 
 public:
-    UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, corpc::Crypter *crypter): _host(host), _port(port), _local_port(local_port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<corpc::Crypter> crypter): _host(host), _port(port), _local_port(local_port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~UdpClient() {}
     
     bool start();
@@ -123,7 +123,7 @@ private:
     bool _enableRecvCRC; // 是否需要收包时校验CRC码
     bool _enableSerial;  // 是否需要消息序号
     
-    corpc::Crypter *_crypter;
+    std::shared_ptr<corpc::Crypter> _crypter;
 
     int _s;
     std::thread _t;
@@ -541,6 +541,10 @@ int main(int argc, const char * argv[])
     std::string host = argv[1];
     uint16_t port = atoi(argv[2]);
     
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigaction( SIGPIPE, &sa, NULL );
+
     // 启动多个线程创建client
     int clientNum = 20;
     std::vector<std::thread> threads;

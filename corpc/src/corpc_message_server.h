@@ -34,14 +34,14 @@ namespace corpc {
             virtual void onClose();
             
             MessageServer *getServer() { return _server; }
-            Crypter *getCrypter() { return _crypter; }
-            void setCrypter(Crypter *crypter) { _crypter = crypter; }
+            std::shared_ptr<Crypter> &getCrypter() { return _crypter; }
+            void setCrypter(std::shared_ptr<Crypter> &crypter) { _crypter = crypter; }
             uint64_t getCreateTime() { return _createTime; }
             
             void send(int32_t type, bool isRaw, bool needCrypt, uint16_t serial, std::shared_ptr<void> msg);
         private:
             MessageServer *_server;
-            Crypter *_crypter;
+            std::shared_ptr<Crypter> _crypter;
             time_t _createTime;   // 连接创建时间
             uint16_t _recvSerial; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
         public:

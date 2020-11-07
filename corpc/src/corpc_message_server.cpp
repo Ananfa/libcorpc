@@ -27,10 +27,6 @@ MessageServer::Connection::Connection(int fd, MessageServer* server): corpc::Con
 }
 
 MessageServer::Connection::~Connection() {
-    if (_crypter != nullptr) {
-        delete _crypter;
-    }
-    
     LOG("MessageServer::Connection::~Connection -- fd:%d\n", _fd);
 }
 
@@ -138,7 +134,7 @@ void MessageServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
 
 void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
     std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
-    Crypter *crypter = conn->getCrypter();
+    std::shared_ptr<Crypter> crypter = conn->getCrypter();
     MessageServer *server = conn->getServer();
     
     //uint32_t bodySize = *(uint32_t *)head;
@@ -241,7 +237,7 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
     }
 
     bool needCrypt = msgInfo->needCrypt;
-    Crypter *crypter = conn->getCrypter();
+    std::shared_ptr<Crypter> crypter = conn->getCrypter();
     if (needCrypt && crypter == nullptr) {
         return false;
     }

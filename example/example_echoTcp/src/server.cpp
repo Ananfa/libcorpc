@@ -73,9 +73,9 @@ int main(int argc, const char * argv[]) {
     sigaction( SIGPIPE, &sa, NULL );
 
     std::string key = "1234567fvxcvc";
-    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+    std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
 
-    std::map<int, uint16_t> clients;
+    std::map<void *, uint16_t> clients;
     
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
@@ -83,17 +83,21 @@ int main(int argc, const char * argv[]) {
     corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, true, true, true, true, ip, port);
     server->start();
     
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [crypter, &clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+        LOG("connect\n");
         conn->setCrypter(crypter);
-        int fd = conn->getfd();
-        assert(clients.find(fd) == clients.end());
-        clients[fd] = 0;
+        void *conn_ptr = conn.get();
+        assert(clients.find(conn_ptr) == clients.end());
+        clients[conn_ptr] = 0;
+        LOG("connect %d\n", conn->getfd());
     });
 
     server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
-        int fd = conn->getfd();
-        assert(clients.find(fd) != clients.end());
-        clients.erase(fd);
+        LOG("connect close\n");
+        void *conn_ptr = conn.get();
+        assert(clients.find(conn_ptr) != clients.end());
+        clients.erase(conn_ptr);
+        LOG("connect %d closed\n", conn->getfd());
     });
 
     server->registerMessage(1, new FooRequest, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
@@ -108,10 +112,10 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
 
-        int fd = conn->getfd();
-        assert(clients.find(fd) != clients.end());
+        void *conn_ptr = conn.get();
+        assert(clients.find(conn_ptr) != clients.end());
         
-        conn->send(1, false, true, ++clients[fd], response);
+        conn->send(1, false, true, ++clients[conn_ptr], response);
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

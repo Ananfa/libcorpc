@@ -84,7 +84,7 @@ class TcpClient {
     };
     
 public:
-    TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, corpc::Crypter *crypter): _host(host), _port(port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+    TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<corpc::Crypter> &crypter): _host(host), _port(port), _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
     ~TcpClient() {}
     
     bool start();
@@ -109,7 +109,7 @@ private:
     bool _enableRecvCRC; // 是否需要收包时校验CRC码
     bool _enableSerial;  // 是否需要消息序号
     
-    corpc::Crypter *_crypter;
+    std::shared_ptr<corpc::Crypter> _crypter;
 
     int _s;
     std::thread _t;
@@ -209,8 +209,12 @@ void TcpClient::threadEntry( TcpClient *self ) {
         }
         
         if (ret) {
-            if (ret == -1) {
-                perror("poll fd_in");
+            if (ret < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+
+                perror("poll fd_in\n");
                 close(s);
                 return;
             }
@@ -219,11 +223,11 @@ void TcpClient::threadEntry( TcpClient *self ) {
             ret = (int)read(s, buf, CORPC_MESSAGE_HEAD_SIZE + CORPC_MAX_MESSAGE_SIZE);
             if (ret <= 0) {
                 // ret 0 mean disconnected
-                if (ret < 0 && errno == EAGAIN) {
+                if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
                     continue;
                 }
                 
-                perror("read data");
+                perror("read data\n");
                 close(s);
                 return;
             }
@@ -492,7 +496,7 @@ bool TcpClient::registerMessage(int type, google::protobuf::Message *proto) {
 
 void testThread(std::string host, uint16_t port) {
     std::string key("1234567fvxcvc");
-    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+    std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     TcpClient client(host, port, true, true, true, true, crypter);
     client.registerMessage(1, new FooResponse);
     
@@ -532,8 +536,12 @@ int main(int argc, const char * argv[])
     std::string host = argv[1];
     uint16_t port = atoi(argv[2]);
     
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigaction( SIGPIPE, &sa, NULL );
+
     // 启动多个线程创建client
-    int clientNum = 10;
+    int clientNum = 20;
     std::vector<std::thread> threads;
     for (int i = 0; i < clientNum; i++) {
         threads.push_back(std::thread(testThread, host, port));
