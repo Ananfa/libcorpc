@@ -501,7 +501,7 @@ bool UdpClient::registerMessage(int type, google::protobuf::Message *proto) {
 
 void testThread(std::string host, uint16_t port, uint16_t local_port) {
     std::string key("1234567fvxcvc");
-    corpc::Crypter *crypter = new corpc::SimpleXORCrypter(key);
+    std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     UdpClient client(host, port, local_port, true, true, true, false, crypter);
     client.registerMessage(1, new FooResponse);
     
