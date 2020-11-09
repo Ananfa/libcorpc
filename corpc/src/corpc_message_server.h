@@ -49,17 +49,19 @@ namespace corpc {
         };
         
     private:
-        typedef std::function<void(std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
+        typedef std::function<void(int16_t type, std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
         
         struct RegisterMessageInfo {
-            int32_t type;
+            int16_t type;
             google::protobuf::Message *proto;
             bool needCoroutine;
+            bool banned; // 屏蔽
             MessageHandle handle;
         };
         
         struct WorkerTask {
             int16_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
+            bool banned; // 屏蔽
             std::shared_ptr<Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
             std::shared_ptr<google::protobuf::Message> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据
         };
@@ -87,6 +89,9 @@ namespace corpc {
                              google::protobuf::Message *proto,
                              bool needCoroutine,
                              MessageHandle handle);
+
+        bool banMessage(int type);
+        bool unbanMessage(int type);
         
         static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         

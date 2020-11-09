@@ -23,6 +23,7 @@
 #include "corpc_crc.h"
 #include "echo.pb.h"
 
+#define CORPC_MSG_TYPE_BANNED -10
 #define CORPC_MSG_TYPE_HEARTBEAT -115
 #define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
@@ -499,6 +500,7 @@ void testThread(std::string host, uint16_t port) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     TcpClient client(host, port, true, true, true, true, crypter);
     client.registerMessage(1, new FooResponse);
+    client.registerMessage(CORPC_MSG_TYPE_BANNED, new BanResponse);
     
     client.start();
     
@@ -518,10 +520,22 @@ void testThread(std::string host, uint16_t port) {
             client.recv(rType, rMsg);
         } while (!rType);
         
-        assert(rType == 1);
-        FooResponse *response = (FooResponse*)rMsg;
-        //printf("%s\n", response->text().c_str());
-        delete response;
+        switch (rType) {
+            case 1: {
+                FooResponse *response = (FooResponse*)rMsg;
+                //printf("%s\n", response->text().c_str());
+                delete response;
+                break;
+            }
+            case 2: {
+                BanResponse *response = (BanResponse*)rMsg;
+                //printf("%s\n", response->text().c_str());
+                delete response;
+                break;
+            }
+            default:
+                assert(false);
+        }
     }
 }
 

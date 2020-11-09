@@ -53,7 +53,7 @@ void * MessageServer::Worker::taskCallRoutine( void * arg ) {
     
     auto iter = server->_registerMessageMap.find(task->type);
     
-    iter->second.handle(task->msg, task->connection);
+    iter->second.handle(task->type, task->msg, task->connection);
     
     delete task;
     
@@ -74,18 +74,19 @@ void MessageServer::Worker::handleMessage(void *msg) {
             // TODO:
             break;
     }
-    
-    auto iter = _server->_registerMessageMap.find(task->type);
+
+    auto iter = task->banned?_server->_registerMessageMap.find(CORPC_MSG_TYPE_BANNED):_server->_registerMessageMap.find(task->type);
+
     if (iter == _server->_registerMessageMap.end()) {
         ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
         delete task;
         return;
     }
-    
+
     if (iter->second.needCoroutine) {
         corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
     } else {
-        iter->second.handle(task->msg, task->connection);
+        iter->second.handle(task->type, task->msg, task->connection);
         
         delete task;
     }
@@ -105,11 +106,30 @@ bool MessageServer::registerMessage(int type,
     info.type = type;
     info.proto = proto;
     info.needCoroutine = needCoroutine;
+    info.banned = false;
     info.handle = handle;
     
     _registerMessageMap.insert(std::make_pair(type, info));
     
     return false;
+}
+
+bool MessageServer::banMessage(int type) {
+    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
+        return false;
+    }
+
+    _registerMessageMap[type].banned = true;
+    return true;
+}
+
+bool MessageServer::unbanMessage(int type) {
+    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
+        return false;
+    }
+
+    _registerMessageMap[type].banned = false;
+    return true;
 }
 
 corpc::Connection *MessageServer::buildConnection(int fd) {
@@ -119,6 +139,7 @@ corpc::Connection *MessageServer::buildConnection(int fd) {
 void MessageServer::onConnect(std::shared_ptr<corpc::Connection>& connection) {
     WorkerTask *task = new WorkerTask;
     task->type = CORPC_MSG_TYPE_CONNECT;
+    task->banned = false;
     task->connection = std::static_pointer_cast<Connection>(connection);
     
     _worker->addMessage(task);
@@ -127,6 +148,7 @@ void MessageServer::onConnect(std::shared_ptr<corpc::Connection>& connection) {
 void MessageServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
     WorkerTask *task = new WorkerTask;
     task->type = CORPC_MSG_TYPE_CLOSE;
+    task->banned = false;
     task->connection = std::static_pointer_cast<Connection>(connection);
     
     _worker->addMessage(task);
@@ -207,20 +229,24 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     
     google::protobuf::Message *msg = NULL;
     
-    if (iter->second.proto) {
-        msg = iter->second.proto->New();
-        if (!msg->ParseFromArray(body, size)) {
-            // 出错处理
-            ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
-            connection->setDecodeError();
-            return nullptr;
+    if (!iter->second.banned) {
+        if (iter->second.proto) {
+            msg = iter->second.proto->New();
+            if (!msg->ParseFromArray(body, size)) {
+                // 出错处理
+                ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
+                connection->setDecodeError();
+                delete msg;
+                return nullptr;
+            }
+        } else {
+            assert(size == 0);
         }
-    } else {
-        assert(size == 0);
     }
-    
+
     WorkerTask *task = new WorkerTask;
     task->type = msgType;
+    task->banned = iter->second.banned;
     task->connection = conn;
     task->msg = std::shared_ptr<google::protobuf::Message>(msg);
     

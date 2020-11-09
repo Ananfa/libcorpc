@@ -9,3 +9,7 @@ message FooResponse {
     string text = 1;
     bool result = 2;
 }
+
+message BanResponse {
+	int32 type = 1;
+}

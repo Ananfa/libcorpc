@@ -25,6 +25,7 @@
 #include "echo.pb.h"
 
 static int g_cnt = 0;
+static int g_bcnt = 0;
 
 static void *log_routine( void *arg )
 {
@@ -38,7 +39,7 @@ static void *log_routine( void *arg )
     while (true) {
         sleep(1);
         
-        total += g_cnt;
+        total += g_cnt + g_bcnt;
         
         if (total == 0) {
             startAt = time(NULL);
@@ -54,11 +55,36 @@ static void *log_routine( void *arg )
             average = total;
         }
         
-        LOG("time %ld seconds, cnt: %d, average: %d, total: %d\n", difTime, g_cnt, average, total);
+        LOG("time %ld seconds, cnt: %d, bcnt: %d, average: %d, total: %d\n", difTime, g_cnt, g_bcnt, average, total);
         
         g_cnt = 0;
+        g_bcnt = 0;
     }
     
+    return NULL;
+}
+
+static void *ban_routine( void *arg )
+{
+    co_enable_hook_sys();
+
+    corpc::TcpMessageServer *server = (corpc::TcpMessageServer*)arg;
+
+    bool banned = false;
+    while (true) {
+        sleep(5);
+
+        if (banned) {
+            LOG("ban message\n");
+            server->unbanMessage(1);
+            banned = false;
+        } else {
+            LOG("unban message\n");
+            server->banMessage(1);
+            banned = true;
+        }
+    }
+
     return NULL;
 }
 
@@ -89,7 +115,7 @@ int main(int argc, const char * argv[]) {
     corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, true, true, false, ip, port);
     server->start();
     
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](uint16_t type, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect\n");
         conn->setCrypter(crypter);
         void *conn_ptr = conn.get();
@@ -98,7 +124,7 @@ int main(int argc, const char * argv[]) {
         LOG("connect %d\n", conn->getfd());
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](uint16_t type, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect close\n");
         void *conn_ptr = conn.get();
         assert(clients.find(conn_ptr) != clients.end());
@@ -106,7 +132,19 @@ int main(int argc, const char * argv[]) {
         LOG("connect %d closed\n", conn->getfd());
     });
 
-    server->registerMessage(1, new FooRequest, false, [&clients](std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [&clients](uint16_t type, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+        WARN_LOG("banned msg type %d\n", type);
+        g_bcnt++;
+        std::shared_ptr<BanResponse> response(new BanResponse);
+        response->set_type(type);
+
+        void *conn_ptr = conn.get();
+        assert(clients.find(conn_ptr) != clients.end());
+        
+        conn->send(1, false, true, ++clients[conn_ptr], response);
+    });
+
+    server->registerMessage(1, new FooRequest, false, [&clients](uint16_t type, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -125,6 +163,7 @@ int main(int argc, const char * argv[]) {
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
+    corpc::RoutineEnvironment::startCoroutine(ban_routine, server);
     
     corpc::RoutineEnvironment::runEventLoop();
 }

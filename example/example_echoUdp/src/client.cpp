@@ -32,6 +32,7 @@
 
 #define LOCAL_PORT 20000
 
+#define CORPC_MSG_TYPE_BANNED -10
 #define CORPC_MSG_TYPE_UDP_UNSHAKE -110
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
@@ -504,6 +505,7 @@ void testThread(std::string host, uint16_t port, uint16_t local_port) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     UdpClient client(host, port, local_port, true, true, true, false, crypter);
     client.registerMessage(1, new FooResponse);
+    client.registerMessage(CORPC_MSG_TYPE_BANNED, new BanResponse);
     
     client.start();
     
@@ -523,10 +525,22 @@ void testThread(std::string host, uint16_t port, uint16_t local_port) {
             client.recv(rType, rMsg);
         } while (!rType);
         
-        assert(rType == 1);
-        FooResponse *response = (FooResponse*)rMsg;
-        //printf("%s\n", response->text().c_str());
-        delete response;
+        switch (rType) {
+            case 1: {
+                FooResponse *response = (FooResponse*)rMsg;
+                //printf("%s\n", response->text().c_str());
+                delete response;
+                break;
+            }
+            case 2: {
+                BanResponse *response = (BanResponse*)rMsg;
+                //printf("%s\n", response->text().c_str());
+                delete response;
+                break;
+            }
+            default:
+                assert(false);
+        }
     }
 }
 
