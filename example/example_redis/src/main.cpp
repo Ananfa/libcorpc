@@ -194,7 +194,7 @@ static void *redis_routine1( void *arg )
     
     // 归还连接
     proxy.put(redis, false);
-    
+    LOG("4\n");
     
     return NULL;
 }
@@ -228,8 +228,8 @@ void clientThread(RedisConnectPool *redisPool) {
 
 int main(int argc, const char * argv[]) {
     co_start_hook();
-    
-    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.3", 6379, 8);
+
+    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.221", 6379, 0, 8);
     
     /*
     // 开两个线程进行多线程访问
@@ -239,7 +239,7 @@ int main(int argc, const char * argv[]) {
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
     */
     
-    RoutineEnvironment::startCoroutine(redis_routine1, redisPool);
+    RoutineEnvironment::startCoroutine(redis_routine, redisPool);
     RoutineEnvironment::startCoroutine(log_routine, NULL);
     
     RoutineEnvironment::runEventLoop();

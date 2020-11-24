@@ -65,10 +65,10 @@ namespace corpc {
                          ::google::protobuf::Closure* done);
         
     public:
-        static RedisConnectPool* create(const char *host, unsigned int port, uint32_t maxConnectNum);
+        static RedisConnectPool* create(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
         
     private:
-        RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum);
+        RedisConnectPool(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
         ~RedisConnectPool() {}
         
         void init();
@@ -80,7 +80,8 @@ namespace corpc {
         
     private:
         std::string _host;
-        unsigned int _port;
+        uint16_t _port;
+        uint16_t _dbIndex;
         
         uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
         uint32_t _realConnectCount; // 当前实际建立连接的数量

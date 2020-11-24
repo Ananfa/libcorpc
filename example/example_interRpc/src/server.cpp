@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
     sigaction( SIGPIPE, &sa, NULL );
     
     // 注册服务
-    IO *io = IO::create(0, 1);
+    IO *io = IO::create(1, 1);
     
     RpcServer *server = RpcServer::create(io, 0, ip, port);
     server->registerService(&g_fooService);

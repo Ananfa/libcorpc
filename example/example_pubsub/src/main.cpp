@@ -44,7 +44,7 @@ void subThread() {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.3", 6379, 8);
+    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.221", 6379, 0, 8);
     std::list<std::string> topics;
     topics.push_back("test_topic1");
     topics.push_back("test_topic2");
@@ -56,7 +56,7 @@ int main(int argc, const char * argv[]) {
     PubsubService::Subscribe("test_topic3", true, subCallback);
     RoutineEnvironment::startCoroutine(log_routine, NULL);
 
-    std::thread t1 = std::thread(subThread);
+    //std::thread t1 = std::thread(subThread);
     
     RoutineEnvironment::runEventLoop();
     

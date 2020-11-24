@@ -73,7 +73,7 @@ void RedisConnectPool::Proxy::put(redisContext* redis, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-RedisConnectPool::RedisConnectPool(const char *host, unsigned int port, uint32_t maxConnectNum): _host(host), _port(port), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
+RedisConnectPool::RedisConnectPool(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum): _host(host), _port(port), _dbIndex(dbIndex), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -94,7 +94,21 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
         redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
         
         if (redis && !redis->err) {
-            response->set_handle((intptr_t)redis);
+            // 选择分库
+            if (_dbIndex) {
+                redisReply *reply = (redisReply *)redisCommand(redis,"SELECT %d", _dbIndex);
+                if (reply == NULL) {
+                    controller->SetFailed("can't select index");
+
+                    redisFree(redis);
+                    redis = NULL;
+                } else {
+                    freeReplyObject(reply);
+                    response->set_handle((intptr_t)redis);
+                }
+            } else {
+                response->set_handle((intptr_t)redis);
+            }
         } else if (redis) {
             std::string reason = "can't connect to redis server for ";
             reason.append(redis->errstr);
@@ -201,8 +215,8 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-RedisConnectPool* RedisConnectPool::create(const char *host, unsigned int port, uint32_t maxConnectNum) {
-    RedisConnectPool *pool = new RedisConnectPool(host, port, maxConnectNum);
+RedisConnectPool* RedisConnectPool::create(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum) {
+    RedisConnectPool *pool = new RedisConnectPool(host, port, dbIndex, maxConnectNum);
     pool->init();
     
     return pool;
