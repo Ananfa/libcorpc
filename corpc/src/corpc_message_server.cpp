@@ -194,12 +194,12 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
         }
     }
 
-    // CRC校验（CRC码计算需要包含序号一起算）
+    // CRC校验（CRC码计算需要包含除crc外的包头）
     if (conn->getServer()->_enableRecvCRC) {
         uint16_t crc = *(uint16_t *)(head + 10);
         crc = be16toh(crc);
 
-        uint16_t crc1 = CRC::CheckSum(head + 8, 0xFFFF, 2);
+        uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 10);
         crc1 = CRC::CheckSum(body, crc1, size);
 
         if (crc != crc1) {

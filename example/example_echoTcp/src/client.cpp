@@ -415,7 +415,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
                 }
 
                 if (self->_enableSendCRC) {
-                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum + 8, 0xFFFF, 2);
+                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 10);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                     *(uint16_t *)(buf + sendNum + 10) = htobe16(crc);
                 }

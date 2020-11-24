@@ -445,7 +445,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
             }
 
             if (self->_enableSendCRC) {
-                uint16_t crc = corpc::CRC::CheckSum(buf + 8, 0xFFFF, 2);
+                uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, 10);
                 crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                 *(uint16_t *)(buf + 10) = htobe16(crc);
             }
