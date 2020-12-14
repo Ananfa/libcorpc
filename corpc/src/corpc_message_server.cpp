@@ -53,7 +53,8 @@ void * MessageServer::Worker::taskCallRoutine( void * arg ) {
     
     auto iter = server->_registerMessageMap.find(task->type);
     
-    iter->second.handle(task->type, task->msg, task->connection);
+    std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(task->msg);
+    iter->second.handle(task->type, msg, task->connection);
     
     delete task;
     
@@ -78,7 +79,14 @@ void MessageServer::Worker::handleMessage(void *msg) {
     auto iter = task->banned?_server->_registerMessageMap.find(CORPC_MSG_TYPE_BANNED):_server->_registerMessageMap.find(task->type);
 
     if (iter == _server->_registerMessageMap.end()) {
-        ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
+        if (_server->_otherMessageHandle) {
+            // 其他消息处理（一般用于直接转发给其他服务器）
+            std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(task->msg);
+            _server->_otherMessageHandle(task->type, msg, task->connection);
+        } else {
+            ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
+        }
+
         delete task;
         return;
     }
@@ -86,7 +94,8 @@ void MessageServer::Worker::handleMessage(void *msg) {
     if (iter->second.needCoroutine) {
         corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
     } else {
-        iter->second.handle(task->type, task->msg, task->connection);
+        std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(task->msg);
+        iter->second.handle(task->type, msg, task->connection);
         
         delete task;
     }
@@ -222,35 +231,47 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
 
     auto iter = server->_registerMessageMap.find(msgType);
     if (iter == server->_registerMessageMap.end()) {
-        ERROR_LOG("MessageServer::decode -- unknown message: %d\n", msgType);
-        connection->setDecodeError();
-        return nullptr;
-    }
-    
-    google::protobuf::Message *msg = NULL;
-    
-    if (!iter->second.banned) {
-        if (iter->second.proto) {
-            msg = iter->second.proto->New();
-            if (!msg->ParseFromArray(body, size)) {
-                // 出错处理
-                ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
-                connection->setDecodeError();
-                delete msg;
-                return nullptr;
-            }
+        if (server->_otherMessageHandle) {
+            // 旁路消息处理
+            WorkerTask *task = new WorkerTask;
+            task->type = msgType;
+            task->banned = iter->second.banned;
+            task->connection = conn;
+            task->msg = std::make_shared<std::string>((char *)body, size);
+            
+            return task;
         } else {
-            assert(size == 0);
+            ERROR_LOG("MessageServer::decode -- unknown message: %d\n", msgType);
+            connection->setDecodeError();
+            return nullptr;
         }
-    }
+    } else {
+        google::protobuf::Message *msg = NULL;
+        
+        if (!iter->second.banned) {
+            if (iter->second.proto) {
+                msg = iter->second.proto->New();
+                if (!msg->ParseFromArray(body, size)) {
+                    // 出错处理
+                    ERROR_LOG("MessageServer::decode -- parse body fail for message: %d\n", msgType);
+                    connection->setDecodeError();
+                    delete msg;
+                    return nullptr;
+                }
+            } else {
+                assert(size == 0);
+            }
+        }
 
-    WorkerTask *task = new WorkerTask;
-    task->type = msgType;
-    task->banned = iter->second.banned;
-    task->connection = conn;
-    task->msg = std::shared_ptr<google::protobuf::Message>(msg);
+        WorkerTask *task = new WorkerTask;
+        task->type = msgType;
+        task->banned = iter->second.banned;
+        task->connection = conn;
+        task->msg = std::shared_ptr<google::protobuf::Message>(msg);
+        
+        return task;
+    }
     
-    return task;
 }
 
 bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
