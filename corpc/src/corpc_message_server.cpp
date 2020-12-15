@@ -35,11 +35,12 @@ void MessageServer::Connection::onClose() {
     _server->onClose(self);
 }
 
-void MessageServer::Connection::send(int32_t type, bool isRaw, bool needCrypt, uint16_t serial, std::shared_ptr<void> msg) {
+void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint8_t tag, uint16_t serial, std::shared_ptr<void> msg) {
     std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
     sendInfo->type = type;
     sendInfo->isRaw = isRaw;
     sendInfo->needCrypt = needCrypt;
+    sendInfo->tag = tag;
     sendInfo->serial = serial;
     sendInfo->msg = msg;
     
@@ -54,7 +55,7 @@ void * MessageServer::Worker::taskCallRoutine( void * arg ) {
     auto iter = server->_registerMessageMap.find(task->type);
     
     std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(task->msg);
-    iter->second.handle(task->type, msg, task->connection);
+    iter->second.handle(task->type, task->tag, msg, task->connection);
     
     delete task;
     
@@ -79,10 +80,10 @@ void MessageServer::Worker::handleMessage(void *msg) {
     auto iter = task->banned?_server->_registerMessageMap.find(CORPC_MSG_TYPE_BANNED):_server->_registerMessageMap.find(task->type);
 
     if (iter == _server->_registerMessageMap.end()) {
-        if (_server->_otherMessageHandle) {
+        if (!task->banned && _server->_otherMessageHandle) {
             // 其他消息处理（一般用于直接转发给其他服务器）
             std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(task->msg);
-            _server->_otherMessageHandle(task->type, msg, task->connection);
+            _server->_otherMessageHandle(task->type, task->tag, msg, task->connection);
         } else {
             ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", task->type);
         }
@@ -95,7 +96,7 @@ void MessageServer::Worker::handleMessage(void *msg) {
         corpc::RoutineEnvironment::startCoroutine(taskCallRoutine, task);
     } else {
         std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(task->msg);
-        iter->second.handle(task->type, msg, task->connection);
+        iter->second.handle(task->type, task->tag, msg, task->connection);
         
         delete task;
     }
@@ -168,12 +169,10 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     std::shared_ptr<Crypter> crypter = conn->getCrypter();
     MessageServer *server = conn->getServer();
     
-    //uint32_t bodySize = *(uint32_t *)head;
-    //bodySize = be32toh(bodySize);
     int16_t msgType = *(int16_t *)(head + 4);
     msgType = be16toh(msgType);
-    uint16_t flag = *(uint16_t *)(head + 6);
-    flag = be16toh(flag);
+    uint8_t tag = *(uint8_t *)(head + 6);
+    uint8_t flag = *(uint8_t *)(head + 7);
     
     if (msgType < 0) {
         // 处理系统类型消息，如：心跳
@@ -236,6 +235,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
             WorkerTask *task = new WorkerTask;
             task->type = msgType;
             task->banned = iter->second.banned;
+            task->tag = tag;
             task->connection = conn;
             task->msg = std::make_shared<std::string>((char *)body, size);
             
@@ -266,6 +266,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
         WorkerTask *task = new WorkerTask;
         task->type = msgType;
         task->banned = iter->second.banned;
+        task->tag = tag;
         task->connection = conn;
         task->msg = std::shared_ptr<google::protobuf::Message>(msg);
         
@@ -296,7 +297,7 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
         std::shared_ptr<std::string> msg = std::static_pointer_cast<std::string>(msgInfo->msg);
         
         msgSize = msg?msg->size():0;
-        
+
         int spaceleft = space - CORPC_MESSAGE_HEAD_SIZE;
         if (spaceleft >= msgSize) {
             if (msgSize > 0) {
@@ -385,8 +386,8 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
     *(uint16_t *)(buf + 4) = htobe16(msgInfo->type);
     
     // 头部设置加密标志
-    uint16_t flag = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
-    *(uint16_t *)(buf + 6) = htobe16(flag);
+    *(uint8_t *)(buf + 6) = msgInfo->tag;
+    *(uint8_t *)(buf + 7) = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
     *(uint16_t *)(buf + 8) = htobe16(msgInfo->serial);
     *(uint16_t *)(buf + 10) = htobe16(crc);
 

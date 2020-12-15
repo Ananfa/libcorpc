@@ -81,6 +81,7 @@ private:
 class TcpClient {
     struct MessageInfo {
         int16_t type;
+        uint8_t tag;
         google::protobuf::Message *proto;
     };
     
@@ -92,10 +93,10 @@ public:
     
     void join();
     
-    void send(int32_t type, google::protobuf::Message* msg);
-    void recv(int32_t& type, google::protobuf::Message*& msg); // 收不到数据时type为0，msg为nullptr
+    void send(int16_t type, uint8_t tag, google::protobuf::Message* msg);
+    void recv(int16_t& type, uint8_t &tag, google::protobuf::Message*& msg); // 收不到数据时type为0，msg为nullptr
     
-    bool registerMessage(int type,
+    bool registerMessage(int16_t type,
                          google::protobuf::Message *proto);
     
 private:
@@ -118,7 +119,7 @@ private:
     SyncQueue<MessageInfo*> _sendQueue;
     SyncQueue<MessageInfo*> _recvQueue;
     
-    std::map<int, MessageInfo> _registerMessageMap;
+    std::map<int16_t, MessageInfo> _registerMessageMap;
     
     uint64_t _lastRecvHBTime; // 最后一次收到心跳的时间
     uint64_t _lastSendHBTime; // 最后一次发送心跳的时间
@@ -184,7 +185,8 @@ void TcpClient::threadEntry( TcpClient *self ) {
     
     uint32_t bodySize = 0;
     int16_t msgType = 0;
-    uint16_t flag = 0;
+    uint8_t tag = 0;
+    uint8_t flag = 0;
 
     uint16_t lastRecvSerial = 0;
     uint16_t lastSendSerial = 0;
@@ -256,8 +258,8 @@ void TcpClient::threadEntry( TcpClient *self ) {
                         bodySize = be32toh(bodySize);
                         msgType = *(int16_t *)(buf + 4);
                         msgType = be16toh(msgType);
-                        flag = *(uint16_t *)(buf + 6);
-                        flag = be16toh(flag);
+                        tag = *(uint8_t *)(buf + 6);
+                        flag = *(uint8_t *)(buf + 7);
                     } else {
                         assert(remainNum == 0);
                         break;
@@ -346,6 +348,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
                         
                         MessageInfo *info = new MessageInfo;
                         info->type = msgType;
+                        info->tag = tag;
                         info->proto = msg;
                         
                         self->_recvQueue.push(info);
@@ -402,14 +405,14 @@ void TcpClient::threadEntry( TcpClient *self ) {
 
                 if (self->_crypter != nullptr) {
                     self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-
-                    uint16_t flag = CORPC_MESSAGE_FLAG_CRYPT;
-                    *(uint16_t *)(buf + sendNum + 6) = htobe16(flag);
+                    *(uint8_t *)(buf + sendNum + 7) = CORPC_MESSAGE_FLAG_CRYPT;
                 }
                 
                 *(uint32_t *)(buf + sendNum) = htobe32(msgSize);
                 *(int16_t *)(buf + sendNum + 4) = htobe16(info->type);
 
+                *(uint8_t *)(buf + sendNum + 6) = info->tag;
+                
                 if (self->_enableSerial) {
                     *(uint16_t *)(buf + sendNum + 8) = htobe16(++lastSendSerial);
                 }
@@ -464,28 +467,31 @@ void TcpClient::join() {
     _t.join();
 }
 
-void TcpClient::send(int32_t type, google::protobuf::Message* msg) {
+void TcpClient::send(int16_t type, uint8_t tag, google::protobuf::Message* msg) {
     MessageInfo *info = new MessageInfo;
     info->type = type;
+    info->tag = tag;
     info->proto = msg;
     
     _sendQueue.push(info);
 }
 
-void TcpClient::recv(int32_t& type, google::protobuf::Message*& msg) {
+void TcpClient::recv(int16_t& type, uint8_t &tag, google::protobuf::Message*& msg) {
     MessageInfo *info = _recvQueue.pop();
     if (info) {
         type = info->type;
+        tag = info->tag;
         msg = info->proto;
         
         delete info;
     } else {
         type = 0;
+        tag = 0;
         msg = nullptr;
     }
 }
 
-bool TcpClient::registerMessage(int type, google::protobuf::Message *proto) {
+bool TcpClient::registerMessage(int16_t type, google::protobuf::Message *proto) {
     MessageInfo info;
     info.type = type;
     info.proto = proto;
@@ -500,25 +506,31 @@ void testThread(std::string host, uint16_t port) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     TcpClient client(host, port, true, true, true, true, crypter);
     client.registerMessage(1, new FooResponse);
-    client.registerMessage(CORPC_MSG_TYPE_BANNED, new BanResponse);
+    client.registerMessage(2, new BanResponse);
     
     client.start();
     
     // send/recv data to/from client
+    uint8_t sendTag = 0;
+    uint8_t recvTag = 0;
     while (true) {
         // send FooRequest
         FooRequest *request = new FooRequest;
         request->set_text("hello world!");
         request->set_times(10);
         
-        client.send(1, request);
+        client.send(1, ++sendTag, request);
         
-        int32_t rType;
+        int16_t rType;
         google::protobuf::Message *rMsg;
         do {
             usleep(100);
-            client.recv(rType, rMsg);
+            client.recv(rType, recvTag, rMsg);
         } while (!rType);
+
+        if (sendTag != recvTag) {
+            printf("Error: tag not match\n");
+        }
         
         switch (rType) {
             case 1: {

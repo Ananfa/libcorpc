@@ -1011,6 +1011,7 @@ Heartbeater::Heartbeater(): _heartbeatmsg(new SendMessageInfo) {
     _heartbeatmsg->type = CORPC_MSG_TYPE_HEARTBEAT;
     _heartbeatmsg->isRaw = true;
     _heartbeatmsg->needCrypt = false;
+    _heartbeatmsg->tag = 0;
     _heartbeatmsg->serial = 0;
     
     _t = std::thread(threadEntry, this);
