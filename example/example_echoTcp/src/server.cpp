@@ -109,7 +109,7 @@ int main(int argc, const char * argv[]) {
     corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, true, true, true, true, ip, port);
     server->start();
     
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](int16_t type, uint8_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
         void *conn_ptr = conn.get();
@@ -117,14 +117,14 @@ int main(int argc, const char * argv[]) {
         clients[conn_ptr] = 0;
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](int16_t type, uint8_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect %d close\n", conn->getfd());
         void *conn_ptr = conn.get();
         assert(clients.find(conn_ptr) != clients.end());
         clients.erase(conn_ptr);
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [&clients](int16_t type, uint8_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [&clients](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         WARN_LOG("banned msg type %d\n", type);
         g_bcnt++;
         std::shared_ptr<BanResponse> response(new BanResponse);
@@ -136,7 +136,7 @@ int main(int argc, const char * argv[]) {
         conn->send(2, false, true, tag, ++clients[conn_ptr], response);
     });
 
-    server->registerMessage(1, new FooRequest, false, [&clients](int16_t type, uint8_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(1, new FooRequest, false, [&clients](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;

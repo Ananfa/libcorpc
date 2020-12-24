@@ -27,7 +27,7 @@
 #define CORPC_MSG_TYPE_HEARTBEAT -115
 #define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
-#define CORPC_MESSAGE_HEAD_SIZE 12
+#define CORPC_MESSAGE_HEAD_SIZE 20
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 
 #define CORPC_HEARTBEAT_PERIOD 5000
@@ -81,7 +81,7 @@ private:
 class TcpClient {
     struct MessageInfo {
         int16_t type;
-        uint8_t tag;
+        uint16_t tag;
         google::protobuf::Message *proto;
     };
     
@@ -93,8 +93,8 @@ public:
     
     void join();
     
-    void send(int16_t type, uint8_t tag, google::protobuf::Message* msg);
-    void recv(int16_t& type, uint8_t &tag, google::protobuf::Message*& msg); // 收不到数据时type为0，msg为nullptr
+    void send(int16_t type, uint16_t tag, google::protobuf::Message* msg);
+    void recv(int16_t& type, uint16_t &tag, google::protobuf::Message*& msg); // 收不到数据时type为0，msg为nullptr
     
     bool registerMessage(int16_t type,
                          google::protobuf::Message *proto);
@@ -185,11 +185,11 @@ void TcpClient::threadEntry( TcpClient *self ) {
     
     uint32_t bodySize = 0;
     int16_t msgType = 0;
-    uint8_t tag = 0;
-    uint8_t flag = 0;
+    uint16_t tag = 0;
+    uint16_t flag = 0;
 
-    uint16_t lastRecvSerial = 0;
-    uint16_t lastSendSerial = 0;
+    uint32_t lastRecvSerial = 0;
+    uint32_t lastSendSerial = 0;
     
     uint64_t nowms = 0;
     // 开始定时心跳，以及接收／发送数据包
@@ -258,8 +258,10 @@ void TcpClient::threadEntry( TcpClient *self ) {
                         bodySize = be32toh(bodySize);
                         msgType = *(int16_t *)(buf + 4);
                         msgType = be16toh(msgType);
-                        tag = *(uint8_t *)(buf + 6);
-                        flag = *(uint8_t *)(buf + 7);
+                        tag = *(uint16_t *)(buf + 6);
+                        tag = be16toh(tag);
+                        flag = *(uint16_t *)(buf + 8);
+                        flag = be16toh(flag);
                     } else {
                         assert(remainNum == 0);
                         break;
@@ -294,8 +296,8 @@ void TcpClient::threadEntry( TcpClient *self ) {
                         assert(bodySize > 0);
                         // 校验序列号
                         if (self->_enableSerial) {
-                            uint16_t serial = *(uint16_t *)(buf + 8);
-                            serial = be16toh(serial);
+                            uint32_t serial = *(uint32_t *)(buf + 14);
+                            serial = be32toh(serial);
 
                             if (serial != ++lastRecvSerial) {
                                 printf("ERROR: serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
@@ -307,7 +309,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
 
                         // 校验CRC
                         if (self->_enableRecvCRC) {
-                            uint16_t crc = *(uint16_t *)(buf + 10);
+                            uint16_t crc = *(uint16_t *)(buf + 18);
                             crc = be16toh(crc);
 
                             uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
@@ -405,22 +407,22 @@ void TcpClient::threadEntry( TcpClient *self ) {
 
                 if (self->_crypter != nullptr) {
                     self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-                    *(uint8_t *)(buf + sendNum + 7) = CORPC_MESSAGE_FLAG_CRYPT;
+                    *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 }
                 
                 *(uint32_t *)(buf + sendNum) = htobe32(msgSize);
                 *(int16_t *)(buf + sendNum + 4) = htobe16(info->type);
 
-                *(uint8_t *)(buf + sendNum + 6) = info->tag;
+                *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
                 if (self->_enableSerial) {
-                    *(uint16_t *)(buf + sendNum + 8) = htobe16(++lastSendSerial);
+                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++lastSendSerial);
                 }
 
                 if (self->_enableSendCRC) {
-                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 10);
+                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
-                    *(uint16_t *)(buf + sendNum + 10) = htobe16(crc);
+                    *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
                 }
                 
                 sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
@@ -467,7 +469,7 @@ void TcpClient::join() {
     _t.join();
 }
 
-void TcpClient::send(int16_t type, uint8_t tag, google::protobuf::Message* msg) {
+void TcpClient::send(int16_t type, uint16_t tag, google::protobuf::Message* msg) {
     MessageInfo *info = new MessageInfo;
     info->type = type;
     info->tag = tag;
@@ -476,7 +478,7 @@ void TcpClient::send(int16_t type, uint8_t tag, google::protobuf::Message* msg) 
     _sendQueue.push(info);
 }
 
-void TcpClient::recv(int16_t& type, uint8_t &tag, google::protobuf::Message*& msg) {
+void TcpClient::recv(int16_t& type, uint16_t &tag, google::protobuf::Message*& msg) {
     MessageInfo *info = _recvQueue.pop();
     if (info) {
         type = info->type;
@@ -511,8 +513,8 @@ void testThread(std::string host, uint16_t port) {
     client.start();
     
     // send/recv data to/from client
-    uint8_t sendTag = 0;
-    uint8_t recvTag = 0;
+    uint16_t sendTag = 0;
+    uint16_t recvTag = 0;
     while (true) {
         // send FooRequest
         FooRequest *request = new FooRequest;

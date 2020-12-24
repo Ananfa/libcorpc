@@ -40,7 +40,7 @@
 #define CORPC_MSG_TYPE_HEARTBEAT -115
 #define CORPC_MESSAGE_FLAG_CRYPT 0x1
 
-#define CORPC_MESSAGE_HEAD_SIZE 12
+#define CORPC_MESSAGE_HEAD_SIZE 20
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
 
 #define CORPC_HEARTBEAT_PERIOD 5000
@@ -272,8 +272,8 @@ void UdpClient::threadEntry( UdpClient *self ) {
     
     int ret;
     
-    uint16_t lastRecvSerial = 0;
-    uint16_t lastSendSerial = 0;
+    uint32_t lastRecvSerial = 0;
+    uint32_t lastSendSerial = 0;
     
     // 开始定时心跳，以及接收／发送数据包
     // 逻辑：采用轮询机制
@@ -314,7 +314,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 bodySize = be32toh(bodySize);
                 int16_t msgType = *(int16_t *)(buf + 4);
                 msgType = be16toh(msgType);
-                uint16_t flag = *(uint16_t *)(buf + 6);
+                uint16_t flag = *(uint16_t *)(buf + 8);
                 flag = be16toh(flag);
                 
                 if (msgType < 0) {
@@ -337,8 +337,8 @@ void UdpClient::threadEntry( UdpClient *self ) {
                     assert(bodySize > 0);
                     // 校验序列号
                     if (self->_enableSerial) {
-                        uint16_t serial = *(uint16_t *)(buf + 8);
-                        serial = be16toh(serial);
+                        uint32_t serial = *(uint32_t *)(buf + 14);
+                        serial = be32toh(serial);
 
                         if (serial != ++lastRecvSerial) {
                             printf("ERROR: serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
@@ -350,7 +350,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
 
                     // 校验CRC
                     if (self->_enableRecvCRC) {
-                        uint16_t crc = *(uint16_t *)(buf + 10);
+                        uint16_t crc = *(uint16_t *)(buf + 18);
                         crc = be16toh(crc);
 
                         uint16_t crc1 = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, bodySize);
@@ -434,20 +434,20 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 self->_crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
 
                 uint16_t flag = CORPC_MESSAGE_FLAG_CRYPT;
-                *(uint16_t *)(buf + 6) = htobe16(flag);
+                *(uint16_t *)(buf + 8) = htobe16(flag);
             }
 
             *(uint32_t *)buf = htobe32(msgSize);
             *(int16_t *)(buf + 4) = htobe16(info->type);
 
             if (self->_enableSerial) {
-                *(uint16_t *)(buf + 8) = htobe16(++lastSendSerial);
+                *(uint32_t *)(buf + 14) = htobe32(++lastSendSerial);
             }
 
             if (self->_enableSendCRC) {
-                uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, 10);
+                uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, 18);
                 crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
-                *(uint16_t *)(buf + 10) = htobe16(crc);
+                *(uint16_t *)(buf + 18) = htobe16(crc);
             }
             
             int size = msgSize + CORPC_MESSAGE_HEAD_SIZE;

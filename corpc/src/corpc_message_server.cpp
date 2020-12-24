@@ -35,7 +35,7 @@ void MessageServer::Connection::onClose() {
     _server->onClose(self);
 }
 
-void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint8_t tag, uint16_t serial, std::shared_ptr<void> msg) {
+void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, uint32_t serial, std::shared_ptr<void> msg) {
     std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
     sendInfo->type = type;
     sendInfo->isRaw = isRaw;
@@ -171,8 +171,10 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     
     int16_t msgType = *(int16_t *)(head + 4);
     msgType = be16toh(msgType);
-    uint8_t tag = *(uint8_t *)(head + 6);
-    uint8_t flag = *(uint8_t *)(head + 7);
+    uint16_t tag = *(uint16_t *)(head + 6);
+    tag = be16toh(tag);
+    uint16_t flag = *(uint16_t *)(head + 8);
+    flag = be16toh(flag);
     
     if (msgType < 0) {
         // 处理系统类型消息，如：心跳
@@ -192,8 +194,8 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     if (server->_enableSerial) {
         conn->_recvSerial++;
 
-        uint16_t serial = *(uint16_t *)(head + 8);
-        serial = be16toh(serial);
+        uint32_t serial = *(uint32_t *)(head + 14);
+        serial = be32toh(serial);
 
         if (conn->_recvSerial != serial) {
             ERROR_LOG("MessageServer::decode -- serial not match, need:%d get:%d\n", conn->_recvSerial, serial);
@@ -204,10 +206,10 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
 
     // CRC校验（CRC码计算需要包含除crc外的包头）
     if (conn->getServer()->_enableRecvCRC) {
-        uint16_t crc = *(uint16_t *)(head + 10);
+        uint16_t crc = *(uint16_t *)(head + 18);
         crc = be16toh(crc);
 
-        uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 10);
+        uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 18);
         crc1 = CRC::CheckSum(body, crc1, size);
 
         if (crc != crc1) {
@@ -386,10 +388,11 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
     *(uint16_t *)(buf + 4) = htobe16(msgInfo->type);
     
     // 头部设置加密标志
-    *(uint8_t *)(buf + 6) = msgInfo->tag;
-    *(uint8_t *)(buf + 7) = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
-    *(uint16_t *)(buf + 8) = htobe16(msgInfo->serial);
-    *(uint16_t *)(buf + 10) = htobe16(crc);
+    *(uint16_t *)(buf + 6) = htobe16(msgInfo->tag);
+    uint16_t flag = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
+    *(uint16_t *)(buf + 8) = htobe16(flag);
+    *(uint32_t *)(buf + 14) = htobe32(msgInfo->serial);
+    *(uint16_t *)(buf + 18) = htobe16(crc);
 
     return true;
 }

@@ -41,8 +41,8 @@
 #define CORPC_RESPONSE_HEAD_SIZE 20
 
 // message head format
-// |body size(4 bytes)|message type(2 bytes)|tag(1 byte)|flag(1 byte)|serial number(2 bytes)|crc(2 bytes)|
-#define CORPC_MESSAGE_HEAD_SIZE 12
+// |body size(4 bytes)|message type(2 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
+#define CORPC_MESSAGE_HEAD_SIZE 20
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
 
@@ -182,8 +182,8 @@ namespace corpc {
         int16_t type;
         bool isRaw;
         bool needCrypt;
-        uint8_t tag;
-        uint16_t serial;
+        uint16_t tag;
+        uint32_t serial;
         std::shared_ptr<void> msg;  // 当isRaw为true时，msg中存的是std::string指针，当isRaw为false时，msg中存的是google::protobuf::Message指针。这是为了广播或转发消息给玩家时不需要对数据进行protobuf编解码
     };
     
