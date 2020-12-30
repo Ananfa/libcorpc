@@ -35,16 +35,26 @@ void MessageServer::Connection::onClose() {
     _server->onClose(self);
 }
 
-void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, uint32_t serial, std::shared_ptr<void> msg) {
+void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg) {
+    if (!isOpen() && !(_server->_enableSerial && _msgBuffer->needBuf())) {
+        return;
+    }
+
     std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
     sendInfo->type = type;
     sendInfo->isRaw = isRaw;
     sendInfo->needCrypt = needCrypt;
     sendInfo->tag = tag;
-    sendInfo->serial = serial;
     sendInfo->msg = msg;
+
+    if (_server->_enableSerial) {
+        assert(_msgBuffer);
+        _msgBuffer->insertMessage(sendInfo);
+    }
     
-    corpc::Connection::send(sendInfo);
+    if (isOpen()) {
+        corpc::Connection::send(sendInfo);
+    }
 }
 
 void * MessageServer::Worker::taskCallRoutine( void * arg ) {
@@ -63,9 +73,10 @@ void * MessageServer::Worker::taskCallRoutine( void * arg ) {
 }
 
 void MessageServer::Worker::handleMessage(void *msg) {
+
     // 注意：处理完消息需要自己删除msg
     WorkerTask *task = (WorkerTask *)msg;
-    
+
     switch (task->type) {
         case CORPC_MSG_TYPE_CONNECT: // 新连接建立
             LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
@@ -75,6 +86,17 @@ void MessageServer::Worker::handleMessage(void *msg) {
             LOG("MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
             // TODO:
             break;
+        default:
+            if (task->connection->getServer()->_enableSerial) {
+                if (task->connection->_msgBuffer) {
+                    task->connection->_msgBuffer->scrapMessages(task->reqSerial);
+                }
+            }
+
+            if (task->type == CORPC_MSG_TYPE_HEARTBEAT) {
+                delete task;
+                return;
+            }
     }
 
     auto iter = task->banned?_server->_registerMessageMap.find(CORPC_MSG_TYPE_BANNED):_server->_registerMessageMap.find(task->type);
@@ -176,12 +198,26 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     uint16_t flag = *(uint16_t *)(head + 8);
     flag = be16toh(flag);
     
+    uint32_t reqSerial = 0;
     if (msgType < 0) {
         // 处理系统类型消息，如：心跳
         // 注意：如果是UDP握手消息怎么办？
         if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
             uint64_t nowms = mtime();
             connection->setLastRecvHBTime(nowms);
+
+            // 接收最大序列号并发给worker处理消息清理
+            if (server->_enableSerial) {
+                reqSerial = *(uint32_t *)(head + 10);
+                reqSerial = be32toh(reqSerial);
+
+                WorkerTask *task = new WorkerTask;
+                task->type = msgType;
+                task->reqSerial = reqSerial;
+                task->connection = conn;
+                
+                return task;
+            }
         } else {
             WARN_LOG("MessageServer::decode -- recv system message: %d\n", msgType);
         }
@@ -202,6 +238,9 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
             connection->setDecodeError();
             return nullptr;
         }
+
+        reqSerial = *(uint32_t *)(head + 10);
+        reqSerial = be32toh(reqSerial);
     }
 
     // CRC校验（CRC码计算需要包含除crc外的包头）
@@ -236,8 +275,9 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
             // 旁路消息处理
             WorkerTask *task = new WorkerTask;
             task->type = msgType;
-            task->banned = iter->second.banned;
             task->tag = tag;
+            task->reqSerial = reqSerial;
+            task->banned = false;
             task->connection = conn;
             task->msg = std::make_shared<std::string>((char *)body, size);
             
@@ -249,8 +289,11 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
         }
     } else {
         google::protobuf::Message *msg = NULL;
+
+        // 由于iter->second.banned值会在其他线程修改，这里需要先记录下开始处理时的banned值，以免后续改变不一致
+        bool banned = iter->second.banned; 
         
-        if (!iter->second.banned) {
+        if (!banned) {
             if (iter->second.proto) {
                 msg = iter->second.proto->New();
                 if (!msg->ParseFromArray(body, size)) {
@@ -267,8 +310,9 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
 
         WorkerTask *task = new WorkerTask;
         task->type = msgType;
-        task->banned = iter->second.banned;
         task->tag = tag;
+        task->reqSerial = reqSerial;
+        task->banned = banned;
         task->connection = conn;
         task->msg = std::shared_ptr<google::protobuf::Message>(msg);
         

@@ -544,7 +544,7 @@ namespace corpc {
         Heartbeater();
         Heartbeater(Heartbeater const&);
         Heartbeater& operator=(Heartbeater const&);
-        ~Heartbeater() {}
+        ~Heartbeater() { _t.detach(); }
         
         static void threadEntry( Heartbeater *self );
         

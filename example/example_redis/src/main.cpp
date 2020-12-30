@@ -62,8 +62,8 @@ static void *redis_routine( void *arg )
     RedisConnectPool::Proxy& proxy = redisPool->proxy;
     
     redisReply *reply;
-    while (1)
-    {
+    //while (1)
+    //{
         // 获取连接
         redisContext *redis = proxy.take();
         
@@ -71,14 +71,50 @@ static void *redis_routine( void *arg )
             ERROR_LOG("can't take redis handle\n");
             return NULL;
         }
+
+        char cmd[] = "local ret=redis.call('hsetnx',KEYS[1],'token',KEYS[2])\
+                      if ret==1 then\
+                        redis.call('hset',KEYS[1],'gateway',KEYS[3])\
+                        redis.call('hset',KEYS[1],'roleId',KEYS[4])\
+                        redis.call('expire',KEYS[1],60)\
+                        return 1\
+                      else\
+                        return 0\
+                      end";
+        reply = (redisReply *)redisCommand(redis, "eval %s 4 session:%d %s %s %d", cmd, 123, "abcd", "127.0.0.1:12345", 100);
+        LOG("eval return %d\n", reply->integer);
+        freeReplyObject(reply);
+
+
+        reply = (redisReply *)redisCommand(redis,"SADD aaa %d", 1);
+        freeReplyObject(reply);
+
         
+        reply = (redisReply *)redisCommand(redis,"SMEMBERS aaa");
+        LOG("reply->type: %d\n", reply->type);
+        if (reply->type == REDIS_REPLY_ARRAY) {
+            LOG("reply->elements: %d\n", reply->elements);
+
+            if (reply->elements > 0) {
+                LOG("reply->element[0]->type: %d\n", reply->element[0]->type);
+            }
+        }
+        //LOG("PING: %s\n", reply->str);
+        freeReplyObject(reply);
+
+
         // PING server
         reply = (redisReply *)redisCommand(redis,"PING");
         //LOG("PING: %s\n", reply->str);
         freeReplyObject(reply);
         
         // Set a key
-        reply = (redisReply *)redisCommand(redis,"SET %s %s", "foo", "hello world");
+        reply = (redisReply *)redisCommand(redis,"SET ABC:%s %s", "foo", "hello world");
+        //LOG("SET: %s\n", reply->str);
+        freeReplyObject(reply);
+        
+        // Set a key
+        reply = (redisReply *)redisCommand(redis,"SET ABC:%d %s", 123, "hello world");
         //LOG("SET: %s\n", reply->str);
         freeReplyObject(reply);
         
@@ -88,8 +124,8 @@ static void *redis_routine( void *arg )
         freeReplyObject(reply);
         
         // Try a GET and two INCR
-        reply = (redisReply *)redisCommand(redis,"GET foo");
-        //LOG("GET foo: %s\n", reply->str);
+        reply = (redisReply *)redisCommand(redis,"GET ABC:123");
+        LOG("GET ABC:123 %s\n", reply->str);
         freeReplyObject(reply);
         
         reply = (redisReply *)redisCommand(redis,"INCR counter");
@@ -124,7 +160,7 @@ static void *redis_routine( void *arg )
         
         // 归还连接
         proxy.put(redis, false);
-    }
+    //}
     
     return NULL;
 }

@@ -376,6 +376,10 @@ void TcpClient::threadEntry( TcpClient *self ) {
             }
             
             if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
+                if (self->_enableSerial) {
+                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(lastRecvSerial);
+                }
+
                 if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
                     perror("write heartbeat");
                     close(s);
@@ -416,6 +420,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
                 *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
                 if (self->_enableSerial) {
+                    *(uint32_t *)(buf + sendNum + 10) = htobe32(lastRecvSerial);
                     *(uint32_t *)(buf + sendNum + 14) = htobe32(++lastSendSerial);
                 }
 

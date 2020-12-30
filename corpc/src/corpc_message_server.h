@@ -19,12 +19,14 @@
 
 #include "corpc_io.h"
 #include "corpc_crypter.h"
+#include "corpc_message_buffer.h"
 #include <map>
 
 #include <google/protobuf/message.h>
 
 namespace corpc {
     class MessageServer: public corpc::Server {
+        class Worker;
     public:
         class Connection: public corpc::Connection {
         public:
@@ -36,16 +38,20 @@ namespace corpc {
             MessageServer *getServer() { return _server; }
             std::shared_ptr<Crypter> &getCrypter() { return _crypter; }
             void setCrypter(std::shared_ptr<Crypter> &crypter) { _crypter = crypter; }
+            void setMsgBuffer(std::shared_ptr<MessageBuffer> &msgBuffer) { _msgBuffer = msgBuffer; }
             uint64_t getCreateTime() { return _createTime; }
             
-            void send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, uint32_t serial, std::shared_ptr<void> msg);
+            // 注意：此send方法使用了消息缓存，非线程安全
+            void send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg);
         private:
             MessageServer *_server;
             std::shared_ptr<Crypter> _crypter;
+            std::shared_ptr<MessageBuffer> _msgBuffer; // 已发送消息缓存（用于实现断线重连机制，在worker中处理才是安全的）
             time_t _createTime;   // 连接创建时间
             uint32_t _recvSerial; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
         public:
             friend class MessageServer;
+            friend class MessageServer::Worker;
         };
         
     private:
@@ -62,8 +68,9 @@ namespace corpc {
         
         struct WorkerTask {
             int16_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
-            bool banned; // 屏蔽
             uint16_t tag; // 客户端向服务器发带tag消息，服务器对这消息应答消息也需带相同的tag（客户端会等待tag消息返回）
+            uint32_t reqSerial; // 客户端收到的服务器最后消息序号
+            bool banned; // 屏蔽
             std::shared_ptr<Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
             std::shared_ptr<void> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据
         };

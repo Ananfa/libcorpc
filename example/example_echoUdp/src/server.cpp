@@ -75,11 +75,11 @@ static void *ban_routine( void *arg )
         sleep(5);
 
         if (banned) {
-            LOG("ban message\n");
+            LOG("unban message\n");
             server->unbanMessage(1);
             banned = false;
         } else {
-            LOG("unban message\n");
+            LOG("ban message\n");
             server->banMessage(1);
             banned = true;
         }
@@ -107,44 +107,30 @@ int main(int argc, const char * argv[]) {
     std::string key = "1234567fvxcvc";
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
 
-    std::map<void *, uint16_t> clients;
-    
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1);
     
     corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, true, true, false, ip, port);
     server->start();
     
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, &clients](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
-        LOG("connect\n");
-        conn->setCrypter(crypter);
-        void *conn_ptr = conn.get();
-        assert(clients.find(conn_ptr) == clients.end());
-        clients[conn_ptr] = 0;
+    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
+        conn->setCrypter(crypter);
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&clients](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
-        LOG("connect close\n");
-        void *conn_ptr = conn.get();
-        assert(clients.find(conn_ptr) != clients.end());
-        clients.erase(conn_ptr);
+    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect %d closed\n", conn->getfd());
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [&clients](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
-        WARN_LOG("banned msg type %d\n", type);
+    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         g_bcnt++;
         std::shared_ptr<BanResponse> response(new BanResponse);
         response->set_type(type);
 
-        void *conn_ptr = conn.get();
-        assert(clients.find(conn_ptr) != clients.end());
-        
-        conn->send(1, false, true, tag, ++clients[conn_ptr], response);
+        conn->send(2, false, true, tag, response);
     });
 
-    server->registerMessage(1, new FooRequest, false, [&clients](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    server->registerMessage(1, new FooRequest, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -156,10 +142,7 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
 
-        void *conn_ptr = conn.get();
-        assert(clients.find(conn_ptr) != clients.end());
-        
-        conn->send(1, false, true, tag, ++clients[conn_ptr], response);
+        conn->send(1, false, true, tag, response);
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);

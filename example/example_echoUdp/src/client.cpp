@@ -505,7 +505,7 @@ void testThread(std::string host, uint16_t port, uint16_t local_port) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     UdpClient client(host, port, local_port, true, true, true, false, crypter);
     client.registerMessage(1, new FooResponse);
-    client.registerMessage(CORPC_MSG_TYPE_BANNED, new BanResponse);
+    client.registerMessage(2, new BanResponse);
     
     client.start();
     

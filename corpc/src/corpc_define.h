@@ -370,6 +370,224 @@ namespace corpc {
         PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
     };
     
+    template <typename T>
+    class NormalLink {
+    public:
+        class Node {
+        public:
+            std::shared_ptr<T> data;
+            
+            Node *next;
+            Node *prev;
+        };
+        
+        class Iterator {
+            Node* ptr;
+            
+            // implement explicit copy construct (c++11 or later)
+            //explicit Iterator(NodeType* nd): ptr(nd) {}
+            Iterator(Node* nd): ptr(nd) {}
+            
+        public:
+            Iterator(): ptr(NULL) {}
+            
+            Iterator(const Iterator& rhs): ptr(rhs.ptr) {}
+            
+            // swap (c++11 or later)
+            // void swap(Iterator& other) noexcept
+            // {
+            //     using std::swap;
+            //     swap(ptr, other.ptr);
+            // }
+            
+            Iterator& operator++ () {
+                assert(ptr != NULL && "Out-of-bounds iterator increment!");
+                ptr = ptr->next;
+                return *this;
+            }
+            
+            Iterator operator++ (int) {
+                assert(ptr != NULL && "Out-of-bounds iterator increment!");
+                Iterator tmp(*this);
+                ptr = ptr->next;
+                return tmp;
+            }
+            
+            bool operator == (const Iterator& rhs) const {
+                return ptr == rhs.ptr;
+            }
+            
+            bool operator != (const Iterator& rhs) const {
+                return ptr != rhs.ptr;
+            }
+            
+            Node& operator* () const {
+                assert(ptr != NULL && "Out-of-bounds iterator increment!");
+                return *ptr;
+            }
+            
+            Node* operator-> () const {
+                assert(ptr != NULL && "Out-of-bounds iterator increment!");
+                return ptr;
+            }
+            
+        public:
+            friend class NormalLink<T>;
+        };
+
+    public:
+        NormalLink(): _head(nullptr), _tail(nullptr), _eIter(nullptr) {}
+        ~NormalLink() {
+            clear();
+        }
+        
+        void push_back(Node *node);
+        Node* pop_front();
+        void erase(Node *node);
+        void eraseTo(Node *node);
+        void moveToTail(Node *node);
+        void clear();
+        
+        Node* getHead() { return _head; }
+        Node* getTail() { return _tail; }
+        
+        Iterator begin() const {
+            Iterator iter(_head);
+            return iter;
+        }
+
+        const Iterator& end() const { return _eIter; }
+
+    private:
+        Node *_head;
+        Node *_tail;
+
+        Iterator _eIter;
+    };
+
+    template <typename T>
+    void NormalLink<T>::push_back(Node *node) {
+        if (_head) {
+            assert(_tail && !_tail->next);
+            node->next = nullptr;
+            node->prev = _tail;
+            _tail->next = node;
+            _tail = node;
+        } else {
+            assert(!_tail);
+            node->next = nullptr;
+            node->prev = nullptr;
+            _head = node;
+            _tail = node;
+        }
+    }
+
+    template <typename T>
+    typename NormalLink<T>::Node* NormalLink<T>::pop_front() {
+        if (!_head) {
+            return nullptr;
+        }
+        
+        Node *node = _head;
+        _head = _head->next;
+        if (_head) {
+            _head->prev = nullptr;
+        } else {
+            assert(_tail == node);
+            _tail = nullptr;
+        }
+        
+        node->next = nullptr;
+        node->prev = nullptr;
+        
+        return node;
+    }
+
+    template <typename T>
+    void NormalLink<T>::erase(Node *node) {
+        Node *prev = node->prev;
+        Node *next = node->next;
+        
+        if (prev) {
+            prev->next = next;
+        }
+        
+        if (next) {
+            next->prev = prev;
+        }
+        
+        if (_head == node) {
+            _head = next;
+        }
+        
+        if (_tail == node) {
+            _tail = prev;
+        }
+        
+        delete node;
+    }
+
+    template <typename T>
+    void NormalLink<T>::eraseTo(Node *node) {
+        assert(node != nullptr);
+        Node *tmpNode = _head;
+
+        while (tmpNode != node) {
+            assert(tmpNode != nullptr);
+            Node *next = tmpNode->next;
+            delete tmpNode;
+            tmpNode = next;
+        }
+
+        _head = node->next;
+        if (_head) {
+            _head->prev = nullptr;
+        } else {
+            assert(_tail == node);
+            _tail = nullptr;
+        }
+
+        delete node;
+    }
+
+    template <typename T>
+    void NormalLink<T>::moveToTail(Node *node) {
+        Node *next = node->next;
+        
+        assert(next || _tail == node);
+        
+        if (next) {
+            Node *prev = node->prev;
+            next->prev = prev;
+            
+            if (prev) {
+                prev->next = next;
+            }
+            
+            if (_head == node) {
+                _head = next;
+            }
+            
+            node->next = nullptr;
+            node->prev = _tail;
+            _tail->next = node;
+            _tail = node;
+        }
+    }
+
+    template <typename T>
+    void NormalLink<T>::clear() {
+        Node *node = _head;
+        while (node) {
+            Node *next = node->next;
+            delete node;
+            node = next;
+        }
+        
+        _head = nullptr;
+        _tail = nullptr;
+    }
+
     struct DebugContext {
         // the params below are for debug
         int iSuccCnt = 0;
