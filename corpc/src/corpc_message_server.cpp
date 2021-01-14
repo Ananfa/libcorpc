@@ -35,6 +35,12 @@ void MessageServer::Connection::onClose() {
     _server->onClose(self);
 }
 
+void MessageServer::Connection::scrapMessages(uint32_t serial) {
+    if (_msgBuffer) {
+        _msgBuffer->scrapMessages(serial);
+    }
+}
+
 void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg) {
     if (!isOpen() && !(_server->_enableSerial && _msgBuffer->needBuf())) {
         return;
@@ -54,6 +60,19 @@ void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, u
     
     if (isOpen()) {
         corpc::Connection::send(sendInfo);
+    }
+}
+
+void MessageServer::Connection::resend() {
+    if (_msgBuffer) {
+        _msgBuffer->traversal([this](std::shared_ptr<SendMessageInfo> &sendInfo) -> bool {
+            if (!isOpen()) {
+                return false;
+            }
+
+            corpc::Connection::send(sendInfo);
+            return true;
+        });
     }
 }
 

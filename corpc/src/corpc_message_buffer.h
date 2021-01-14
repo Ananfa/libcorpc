@@ -31,7 +31,7 @@ namespace corpc {
     class MessageBuffer
     {
         typedef NormalLink<SendMessageInfo> BufMessageLink;
-        typedef std::function<bool(std::shared_ptr<SendMessageInfo>)> MessageHandle;
+        typedef std::function<bool(std::shared_ptr<SendMessageInfo>&)> MessageHandle;
         
     public:
         MessageBuffer(bool needBuf): _needBuf(needBuf), _lastSendSerial(0) {}
@@ -44,7 +44,7 @@ namespace corpc {
         void traversal(MessageHandle handle);
 
         // 删除某个消息序号之前的所有消息（包括消息序号消息）
-        void scrapMessages(uint64_t serial);
+        void scrapMessages(uint32_t serial);
 
         bool needBuf() { return _needBuf; }
     private:

@@ -43,7 +43,7 @@ void MessageBuffer::traversal(MessageBuffer::MessageHandle handle) {
     }
 }
 
-void MessageBuffer::scrapMessages(uint64_t serial) {
+void MessageBuffer::scrapMessages(uint32_t serial) {
     if (_needBuf) {
         auto it = _bufMsgMap.find(serial);
         if (it != _bufMsgMap.end()) {

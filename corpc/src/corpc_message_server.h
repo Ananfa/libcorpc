@@ -38,11 +38,14 @@ namespace corpc {
             MessageServer *getServer() { return _server; }
             std::shared_ptr<Crypter> &getCrypter() { return _crypter; }
             void setCrypter(std::shared_ptr<Crypter> &crypter) { _crypter = crypter; }
+            std::shared_ptr<MessageBuffer> &getMsgBuffer() { return _msgBuffer; }
             void setMsgBuffer(std::shared_ptr<MessageBuffer> &msgBuffer) { _msgBuffer = msgBuffer; }
             uint64_t getCreateTime() { return _createTime; }
+            void scrapMessages(uint32_t serial); // 擦除已确认消息
             
             // 注意：此send方法使用了消息缓存，非线程安全
             void send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg);
+            void resend(); // 重发消息缓存中所有消息
         private:
             MessageServer *_server;
             std::shared_ptr<Crypter> _crypter;

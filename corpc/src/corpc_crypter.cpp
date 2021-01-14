@@ -18,7 +18,7 @@
 
 using namespace corpc;
 
-SimpleXORCrypter::SimpleXORCrypter(std::string &key): Crypter(), _key(key) {
+SimpleXORCrypter::SimpleXORCrypter(const std::string &key): Crypter(), _key(key) {
 	_keyBuf = (uint8_t *)_key.data();
     _keySize = _key.size();
 }

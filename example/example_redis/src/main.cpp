@@ -71,7 +71,7 @@ static void *redis_routine( void *arg )
             ERROR_LOG("can't take redis handle\n");
             return NULL;
         }
-
+/*
         char cmd[] = "local ret=redis.call('hsetnx',KEYS[1],'token',KEYS[2])\
                       if ret==1 then\
                         redis.call('hset',KEYS[1],'gateway',KEYS[3])\
@@ -84,7 +84,32 @@ static void *redis_routine( void *arg )
         reply = (redisReply *)redisCommand(redis, "eval %s 4 session:%d %s %s %d", cmd, 123, "abcd", "127.0.0.1:12345", 100);
         LOG("eval return %d\n", reply->integer);
         freeReplyObject(reply);
+*/
 
+        char cmd[] = "local gateId = redis.call('hget',KEYS[1],'gateId')\
+                      if not gateId then\
+                        return 0\
+                      elseif gateId ~= ARGV[1] then\
+                        return 0\
+                      end\
+                      local gToken = redis.call('hget',KEYS[1],'gToken')\
+                      if not gToken then\
+                        return 0\
+                      elseif gToken ~= ARGV[2] then\
+                        return 0\
+                      end\
+                      local roleId = redis.call('hget',KEYS[1],'roleId')\
+                      if not roleId then\
+                        return 0\
+                      end\
+                      local ret = redis.call('expire',KEYS[1],ARGV[3])\
+                      if ret == 0 then\
+                        return 0\
+                      end\
+                      return tonumber(roleId)";
+        reply = (redisReply *)redisCommand(redis, "eval %s 1 session:%d %d %s %d", cmd, 100, 1, "abcd", 60);
+        LOG("eval return %d\n", reply->integer);
+        freeReplyObject(reply);
 
         reply = (redisReply *)redisCommand(redis,"SADD aaa %d", 1);
         freeReplyObject(reply);

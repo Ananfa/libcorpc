@@ -30,7 +30,7 @@ namespace corpc {
 
 	class SimpleXORCrypter: public Crypter {
 	public:
-		SimpleXORCrypter(std::string &key);
+		SimpleXORCrypter(const std::string &key);
 		virtual ~SimpleXORCrypter() {}
 
 		virtual void encrypt(uint8_t *src, uint8_t *dst, int size);
