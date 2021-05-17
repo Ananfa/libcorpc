@@ -35,7 +35,7 @@ void MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
 
 void MessageBuffer::traversal(MessageBuffer::MessageHandle handle) {
     if (_needBuf) {
-        for (auto it = _bufMsglink.begin(); it != _bufMsglink.end(); it++) {
+        for (auto it = _bufMsglink.begin(); it != _bufMsglink.end(); ++it) {
             if (!handle(it->data)) {
                 return;
             }
@@ -49,7 +49,7 @@ void MessageBuffer::scrapMessages(uint32_t serial) {
         if (it != _bufMsgMap.end()) {
             BufMessageLink::Node *node = it->second;
 
-            for (auto it1 = _bufMsglink.begin(); it1 != _bufMsglink.end(); it1++) {
+            for (auto it1 = _bufMsglink.begin(); it1 != _bufMsglink.end(); ++it1) {
                 _bufMsgMap.erase(it1->data->serial);
 
                 if (it1->data->serial == serial) {

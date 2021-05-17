@@ -866,7 +866,7 @@ void *Sender::connectionRoutine( void * arg ) {
     connection->_routine = co_self();
     connection->_routineHang = false;
     
-    std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
+    std::string buffs(CORPC_MAX_BUFFER_SIZE, 0);
     uint8_t *buf = (uint8_t *)buffs.data();
     uint32_t startIndex = 0;
     uint32_t endIndex = 0;
