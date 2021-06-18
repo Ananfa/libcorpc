@@ -71,21 +71,100 @@ static void *redis_routine( void *arg )
             ERROR_LOG("can't take redis handle\n");
             return NULL;
         }
-/*
-        char cmd[] = "local ret=redis.call('hsetnx',KEYS[1],'token',KEYS[2])\
+
+        char cmd[] = "\
+            local ret = redis.call('exists',KEYS[1])\
+            if ret==0 then\
+              return {}\
+            end\
+            if ARGV[1]==\"1\" then\
+              redis.call('persist',KEYS[1])\
+            end\
+            return redis.call('hgetall',KEYS[1])";
+        reply = (redisReply *)redisCommand(redis, "eval %s 1 Role:%d 1", cmd, 123);
+        if (!reply) {
+            ERROR_LOG("cmd reply failed\n");
+            proxy.put(redis, true);
+            return nullptr;
+        }
+        if (reply->type != REDIS_REPLY_ARRAY) {
+            ERROR_LOG("cmd return type not array\n");
+            freeReplyObject(reply);
+            proxy.put(redis, false);
+            return nullptr;
+        }
+        LOG("eval return array size = %d\n", reply->elements);
+        freeReplyObject(reply);
+
+        g_cnt++;
+        
+        // 归还连接
+        proxy.put(redis, false);
+    //}
+    
+    return NULL;
+}
+
+static void *redis_routine2( void *arg )
+{
+    co_enable_hook_sys();
+    
+    RedisConnectPool *redisPool = (RedisConnectPool*)arg;
+    RedisConnectPool::Proxy& proxy = redisPool->proxy;
+    
+    redisReply *reply;
+    //while (1)
+    //{
+        // 获取连接
+        redisContext *redis = proxy.take();
+        
+        if (!redis) {
+            ERROR_LOG("can't take redis handle\n");
+            return NULL;
+        }
+
+        char cmd[] = "local ret=redis.call('hsetnx',KEYS[1],'token',ARGV[1])\
                       if ret==1 then\
-                        redis.call('hset',KEYS[1],'gateway',KEYS[3])\
-                        redis.call('hset',KEYS[1],'roleId',KEYS[4])\
-                        redis.call('expire',KEYS[1],60)\
+                        redis.call('hset',KEYS[1],'gateway',ARGV[2])\
+                        redis.call('hset',KEYS[1],'roleId',ARGV[3])\
+                        redis.call('expire',KEYS[1],ARGV[4])\
                         return 1\
                       else\
                         return 0\
                       end";
-        reply = (redisReply *)redisCommand(redis, "eval %s 4 session:%d %s %s %d", cmd, 123, "abcd", "127.0.0.1:12345", 100);
+        //reply = (redisReply *)redisCommand(redis, "eval %s 1 session:%d %s %s %d", cmd, 123, "abcd", "127.0.0.1:12345", 100, 60);
+        //LOG("eval return %d\n", reply->integer);
+        //freeReplyObject(reply);
+
+        std::vector<const char *> argv;
+        std::vector<size_t> argvlen;
+        argv.reserve(8);
+        argvlen.reserve(8);
+        argv.push_back("EVAL");
+        argvlen.push_back(4);
+        argv.push_back(cmd);
+        argvlen.push_back(strlen(cmd));
+        argv.push_back("1");
+        argvlen.push_back(1);
+
+        char tmpStr[50];
+        sprintf(tmpStr,"session:{%d}", 111);
+        argv.push_back(tmpStr);
+        argvlen.push_back(strlen(tmpStr));
+        argv.push_back("abcd");
+        argvlen.push_back(4);
+        argv.push_back("127.0.0.1:12345");
+        argvlen.push_back(15);
+        argv.push_back("100");
+        argvlen.push_back(3);
+        argv.push_back("60");
+        argvlen.push_back(2);
+
+        reply = (redisReply *)redisCommandArgv(redis, argv.size(), &(argv[0]), &(argvlen[0]));
         LOG("eval return %d\n", reply->integer);
         freeReplyObject(reply);
-*/
 
+/*
         char cmd[] = "local gateId = redis.call('hget',KEYS[1],'gateId')\
                       if not gateId then\
                         return 0\
@@ -110,6 +189,10 @@ static void *redis_routine( void *arg )
         reply = (redisReply *)redisCommand(redis, "eval %s 1 session:%d %d %s %d", cmd, 100, 1, "abcd", 60);
         LOG("eval return %d\n", reply->integer);
         freeReplyObject(reply);
+*/
+
+
+
 
         reply = (redisReply *)redisCommand(redis,"SADD aaa %d", 1);
         freeReplyObject(reply);
@@ -290,7 +373,7 @@ void clientThread(RedisConnectPool *redisPool) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
 
-    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.221", 6379, 0, 8);
+    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.3", 6379, 0, 8);
     
     /*
     // 开两个线程进行多线程访问

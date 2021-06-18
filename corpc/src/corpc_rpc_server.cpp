@@ -204,7 +204,7 @@ bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shar
     std::shared_ptr<RpcServerTask> rpcTask = std::static_pointer_cast<RpcServerTask>(data);
     uint32_t msgSize = rpcTask->response->GetCachedSize();
     if (msgSize == 0) {
-        msgSize = rpcTask->response->ByteSize();
+        msgSize = rpcTask->response->ByteSizeLong();
     }
     
     // 若空间不足容纳消息头部则等待下次

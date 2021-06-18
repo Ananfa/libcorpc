@@ -153,8 +153,13 @@ bool MessageServer::registerMessage(int type,
                                     google::protobuf::Message *proto,
                                     bool needCoroutine,
                                     MessageHandle handle) {
+    if (_registerMessageMap.find(type) != _registerMessageMap.end()) {
+        return false;
+    }
+
+
     RegisterMessageInfo info;
-    info.type = type;
+    //info.type = type;
     info.proto = proto;
     info.needCoroutine = needCoroutine;
     info.banned = false;
@@ -162,7 +167,7 @@ bool MessageServer::registerMessage(int type,
     
     _registerMessageMap.insert(std::make_pair(type, info));
     
-    return false;
+    return true;
 }
 
 bool MessageServer::banMessage(int type) {
@@ -405,7 +410,7 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
         
         msgSize = msg->GetCachedSize();
         if (msgSize == 0) {
-            msgSize = msg->ByteSize();
+            msgSize = msg->ByteSizeLong();
         }
 
         int spaceleft = space - CORPC_MESSAGE_HEAD_SIZE;
