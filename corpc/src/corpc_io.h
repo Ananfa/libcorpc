@@ -23,6 +23,7 @@
 
 #include <thread>
 
+// 注意：当前UDP绑定四元组的实现方式还有问题，消息还是会被没绑定四元组的socket接收，有时又能正确发到绑定四元组的socket上，未找到具体原因（好像和系统有关系）
 namespace corpc {
     
     class IO;

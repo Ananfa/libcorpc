@@ -486,7 +486,6 @@ void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
 
 void *UdpAcceptor::acceptRoutine( void * arg ) {
     UdpAcceptor *self = (UdpAcceptor *)arg;
-    Server *server = self->_server;
     int listen_fd = self->_listen_fd;
     char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     
@@ -520,6 +519,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
             continue;
         }
+        DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake 1 msg.\n");
         
         int new_fd = self->_shake_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         
@@ -575,6 +575,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
             if (ret < 0 && errno == EAGAIN) {
                 waittime <<= 1;
                 trytimes--;
+                co_set_timeout(shake_fd, waittime, 1000);
                 
                 continue;
             }
@@ -594,7 +595,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
                 WARN_LOG("UdpAcceptor::handshakeRoutine() -- not shake 3 msg, fd %d, msgtype %d\n", shake_fd, msgtype);
                 continue;
             }
-            
+            DEBUG_LOG("recv shake 3 msg, fd:%d\n", shake_fd);
             // 握手成功，创建connection对象
             co_set_timeout(shake_fd, -1, 1000);
             
@@ -692,7 +693,7 @@ void *Receiver::connectionRoutine( void * arg ) {
     
     std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
     uint8_t *buf = (uint8_t *)buffs.data();
-    
+    int retryTimes = 0;
     while (true) {
         // 先将数据读到缓存中（尽可能多的读）
         int ret = (int)read(fd, buf, CORPC_MAX_BUFFER_SIZE);
@@ -700,7 +701,12 @@ void *Receiver::connectionRoutine( void * arg ) {
         if (ret <= 0) {
             // ret 0 mean disconnected
             if (ret < 0 && errno == EAGAIN) {
-                continue;
+                // 这里设置最大重试次数
+                if (retryTimes < 5) {
+                    msleep(100);
+                    retryTimes++;
+                    continue;
+                }
             }
             
             // 出错处理

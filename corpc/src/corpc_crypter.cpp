@@ -19,17 +19,17 @@
 using namespace corpc;
 
 SimpleXORCrypter::SimpleXORCrypter(const std::string &key): Crypter(), _key(key) {
-	_keyBuf = (uint8_t *)_key.data();
+    _keyBuf = (uint8_t *)_key.data();
     _keySize = _key.size();
 }
 
 void SimpleXORCrypter::encrypt(uint8_t *src, uint8_t *dst, int size) {
-	for (int i = 0; i < size; i++) {
-		dst[i] = src[i] ^ _key[i%_keySize];
-	}
+    for (int i = 0; i < size; i++) {
+        dst[i] = src[i] ^ _key[i%_keySize];
+    }
 }
 
 void SimpleXORCrypter::decrypt(uint8_t *src, uint8_t *dst, int size) {
-	encrypt(src, dst, size);
+    encrypt(src, dst, size);
 }
 

@@ -283,7 +283,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     }
 
     // 解密
-    if (flag & CORPC_MESSAGE_FLAG_CRYPT != 0) {
+    if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
         if (crypter == nullptr) {
             ERROR_LOG("MessageServer::decode -- decrypt fail for no crypter\n");
             connection->setDecodeError();

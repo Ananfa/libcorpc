@@ -87,7 +87,7 @@ void _print_time(FILE* fd, struct tm& tm_now, uint32_t mseconds) {
     strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", &tm_now);
     fputs(buffer, fd);
     
-    snprintf(buffer, 26, ".%03ld", mseconds);
+    snprintf(buffer, 26, ".%03u", mseconds);
     fputs(buffer, fd);
 }
 

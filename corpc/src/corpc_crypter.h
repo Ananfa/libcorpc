@@ -20,27 +20,27 @@
 #include <string>
 
 namespace corpc {
-	class Crypter {
-	public:
-		Crypter() {}
+    class Crypter {
+    public:
+        Crypter() {}
         virtual ~Crypter() {};
-		virtual void encrypt(uint8_t *src, uint8_t *dst, int size) = 0;
-		virtual void decrypt(uint8_t *src, uint8_t *dst, int size) = 0;
-	};
+        virtual void encrypt(uint8_t *src, uint8_t *dst, int size) = 0;
+        virtual void decrypt(uint8_t *src, uint8_t *dst, int size) = 0;
+    };
 
-	class SimpleXORCrypter: public Crypter {
-	public:
-		SimpleXORCrypter(const std::string &key);
-		virtual ~SimpleXORCrypter() {}
+    class SimpleXORCrypter: public Crypter {
+    public:
+        SimpleXORCrypter(const std::string &key);
+        virtual ~SimpleXORCrypter() {}
 
-		virtual void encrypt(uint8_t *src, uint8_t *dst, int size);
-		virtual void decrypt(uint8_t *src, uint8_t *dst, int size);
+        virtual void encrypt(uint8_t *src, uint8_t *dst, int size);
+        virtual void decrypt(uint8_t *src, uint8_t *dst, int size);
 
-	private:
-		std::string _key;
-		uint8_t *_keyBuf;
+    private:
+        std::string _key;
+        uint8_t *_keyBuf;
         size_t _keySize;
-	};
+    };
 }
 
 #endif /* corpc_crypter_h */
