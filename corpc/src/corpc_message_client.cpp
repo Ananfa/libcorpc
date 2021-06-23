@@ -29,16 +29,17 @@ void MessageClient::join() {
     _t.join();
 }
 
-void MessageClient::send(int16_t type, uint16_t tag, google::protobuf::Message* msg) {
+void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg) {
     MessageInfo *info = new MessageInfo;
     info->type = type;
     info->tag = tag;
     info->proto = msg;
+    info->needCrypter = needCrypter;
     
     _sendQueue.push(info);
 }
 
-void MessageClient::recv(int16_t& type, uint16_t &tag, google::protobuf::Message*& msg) {
+void MessageClient::recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg) {
     MessageInfo *info = _recvQueue.pop();
     if (info) {
         type = info->type;
@@ -53,7 +54,7 @@ void MessageClient::recv(int16_t& type, uint16_t &tag, google::protobuf::Message
     }
 }
 
-bool MessageClient::registerMessage(int16_t type, google::protobuf::Message *proto) {
+bool MessageClient::registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto) {
     MessageInfo info;
     info.type = type;
     info.proto = proto;
@@ -278,7 +279,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
                             return;
                         }
                         
-                        google::protobuf::Message *msg = iter->second.proto->New();
+                        std::shared_ptr<google::protobuf::Message> msg(iter->second.proto->New());
                         if (!msg->ParseFromArray(bodyBuf, bodySize)) {
                             // 出错处理
                             ERROR_LOG("parse body fail for message: %d\n", msgType);
@@ -347,7 +348,8 @@ void TcpClient::threadEntry( TcpClient *self ) {
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE <= CORPC_MAX_MESSAGE_SIZE - sendNum) {
                 info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
 
-                if (self->_crypter != nullptr) {
+                if (info->needCrypter) {
+                    assert(self->_crypter);
                     self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                     *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 }
@@ -370,7 +372,6 @@ void TcpClient::threadEntry( TcpClient *self ) {
                 
                 sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
                 
-                delete info->proto;
                 delete info;
                 
                 info = self->_sendQueue.pop();
@@ -674,7 +675,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         return;
                     }
                     
-                    google::protobuf::Message *msg = iter->second.proto->New();
+                    std::shared_ptr<google::protobuf::Message> msg(iter->second.proto->New());
                     if (!msg->ParseFromArray(buf + CORPC_MESSAGE_HEAD_SIZE, bodySize)) {
                         // 出错处理
                         ERROR_LOG("parse body fail for message: %d, fd:%d\n", msgType, s);
@@ -758,7 +759,6 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 return;
             }
             
-            delete info->proto;
             delete info;
             
             info = self->_sendQueue.pop();

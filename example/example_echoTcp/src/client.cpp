@@ -13,8 +13,8 @@ void testThread(std::string host, uint16_t port) {
     std::string key("1234567fvxcvc");
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
     corpc::TcpClient client(host, port, true, true, true, true, crypter);
-    client.registerMessage(1, new FooResponse);
-    client.registerMessage(2, new BanResponse);
+    client.registerMessage(1, std::shared_ptr<google::protobuf::Message>(new FooResponse));
+    client.registerMessage(2, std::shared_ptr<google::protobuf::Message>(new BanResponse));
     
     client.start();
     
@@ -23,14 +23,14 @@ void testThread(std::string host, uint16_t port) {
     uint16_t recvTag = 0;
     while (true) {
         // send FooRequest
-        FooRequest *request = new FooRequest;
+        std::shared_ptr<FooRequest> request(new FooRequest);
         request->set_text("hello world!");
         request->set_times(10);
         
-        client.send(1, ++sendTag, request);
+        client.send(1, ++sendTag, true, std::static_pointer_cast<google::protobuf::Message>(request));
         
         int16_t rType;
-        google::protobuf::Message *rMsg;
+        std::shared_ptr<google::protobuf::Message> rMsg;
         do {
             usleep(100);
             client.recv(rType, recvTag, rMsg);
@@ -42,15 +42,13 @@ void testThread(std::string host, uint16_t port) {
         
         switch (rType) {
             case 1: {
-                FooResponse *response = (FooResponse*)rMsg;
+                std::shared_ptr<FooResponse> response = std::static_pointer_cast<FooResponse>(rMsg);
                 //printf("%s\n", response->text().c_str());
-                delete response;
                 break;
             }
             case 2: {
-                BanResponse *response = (BanResponse*)rMsg;
+                std::shared_ptr<BanResponse> response = std::static_pointer_cast<BanResponse>(rMsg);
                 //printf("%s\n", response->text().c_str());
-                delete response;
                 break;
             }
             default:

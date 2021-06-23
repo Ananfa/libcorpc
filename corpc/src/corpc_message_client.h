@@ -32,16 +32,17 @@ namespace corpc {
         
         void join();
         
-        void send(int16_t type, uint16_t tag, google::protobuf::Message* msg);
-        void recv(int16_t& type, uint16_t &tag, google::protobuf::Message*& msg); // 收不到数据时type为0，msg为nullptr
+        void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
+        void recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
         
-        bool registerMessage(int16_t type, google::protobuf::Message *proto);
+        bool registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto);
         
     protected:
         struct MessageInfo {
             int16_t type;
             uint16_t tag;
-            google::protobuf::Message *proto;
+            std::shared_ptr<google::protobuf::Message> proto;
+            bool needCrypter;   // 发送消息时标记消息是否需要加密
         };
         
         bool _needHB;        // 是否需要心跳
@@ -61,6 +62,8 @@ namespace corpc {
         
         uint64_t _lastRecvHBTime; // 最后一次收到心跳的时间
         uint64_t _lastSendHBTime; // 最后一次发送心跳的时间
+
+        // TODO: 实现运行状态标志
     };
 
     class TcpClient: public MessageClient {
