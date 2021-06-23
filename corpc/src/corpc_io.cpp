@@ -469,10 +469,13 @@ bool TcpAcceptor::start() {
     return true;
 }
 
-UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0), _unshakemsg(CORPC_MESSAGE_HEAD_SIZE, 0) {
+UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0), _shakemsg4(CORPC_MESSAGE_HEAD_SIZE, 0), _unshakemsg(CORPC_MESSAGE_HEAD_SIZE, 0) {
     _shakemsg2buf = (uint8_t *)_shakemsg2.data();
     memset(_shakemsg2buf, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(_shakemsg2buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+    _shakemsg4buf = (uint8_t *)_shakemsg4.data();
+    memset(_shakemsg4buf, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(_shakemsg4buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
     _unshakemsg2buf = (uint8_t *)_unshakemsg.data();
     memset(_unshakemsg2buf, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(_unshakemsg2buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_UNSHAKE);
@@ -516,7 +519,15 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
         
         // 判断是否“连接请求”消息
         if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
-            ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
+            if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
+                // 要求客户端重发握手3消息
+                DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake3.\n");
+            
+                sendto(listen_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+            } else {
+                ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
+            }
+            
             continue;
         }
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake 1 msg.\n");
@@ -562,7 +573,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
         DEBUG_LOG("Send shake 2 msg\n");
         int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
         if (ret != CORPC_MESSAGE_HEAD_SIZE) {
-            ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg fail for fd %d ret %d errno %d (%s)\n",
+            ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 2 fail for fd %d ret %d errno %d (%s)\n",
                    shake_fd, ret, errno, strerror(errno));
             close(shake_fd);
             break;
@@ -596,6 +607,17 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
                 continue;
             }
             DEBUG_LOG("recv shake 3 msg, fd:%d\n", shake_fd);
+
+            // 注意：由于发现绑定四元组socket后开始时handshake3消息有较大概率发到listen_fd，因此需要让客户端确认四元组socket确实收到消息
+            // 这里需要发个shake4消息给客户端，客户端收到之后才能开始发数据消息（由于客户端能收到shake2消息因此shake4消息也能收到，若收不到就通过心跳机制关闭连接）
+            int ret = (int)write(shake_fd, self->_shakemsg4buf, CORPC_MESSAGE_HEAD_SIZE);
+            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 4 fail for fd %d ret %d errno %d (%s)\n",
+                       shake_fd, ret, errno, strerror(errno));
+                close(shake_fd);
+                break;
+            }
+
             // 握手成功，创建connection对象
             co_set_timeout(shake_fd, -1, 1000);
             

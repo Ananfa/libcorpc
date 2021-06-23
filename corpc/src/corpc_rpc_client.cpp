@@ -46,7 +46,7 @@ void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
     std::shared_ptr<ClientTask> task;
     // 注意: _waitResultCoMap需进行线程同步
     {
-        std::unique_lock<std::mutex> lock( conn->_waitResultCoMapMutex );
+        LockGuard lock( conn->_waitResultCoMapMutex );
         Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(callId);
         
         if (itor == conn->_waitResultCoMap.end()) {
@@ -325,7 +325,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
                     assert(connection->_waitSendTaskCoList.empty());
                     
                     {
-                        std::unique_lock<std::mutex> lock( connection->_waitResultCoMapMutex );
+                        LockGuard lock( connection->_waitResultCoMapMutex );
                         while (!connection->_waitResultCoMap.empty()) {
                             Connection::WaitTaskMap::iterator itor = connection->_waitResultCoMap.begin();
                             std::shared_ptr<ClientTask> task = std::move(itor->second);
@@ -470,7 +470,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
                             // 若rpc任务已超时就不需发给服务器
                             if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
                                 {
-                                    std::unique_lock<std::mutex> lock(connection->_waitResultCoMapMutex);
+                                    LockGuard lock(connection->_waitResultCoMapMutex);
 
                                     // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
                                     //connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
@@ -566,7 +566,7 @@ void *RpcClient::taskHandleRoutine(void *arg) {
                         // 若rpc任务已超时就不需发给服务器
                         if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
                             {
-                                std::unique_lock<std::mutex> lock(conn->_waitResultCoMapMutex);
+                                LockGuard lock(conn->_waitResultCoMapMutex);
 
                                 // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
                                 //conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));

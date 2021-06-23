@@ -55,6 +55,7 @@
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_2 -112
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_3 -113
+#define CORPC_MSG_TYPE_UDP_HANDSHAKE_4 -114
 #define CORPC_MSG_TYPE_HEARTBEAT -115
 
 #define CORPC_HEARTBEAT_PERIOD 5000
@@ -205,8 +206,7 @@ namespace corpc {
             newNode->value = v;
             
             newNode->next = _head;
-            do {
-            } while (!_head.compare_exchange_weak(newNode->next, newNode));
+            while (!_head.compare_exchange_weak(newNode->next, newNode));
         }
         
         void push(T&& v) {
@@ -214,18 +214,16 @@ namespace corpc {
             newNode->value = std::move(v);
             
             newNode->next = _head;
-            do {
-            } while (!_head.compare_exchange_weak(newNode->next, newNode));
+            while (!_head.compare_exchange_weak(newNode->next, newNode));
         }
         
         T pop() {
             T ret(nullptr);
-        
+            
             if (!_outqueue) {
                 if (_head != NULL) {
                     _outqueue = _head;
-                    do {
-                    } while (!_head.compare_exchange_weak(_outqueue, NULL));
+                    while (!_head.compare_exchange_weak(_outqueue, NULL));
                     
                     // 翻转
                     Node *n1 = _outqueue;

@@ -554,6 +554,8 @@ void UdpClient::threadEntry( UdpClient *self ) {
     uint32_t lastSendSerial = 0;
     
     uint64_t nowms = 0;
+
+    bool shakeOK = false;
     // 开始定时心跳，以及接收／发送数据包
     // 逻辑：采用轮询机制
     //   1.每4ms尝试一次数据读取
@@ -606,17 +608,24 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         self->_lastRecvHBTime = nowms;
                     } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                         // 重发handshake_3
-                        DEBUG_LOG("resend handshake3\n");
+                        DEBUG_LOG("resend handshake3, fd:%d\n", s);
                         if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
-                            ERROR_LOG("can't send handshake3\n");
+                            ERROR_LOG("can't send handshake3, fd:%d\n", s);
                             close(s);
                             return;
                         }
+                    } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_4) {
+                        shakeOK = true;
+                        DEBUG_LOG("shake succeed, fd:%d\n", s);
                     } else if (msgType == CORPC_MSG_TYPE_UDP_UNSHAKE) {
-                        ERROR_LOG("unshake\n");
+                        ERROR_LOG("unshake, fd:%d\n", s);
                         close(s);
                         return;
                     }
+                } else if (!shakeOK) {
+                    ERROR_LOG("recv msg when unshake, fd:%d\n", s);
+                    close(s);
+                    return;
                 } else {
                     assert(bodySize > 0);
                     // 校验序列号
@@ -625,7 +634,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         serial = be32toh(serial);
 
                         if (serial != ++lastRecvSerial) {
-                            ERROR_LOG("serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
+                            ERROR_LOG("serial check failed, fd:%d, need:%d, get:%d\n", s, lastRecvSerial, serial);
                             close(s);
                             return;
                         }
@@ -640,7 +649,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                         uint16_t crc1 = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, bodySize);
 
                         if (crc != crc1) {
-                            ERROR_LOG("crc check failed, recv:%d, cal:%d\n", crc, crc1);
+                            ERROR_LOG("crc check failed, fd:%d, recv:%d, cal:%d\n", s, crc, crc1);
                             close(s);
                             return;
                         }
@@ -649,7 +658,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                     // 解密
                     if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
                         if (self->_crypter == nullptr) {
-                            ERROR_LOG("cant decrypt message for crypter not exist\n");
+                            ERROR_LOG("cant decrypt message for crypter not exist, fd:%d\n", s);
                             close(s);
                             return;
                         }
@@ -660,7 +669,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                     // 解码数据
                     auto iter = self->_registerMessageMap.find(msgType);
                     if (iter == self->_registerMessageMap.end()) {
-                        ERROR_LOG("unknown message: %d\n", msgType);
+                        ERROR_LOG("unknown message: %d, fd:%d\n", msgType, s);
                         close(s);
                         return;
                     }
@@ -668,7 +677,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
                     google::protobuf::Message *msg = iter->second.proto->New();
                     if (!msg->ParseFromArray(buf + CORPC_MESSAGE_HEAD_SIZE, bodySize)) {
                         // 出错处理
-                        ERROR_LOG("parse body fail for message: %d\n", msgType);
+                        ERROR_LOG("parse body fail for message: %d, fd:%d\n", msgType, s);
                         close(s);
                         return;
                     }
@@ -682,19 +691,23 @@ void UdpClient::threadEntry( UdpClient *self ) {
                 }
             }
         }
-        
+
         // 心跳判断
         if (nowms - self->_lastRecvHBTime > CORPC_MAX_NO_HEARTBEAT_TIME) {
             // 无心跳，断线
-            ERROR_LOG("heartbeat timeout\n");
+            ERROR_LOG("heartbeat timeout, fd:%d\n", s);
             close(s);
             return;
         }
         
+        if (!shakeOK) {
+            continue;
+        }
+        
         if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
-            DEBUG_LOG("send heartbeat\n");
+            DEBUG_LOG("send heartbeat, fd:%d\n", s);
             if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
-                ERROR_LOG("can't send heartbeat\n");
+                ERROR_LOG("can't send heartbeat, fd:%d\n", s);
                 close(s);
                 return;
             }
@@ -708,7 +721,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
             uint32_t msgSize = info->proto->ByteSizeLong();
             
             if (msgSize + CORPC_MESSAGE_HEAD_SIZE > CORPC_MAX_UDP_MESSAGE_SIZE) {
-                ERROR_LOG("message size too large\n");
+                ERROR_LOG("message size too large, fd:%d\n", s);
                 close(s);
                 return;
             }
@@ -740,7 +753,7 @@ void UdpClient::threadEntry( UdpClient *self ) {
             int size = msgSize + CORPC_MESSAGE_HEAD_SIZE;
             //DEBUG_LOG("send message\n");
             if (write(s, buf, size) != size) {
-                ERROR_LOG("can't send message\n");
+                ERROR_LOG("can't send message, fd:%d\n", s);
                 close(s);
                 return;
             }

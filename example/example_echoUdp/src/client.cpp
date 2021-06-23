@@ -30,7 +30,7 @@ void testThread(std::string host, uint16_t port, uint16_t local_port) {
     
     // 注意：这里等待udp连接真正建立，不然后续发送消息会与握手过程混淆
     // TODO：判断握手成功之后才做后续逻辑
-    sleep(5);
+    //sleep(5);
 
     // send/recv data to/from client
     while (true) {
@@ -84,7 +84,7 @@ int main(int argc, const char * argv[])
     sigaction( SIGPIPE, &sa, NULL );
 
     // 启动多个线程创建client
-    int clientNum = 10;
+    int clientNum = 20;
     std::vector<std::thread> threads;
     for (int i = 0; i < clientNum; i++) {
         threads.push_back(std::thread(testThread, host, port, LOCAL_PORT+i));

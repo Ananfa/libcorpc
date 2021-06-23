@@ -19,11 +19,10 @@
 
 #include "corpc_io.h"
 #include "corpc_rpc_common.h"
+#include "corpc_mutex.h"
 
-#include <list>
 #include <map>
 #include <queue>
-#include <mutex>
 #include <unistd.h>
 
 #include <google/protobuf/service.h>
@@ -89,7 +88,7 @@ namespace corpc {
             
             WaitTaskList _waitSendTaskCoList;// 等待发送RPC请求的任务
             WaitTaskMap _waitResultCoMap; // 等待接受RPC结果的任务
-            std::mutex _waitResultCoMapMutex; // _waitResultCoMap需要进行线程同步
+            Mutex _waitResultCoMapMutex; // _waitResultCoMap需要进行线程同步
             
         public:
             friend class Channel;
