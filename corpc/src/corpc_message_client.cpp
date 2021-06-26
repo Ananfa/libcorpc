@@ -254,7 +254,7 @@ void TcpClient::threadEntry( TcpClient *self ) {
                             uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
 
                             if (crc != crc1) {
-                                ERROR_LOG("crc check failed, recv:%d, cal:%d\n", crc, crc1);
+                                ERROR_LOG("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, bodySize, crc, crc1);
                                 close(s);
                                 return;
                             }

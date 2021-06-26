@@ -379,7 +379,7 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
                 }
 
                 if (needCRC) {
-                    crc = CRC::CheckSum(msgBuf, 0xFFFF, msgSize);
+                    crc = CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
                 }
             }
             
