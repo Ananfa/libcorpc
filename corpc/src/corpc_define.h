@@ -28,6 +28,7 @@
 #include <memory>
 #include <unistd.h>
 
+#include "corpc_mutex.h"
 #include "corpc_utils.h"
 
 #define USE_NO_LOCK_QUEUE
@@ -295,12 +296,12 @@ namespace corpc {
         ~SyncQueue() {}
         
         void push(T & v) {
-            std::unique_lock<std::mutex> lock( _queueMutex );
+            LockGuard lock( _queueMutex );
             _inqueue.push_back(v);
         }
         
         void push(T && v) {
-            std::unique_lock<std::mutex> lock( _queueMutex );
+            LockGuard lock( _queueMutex );
             _inqueue.push_back(std::move(v));
         }
         
@@ -314,7 +315,7 @@ namespace corpc {
             } else {
                 if (!_inqueue.empty()) {
                     {
-                        std::unique_lock<std::mutex> lock( _queueMutex );
+                        LockGuard lock( _queueMutex );
                         _inqueue.swap(_outqueue);
                     }
                     
@@ -328,7 +329,7 @@ namespace corpc {
         }
         
     private:
-        std::mutex _queueMutex;
+        Mutex _queueMutex;
         std::list<T> _inqueue;
         std::list<T> _outqueue;
     };
