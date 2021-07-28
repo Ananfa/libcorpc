@@ -1102,7 +1102,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
     
     self->_heartbeatRoutine = co_self();
     self->_heartbeatRoutineHang = false;
-    
+
     while (true) {
         if (self->_heartbeatList.empty()) {
             // 挂起
@@ -1133,6 +1133,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
             continue;
         }
         
+        // 注意: 这里有个问题，当连接已经closed时，需要等到心跳时间到达才会被处理，而心跳时长是5秒，因此已断线的连接对象会最长保持5秒
         if (item.nexttime > nowms) {
             msleep(item.nexttime - nowms);
             
