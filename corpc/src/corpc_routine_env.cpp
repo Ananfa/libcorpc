@@ -276,14 +276,14 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
         while (wr) {
             // 校验协程的expireTime是否一致
             if (wr->expireTime) {
-                TimeoutList::Node *node = curenv->_timeoutList.getNode(uint64_t(wr->co));
+                auto node = curenv->_timeoutList.getNode(uint64_t(wr->co));
                 if (node && node->expireTime == wr->expireTime) {
                     if (wr->err) {
-                        node->rpcTask->controller->SetFailed(strerror(wr->err));
-                    } else if (node->rpcTask->controller_1 != NULL && node->rpcTask->controller_1->Failed()) {
-                        node->rpcTask->controller->SetFailed(node->rpcTask->controller_1->ErrorText());
+                        node->data->controller->SetFailed(strerror(wr->err));
+                    } else if (node->data->controller_1 != NULL && node->data->controller_1->Failed()) {
+                        node->data->controller->SetFailed(node->data->controller_1->ErrorText());
                     } else {
-                        node->rpcTask->response->MergeFrom(*(node->rpcTask->response_1));
+                        node->data->response->MergeFrom(*(node->data->response_1));
                     }
 
                     curenv->_timeoutList.remove(node);
@@ -312,7 +312,7 @@ void *RoutineEnvironment::timeoutRoutine( void *arg ) {
     while (true) {
         sleep(1);
 
-        TimeoutList::Node* node = curenv->_timeoutList.getLast();
+        auto node = curenv->_timeoutList.getLast();
         if (node != nullptr) {
             struct timeval t;
             gettimeofday(&t, NULL);
@@ -321,8 +321,8 @@ void *RoutineEnvironment::timeoutRoutine( void *arg ) {
 
             while (node != nullptr && node->expireTime <= now) {
                 // 唤醒超时任务处理
-                node->rpcTask->controller->SetFailed(strerror(ETIMEDOUT));
-                stCoRoutine_t *co = node->rpcTask->co;
+                node->data->controller->SetFailed(strerror(ETIMEDOUT));
+                stCoRoutine_t *co = node->data->co;
                 curenv->_timeoutList.remove(node);
                 co_activate(co);
                 node = curenv->_timeoutList.getLast();

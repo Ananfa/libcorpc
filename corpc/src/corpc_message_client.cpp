@@ -29,6 +29,10 @@ void MessageClient::join() {
     _t.join();
 }
 
+void MessageClient::detach() {
+    _t.detach();
+}
+
 void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg) {
     MessageInfo *info = new MessageInfo;
     info->type = type;
@@ -98,7 +102,9 @@ bool TcpClient::start() {
     return true;
 }
 
-void TcpClient::threadEntry( TcpClient *self ) {
+void TcpClient::threadEntry( TcpClient *client ) {
+    std::shared_ptr<TcpClient> self = std::static_pointer_cast<TcpClient>(client->getPtr());
+
     uint8_t buf[CORPC_MAX_MESSAGE_SIZE];
     
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
@@ -529,7 +535,9 @@ bool UdpClient::start() {
     }
 }
 
-void UdpClient::threadEntry( UdpClient *self ) {
+void UdpClient::threadEntry( UdpClient *client ) {
+    std::shared_ptr<UdpClient> self = std::static_pointer_cast<UdpClient>(client->getPtr());
+
     uint8_t buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);

@@ -21,16 +21,22 @@
 #include "corpc_crypter.h"
 #include <google/protobuf/message.h>
 #include <thread>
+#include <memory>
 
 namespace corpc {
-    class MessageClient {
+    class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
         MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
         virtual ~MessageClient() {}
         
         virtual bool start() = 0;
         
+        std::shared_ptr<MessageClient> getPtr() {
+            return shared_from_this();
+        }
+
         void join();
+        void detach();
         
         void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
         void recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
