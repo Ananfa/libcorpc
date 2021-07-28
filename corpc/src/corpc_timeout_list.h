@@ -56,7 +56,7 @@ namespace corpc {
                 link.next = link.prev = this;
             };
             
-            Node(uint64_t expireTime, uint64_t id, int level, std::shared_ptr<T>& data):expireTime(expireTime), id(id), data(data), link(nullptr, nullptr) {
+            Node(uint64_t expireTime, uint64_t id, int level, T& data):expireTime(expireTime), id(id), data(data), link(nullptr, nullptr) {
                 links.reserve(level);
                 for (int i = 0; i < level; i++) {
                     links.emplace_back(nullptr, nullptr);
@@ -69,7 +69,7 @@ namespace corpc {
             uint64_t expireTime;
             uint64_t id;
 
-            std::shared_ptr<T> data;
+            T data;
             
             // 不同超时时间链（跳表）
             std::vector<Link> links;
@@ -82,7 +82,7 @@ namespace corpc {
         TimeoutList();
         virtual ~TimeoutList();
 
-        Node* insert(uint64_t id, uint64_t expireTime, std::shared_ptr<T>& data);
+        Node* insert(uint64_t id, uint64_t expireTime, T& data);
         void remove(Node* node);
         Node* getLast();
         Node* getNode(uint64_t id);
@@ -138,7 +138,7 @@ namespace corpc {
     }
 
     template <typename T>
-    typename TimeoutList<T>::Node* TimeoutList<T>::insert(uint64_t id, uint64_t expireTime, std::shared_ptr<T>& data) {
+    typename TimeoutList<T>::Node* TimeoutList<T>::insert(uint64_t id, uint64_t expireTime, T& data) {
         Node* prevNodes[CORPC_SKIP_LIST_MAX_LEVEL];
         Node* curNode = m_pHeader;
         

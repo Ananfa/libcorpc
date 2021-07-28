@@ -105,7 +105,7 @@ namespace corpc {
         
         WaitResumeQueue _waitResumeQueue; // 用于跨线程唤醒协程
 
-        TimeoutList<RpcClientTask> _timeoutList; // 管理本线程中的RPC请求协程超时
+        TimeoutList<std::shared_ptr<RpcClientTask>> _timeoutList; // 管理本线程中的RPC请求协程超时
         
         static std::atomic<uint32_t> _keyRoutineNum;
         
