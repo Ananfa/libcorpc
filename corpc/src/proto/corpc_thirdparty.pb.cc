@@ -14,46 +14,37 @@
 #include <google/protobuf/wire_format.h>
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
+
+PROTOBUF_PRAGMA_INIT_SEG
 namespace corpc {
 namespace thirdparty {
-class TakeResponseDefaultTypeInternal {
- public:
-  ::PROTOBUF_NAMESPACE_ID::internal::ExplicitlyConstructed<TakeResponse> _instance;
-} _TakeResponse_default_instance_;
-class PutRequestDefaultTypeInternal {
- public:
-  ::PROTOBUF_NAMESPACE_ID::internal::ExplicitlyConstructed<PutRequest> _instance;
-} _PutRequest_default_instance_;
+constexpr TakeResponse::TakeResponse(
+  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
+  : handle_(uint64_t{0u}){}
+struct TakeResponseDefaultTypeInternal {
+  constexpr TakeResponseDefaultTypeInternal()
+    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  ~TakeResponseDefaultTypeInternal() {}
+  union {
+    TakeResponse _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT TakeResponseDefaultTypeInternal _TakeResponse_default_instance_;
+constexpr PutRequest::PutRequest(
+  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
+  : handle_(uint64_t{0u})
+  , error_(false){}
+struct PutRequestDefaultTypeInternal {
+  constexpr PutRequestDefaultTypeInternal()
+    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  ~PutRequestDefaultTypeInternal() {}
+  union {
+    PutRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PutRequestDefaultTypeInternal _PutRequest_default_instance_;
 }  // namespace thirdparty
 }  // namespace corpc
-static void InitDefaultsscc_info_PutRequest_corpc_5fthirdparty_2eproto() {
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-
-  {
-    void* ptr = &::corpc::thirdparty::_PutRequest_default_instance_;
-    new (ptr) ::corpc::thirdparty::PutRequest();
-    ::PROTOBUF_NAMESPACE_ID::internal::OnShutdownDestroyMessage(ptr);
-  }
-  ::corpc::thirdparty::PutRequest::InitAsDefaultInstance();
-}
-
-::PROTOBUF_NAMESPACE_ID::internal::SCCInfo<0> scc_info_PutRequest_corpc_5fthirdparty_2eproto =
-    {{ATOMIC_VAR_INIT(::PROTOBUF_NAMESPACE_ID::internal::SCCInfoBase::kUninitialized), 0, 0, InitDefaultsscc_info_PutRequest_corpc_5fthirdparty_2eproto}, {}};
-
-static void InitDefaultsscc_info_TakeResponse_corpc_5fthirdparty_2eproto() {
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-
-  {
-    void* ptr = &::corpc::thirdparty::_TakeResponse_default_instance_;
-    new (ptr) ::corpc::thirdparty::TakeResponse();
-    ::PROTOBUF_NAMESPACE_ID::internal::OnShutdownDestroyMessage(ptr);
-  }
-  ::corpc::thirdparty::TakeResponse::InitAsDefaultInstance();
-}
-
-::PROTOBUF_NAMESPACE_ID::internal::SCCInfo<0> scc_info_TakeResponse_corpc_5fthirdparty_2eproto =
-    {{ATOMIC_VAR_INIT(::PROTOBUF_NAMESPACE_ID::internal::SCCInfoBase::kUninitialized), 0, 0, InitDefaultsscc_info_TakeResponse_corpc_5fthirdparty_2eproto}, {}};
-
 static ::PROTOBUF_NAMESPACE_ID::Metadata file_level_metadata_corpc_5fthirdparty_2eproto[2];
 static constexpr ::PROTOBUF_NAMESPACE_ID::EnumDescriptor const** file_level_enum_descriptors_corpc_5fthirdparty_2eproto = nullptr;
 static const ::PROTOBUF_NAMESPACE_ID::ServiceDescriptor* file_level_service_descriptors_corpc_5fthirdparty_2eproto[1];
@@ -96,35 +87,35 @@ const char descriptor_table_protodef_corpc_5fthirdparty_2eproto[] PROTOBUF_SECTI
 static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor_table_corpc_5fthirdparty_2eproto_deps[1] = {
   &::descriptor_table_corpc_5foption_2eproto,
 };
-static ::PROTOBUF_NAMESPACE_ID::internal::SCCInfoBase*const descriptor_table_corpc_5fthirdparty_2eproto_sccs[2] = {
-  &scc_info_PutRequest_corpc_5fthirdparty_2eproto.base,
-  &scc_info_TakeResponse_corpc_5fthirdparty_2eproto.base,
-};
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_corpc_5fthirdparty_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_corpc_5fthirdparty_2eproto = {
-  false, false, descriptor_table_protodef_corpc_5fthirdparty_2eproto, "corpc_thirdparty.proto", 304,
-  &descriptor_table_corpc_5fthirdparty_2eproto_once, descriptor_table_corpc_5fthirdparty_2eproto_sccs, descriptor_table_corpc_5fthirdparty_2eproto_deps, 2, 1,
+  false, false, 304, descriptor_table_protodef_corpc_5fthirdparty_2eproto, "corpc_thirdparty.proto", 
+  &descriptor_table_corpc_5fthirdparty_2eproto_once, descriptor_table_corpc_5fthirdparty_2eproto_deps, 1, 2,
   schemas, file_default_instances, TableStruct_corpc_5fthirdparty_2eproto::offsets,
-  file_level_metadata_corpc_5fthirdparty_2eproto, 2, file_level_enum_descriptors_corpc_5fthirdparty_2eproto, file_level_service_descriptors_corpc_5fthirdparty_2eproto,
+  file_level_metadata_corpc_5fthirdparty_2eproto, file_level_enum_descriptors_corpc_5fthirdparty_2eproto, file_level_service_descriptors_corpc_5fthirdparty_2eproto,
 };
+PROTOBUF_ATTRIBUTE_WEAK const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable* descriptor_table_corpc_5fthirdparty_2eproto_getter() {
+  return &descriptor_table_corpc_5fthirdparty_2eproto;
+}
 
 // Force running AddDescriptors() at dynamic initialization time.
-static bool dynamic_init_dummy_corpc_5fthirdparty_2eproto = (static_cast<void>(::PROTOBUF_NAMESPACE_ID::internal::AddDescriptors(&descriptor_table_corpc_5fthirdparty_2eproto)), true);
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY static ::PROTOBUF_NAMESPACE_ID::internal::AddDescriptorsRunner dynamic_init_dummy_corpc_5fthirdparty_2eproto(&descriptor_table_corpc_5fthirdparty_2eproto);
 namespace corpc {
 namespace thirdparty {
 
 // ===================================================================
 
-void TakeResponse::InitAsDefaultInstance() {
-}
 class TakeResponse::_Internal {
  public:
 };
 
-TakeResponse::TakeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena)
-  : ::PROTOBUF_NAMESPACE_ID::Message(arena) {
+TakeResponse::TakeResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
   SharedCtor();
-  RegisterArenaDtor(arena);
+  if (!is_message_owned) {
+    RegisterArenaDtor(arena);
+  }
   // @@protoc_insertion_point(arena_constructor:corpc.thirdparty.TakeResponse)
 }
 TakeResponse::TakeResponse(const TakeResponse& from)
@@ -134,18 +125,19 @@ TakeResponse::TakeResponse(const TakeResponse& from)
   // @@protoc_insertion_point(copy_constructor:corpc.thirdparty.TakeResponse)
 }
 
-void TakeResponse::SharedCtor() {
-  handle_ = PROTOBUF_ULONGLONG(0);
+inline void TakeResponse::SharedCtor() {
+handle_ = uint64_t{0u};
 }
 
 TakeResponse::~TakeResponse() {
   // @@protoc_insertion_point(destructor:corpc.thirdparty.TakeResponse)
+  if (GetArenaForAllocation() != nullptr) return;
   SharedDtor();
   _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
-void TakeResponse::SharedDtor() {
-  GOOGLE_DCHECK(GetArena() == nullptr);
+inline void TakeResponse::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
 }
 
 void TakeResponse::ArenaDtor(void* object) {
@@ -157,11 +149,6 @@ void TakeResponse::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
 void TakeResponse::SetCachedSize(int size) const {
   _cached_size_.Set(size);
 }
-const TakeResponse& TakeResponse::default_instance() {
-  ::PROTOBUF_NAMESPACE_ID::internal::InitSCC(&::scc_info_TakeResponse_corpc_5fthirdparty_2eproto.base);
-  return *internal_default_instance();
-}
-
 
 void TakeResponse::Clear() {
 // @@protoc_insertion_point(message_clear_start:corpc.thirdparty.TakeResponse)
@@ -169,17 +156,15 @@ void TakeResponse::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  handle_ = PROTOBUF_ULONGLONG(0);
+  handle_ = uint64_t{0u};
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
 const char* TakeResponse::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
 #define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
-  ::PROTOBUF_NAMESPACE_ID::Arena* arena = GetArena(); (void)arena;
   while (!ctx->Done(&ptr)) {
     ::PROTOBUF_NAMESPACE_ID::uint32 tag;
     ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
-    CHK_(ptr);
     switch (tag >> 3) {
       // uint64 handle = 1;
       case 1:
@@ -190,7 +175,8 @@ const char* TakeResponse::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_I
         continue;
       default: {
       handle_unusual:
-        if ((tag & 7) == 4 || tag == 0) {
+        if ((tag == 0) || ((tag & 7) == 4)) {
+          CHK_(ptr);
           ctx->SetLastTag(tag);
           goto success;
         }
@@ -217,7 +203,7 @@ failure:
   (void) cached_has_bits;
 
   // uint64 handle = 1;
-  if (this->handle() != 0) {
+  if (this->_internal_handle() != 0) {
     target = stream->EnsureSpace(target);
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt64ToArray(1, this->_internal_handle(), target);
   }
@@ -239,7 +225,7 @@ size_t TakeResponse::ByteSizeLong() const {
   (void) cached_has_bits;
 
   // uint64 handle = 1;
-  if (this->handle() != 0) {
+  if (this->_internal_handle() != 0) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt64Size(
         this->_internal_handle());
@@ -254,38 +240,29 @@ size_t TakeResponse::ByteSizeLong() const {
   return total_size;
 }
 
-void TakeResponse::MergeFrom(const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-// @@protoc_insertion_point(generalized_merge_from_start:corpc.thirdparty.TakeResponse)
-  GOOGLE_DCHECK_NE(&from, this);
-  const TakeResponse* source =
-      ::PROTOBUF_NAMESPACE_ID::DynamicCastToGenerated<TakeResponse>(
-          &from);
-  if (source == nullptr) {
-  // @@protoc_insertion_point(generalized_merge_from_cast_fail:corpc.thirdparty.TakeResponse)
-    ::PROTOBUF_NAMESPACE_ID::internal::ReflectionOps::Merge(from, this);
-  } else {
-  // @@protoc_insertion_point(generalized_merge_from_cast_success:corpc.thirdparty.TakeResponse)
-    MergeFrom(*source);
-  }
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData TakeResponse::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    TakeResponse::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*TakeResponse::GetClassData() const { return &_class_data_; }
+
+void TakeResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message*to,
+                      const ::PROTOBUF_NAMESPACE_ID::Message&from) {
+  static_cast<TakeResponse *>(to)->MergeFrom(
+      static_cast<const TakeResponse &>(from));
 }
+
 
 void TakeResponse::MergeFrom(const TakeResponse& from) {
 // @@protoc_insertion_point(class_specific_merge_from_start:corpc.thirdparty.TakeResponse)
   GOOGLE_DCHECK_NE(&from, this);
-  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::uint32 cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (from.handle() != 0) {
+  if (from._internal_handle() != 0) {
     _internal_set_handle(from._internal_handle());
   }
-}
-
-void TakeResponse::CopyFrom(const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-// @@protoc_insertion_point(generalized_copy_from_start:corpc.thirdparty.TakeResponse)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
 void TakeResponse::CopyFrom(const TakeResponse& from) {
@@ -301,27 +278,29 @@ bool TakeResponse::IsInitialized() const {
 
 void TakeResponse::InternalSwap(TakeResponse* other) {
   using std::swap;
-  _internal_metadata_.Swap<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(&other->_internal_metadata_);
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(handle_, other->handle_);
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata TakeResponse::GetMetadata() const {
-  return GetMetadataStatic();
+  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+      &descriptor_table_corpc_5fthirdparty_2eproto_getter, &descriptor_table_corpc_5fthirdparty_2eproto_once,
+      file_level_metadata_corpc_5fthirdparty_2eproto[0]);
 }
-
 
 // ===================================================================
 
-void PutRequest::InitAsDefaultInstance() {
-}
 class PutRequest::_Internal {
  public:
 };
 
-PutRequest::PutRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena)
-  : ::PROTOBUF_NAMESPACE_ID::Message(arena) {
+PutRequest::PutRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
   SharedCtor();
-  RegisterArenaDtor(arena);
+  if (!is_message_owned) {
+    RegisterArenaDtor(arena);
+  }
   // @@protoc_insertion_point(arena_constructor:corpc.thirdparty.PutRequest)
 }
 PutRequest::PutRequest(const PutRequest& from)
@@ -333,20 +312,22 @@ PutRequest::PutRequest(const PutRequest& from)
   // @@protoc_insertion_point(copy_constructor:corpc.thirdparty.PutRequest)
 }
 
-void PutRequest::SharedCtor() {
-  ::memset(&handle_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&error_) -
-      reinterpret_cast<char*>(&handle_)) + sizeof(error_));
+inline void PutRequest::SharedCtor() {
+::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
+    reinterpret_cast<char*>(&handle_) - reinterpret_cast<char*>(this)),
+    0, static_cast<size_t>(reinterpret_cast<char*>(&error_) -
+    reinterpret_cast<char*>(&handle_)) + sizeof(error_));
 }
 
 PutRequest::~PutRequest() {
   // @@protoc_insertion_point(destructor:corpc.thirdparty.PutRequest)
+  if (GetArenaForAllocation() != nullptr) return;
   SharedDtor();
   _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
-void PutRequest::SharedDtor() {
-  GOOGLE_DCHECK(GetArena() == nullptr);
+inline void PutRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
 }
 
 void PutRequest::ArenaDtor(void* object) {
@@ -358,11 +339,6 @@ void PutRequest::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
 void PutRequest::SetCachedSize(int size) const {
   _cached_size_.Set(size);
 }
-const PutRequest& PutRequest::default_instance() {
-  ::PROTOBUF_NAMESPACE_ID::internal::InitSCC(&::scc_info_PutRequest_corpc_5fthirdparty_2eproto.base);
-  return *internal_default_instance();
-}
-
 
 void PutRequest::Clear() {
 // @@protoc_insertion_point(message_clear_start:corpc.thirdparty.PutRequest)
@@ -378,11 +354,9 @@ void PutRequest::Clear() {
 
 const char* PutRequest::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
 #define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
-  ::PROTOBUF_NAMESPACE_ID::Arena* arena = GetArena(); (void)arena;
   while (!ctx->Done(&ptr)) {
     ::PROTOBUF_NAMESPACE_ID::uint32 tag;
     ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
-    CHK_(ptr);
     switch (tag >> 3) {
       // uint64 handle = 1;
       case 1:
@@ -400,7 +374,8 @@ const char* PutRequest::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID:
         continue;
       default: {
       handle_unusual:
-        if ((tag & 7) == 4 || tag == 0) {
+        if ((tag == 0) || ((tag & 7) == 4)) {
+          CHK_(ptr);
           ctx->SetLastTag(tag);
           goto success;
         }
@@ -427,13 +402,13 @@ failure:
   (void) cached_has_bits;
 
   // uint64 handle = 1;
-  if (this->handle() != 0) {
+  if (this->_internal_handle() != 0) {
     target = stream->EnsureSpace(target);
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt64ToArray(1, this->_internal_handle(), target);
   }
 
   // bool error = 2;
-  if (this->error() != 0) {
+  if (this->_internal_error() != 0) {
     target = stream->EnsureSpace(target);
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(2, this->_internal_error(), target);
   }
@@ -455,14 +430,14 @@ size_t PutRequest::ByteSizeLong() const {
   (void) cached_has_bits;
 
   // uint64 handle = 1;
-  if (this->handle() != 0) {
+  if (this->_internal_handle() != 0) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt64Size(
         this->_internal_handle());
   }
 
   // bool error = 2;
-  if (this->error() != 0) {
+  if (this->_internal_error() != 0) {
     total_size += 1 + 1;
   }
 
@@ -475,41 +450,32 @@ size_t PutRequest::ByteSizeLong() const {
   return total_size;
 }
 
-void PutRequest::MergeFrom(const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-// @@protoc_insertion_point(generalized_merge_from_start:corpc.thirdparty.PutRequest)
-  GOOGLE_DCHECK_NE(&from, this);
-  const PutRequest* source =
-      ::PROTOBUF_NAMESPACE_ID::DynamicCastToGenerated<PutRequest>(
-          &from);
-  if (source == nullptr) {
-  // @@protoc_insertion_point(generalized_merge_from_cast_fail:corpc.thirdparty.PutRequest)
-    ::PROTOBUF_NAMESPACE_ID::internal::ReflectionOps::Merge(from, this);
-  } else {
-  // @@protoc_insertion_point(generalized_merge_from_cast_success:corpc.thirdparty.PutRequest)
-    MergeFrom(*source);
-  }
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData PutRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    PutRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*PutRequest::GetClassData() const { return &_class_data_; }
+
+void PutRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message*to,
+                      const ::PROTOBUF_NAMESPACE_ID::Message&from) {
+  static_cast<PutRequest *>(to)->MergeFrom(
+      static_cast<const PutRequest &>(from));
 }
+
 
 void PutRequest::MergeFrom(const PutRequest& from) {
 // @@protoc_insertion_point(class_specific_merge_from_start:corpc.thirdparty.PutRequest)
   GOOGLE_DCHECK_NE(&from, this);
-  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::uint32 cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (from.handle() != 0) {
+  if (from._internal_handle() != 0) {
     _internal_set_handle(from._internal_handle());
   }
-  if (from.error() != 0) {
+  if (from._internal_error() != 0) {
     _internal_set_error(from._internal_error());
   }
-}
-
-void PutRequest::CopyFrom(const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-// @@protoc_insertion_point(generalized_copy_from_start:corpc.thirdparty.PutRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
 void PutRequest::CopyFrom(const PutRequest& from) {
@@ -525,7 +491,7 @@ bool PutRequest::IsInitialized() const {
 
 void PutRequest::InternalSwap(PutRequest* other) {
   using std::swap;
-  _internal_metadata_.Swap<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(&other->_internal_metadata_);
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(PutRequest, error_)
       + sizeof(PutRequest::error_)
@@ -535,9 +501,10 @@ void PutRequest::InternalSwap(PutRequest* other) {
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata PutRequest::GetMetadata() const {
-  return GetMetadataStatic();
+  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+      &descriptor_table_corpc_5fthirdparty_2eproto_getter, &descriptor_table_corpc_5fthirdparty_2eproto_once,
+      file_level_metadata_corpc_5fthirdparty_2eproto[1]);
 }
-
 
 // ===================================================================
 

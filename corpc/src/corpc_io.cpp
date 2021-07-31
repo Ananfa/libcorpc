@@ -325,6 +325,10 @@ void Connection::close() {
     if (isOpen()) {
         std::shared_ptr<Connection> self = shared_from_this();
         _io->removeConnection(self);
+
+        if (connection->needHB()) {
+            Heartbeater::Instance().removeConnection(self);
+        }
     }
 }
 
@@ -1083,16 +1087,24 @@ void *Heartbeater::dispatchRoutine( void * arg ) {
         }
         
         // 处理任务队列
-        std::shared_ptr<Connection> connection = queue.pop();
-        while (connection) {
-            uint64_t nowms = mtime();
-            self->_heartbeatList.push_back({connection, nowms + CORPC_HEARTBEAT_PERIOD});
-            
-            if (self->_heartbeatRoutineHang) {
-                co_resume(self->_heartbeatRoutine);
+        HeartbeatTask* task = queue.pop();
+        while (task) {
+            if (task->type == HeartbeatTask::START) {
+                uint64_t nowms = mtime();
+                self->_heartbeatList.insert((uint64_t)task->connection.get(), nowms + CORPC_HEARTBEAT_PERIOD, task->connection);
+
+                if (self->_heartbeatRoutineHang) {
+                    co_resume(self->_heartbeatRoutine);
+                }
+            } else { // task->type == HeartbeatTask::STOP
+                auto node = self->_heartbeatList.getNode((uint64_t)task->connection.get());
+                if (node) {
+                    self->_heartbeatList.remove(node);
+                }
             }
-            
-            connection = queue.pop();
+
+            delete task;
+            task = queue.pop();
         }
     }
 }
@@ -1115,44 +1127,59 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         
         uint64_t nowms = mtime();
         
-        HeartbeatItem item = self->_heartbeatList.front();
-        self->_heartbeatList.pop_front();
-        
-        if (item.connection->_closed) {
+        auto node = self->_heartbeatList.getLast();
+        uint64_t expireTime = node->expireTime;
+        std::shared_ptr<Connection> conn = node->data;
+        self->_heartbeatList.remove(node);
+
+        if (conn->_closed) {
             continue;
         }
         
-        if (!item.connection->getLastRecvHBTime()) {
-            item.connection->setLastRecvHBTime(nowms);
+        if (!conn->getLastRecvHBTime()) {
+            // 刚加入心跳队列时初始化心跳时间
+            conn->setLastRecvHBTime(nowms);
         }
         
-        if (nowms - item.connection->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
+        if (nowms - conn->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
             // 心跳超时，断线处理
-            ERROR_LOG("Heartbeater::heartbeatRoutine() -- heartbeat timeout for fd %d\n", item.connection->getfd());
-            item.connection->close();
+            ERROR_LOG("Heartbeater::heartbeatRoutine() -- heartbeat timeout for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
+            conn->close();
             continue;
         }
         
         // 注意: 这里有个问题，当连接已经closed时，需要等到心跳时间到达才会被处理，而心跳时长是5秒，因此已断线的连接对象会最长保持5秒
-        if (item.nexttime > nowms) {
-            msleep(item.nexttime - nowms);
+        if (expireTime > nowms) {
+            msleep(expireTime - nowms);
             
             nowms = mtime();
         }
         
-        if (item.connection->_closed) {
+        if (conn->_closed) {
             continue;
         }
         
         // 发心跳包
-        item.connection->send(self->_heartbeatmsg);
-        item.nexttime = nowms + CORPC_HEARTBEAT_PERIOD;
-        self->_heartbeatList.push_back(item);
+        conn->send(self->_heartbeatmsg);
+
+        // 重新加入队列
+        // TODO: 不同连接允许不一样的心跳周期
+        self->_heartbeatList.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
     }
 }
 
 void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {
-    _queue.push(connection);
+    HeartbeatTask *task = new HeartbeatTask;
+    task->type = HeartbeatTask::START;
+    task->connection = connection;
+    _queue.push(task);
+}
+
+void Heartbeater::removeConnection(std::shared_ptr<Connection>& connection) {
+    HeartbeatTask *task = new HeartbeatTask;
+    task->type = HeartbeatTask::STOP;
+    task->connection = connection;
+    _queue.push(task);
 }
 
 IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {

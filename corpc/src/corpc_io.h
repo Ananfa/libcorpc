@@ -19,6 +19,7 @@
 
 #include "co_routine.h"
 #include "corpc_define.h"
+#include "corpc_timeout_list.h"
 #include <functional>
 
 #include <thread>
@@ -383,7 +384,7 @@ namespace corpc {
         std::shared_ptr<Connection> connection;
     };
 
-    struct HeartBeatTask {
+    struct HeartbeatTask {
         enum TaskType {START, STOP};
         TaskType type;
         std::shared_ptr<Connection> connection;
@@ -392,11 +393,11 @@ namespace corpc {
 #ifdef USE_NO_LOCK_QUEUE
     typedef Co_MPSC_NoLockQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
     typedef Co_MPSC_NoLockQueue<SenderTask*> SenderTaskQueue; // 用于向Sender发送任务
-    typedef Co_MPSC_NoLockQueue<std::shared_ptr<Connection>> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接（TODO：队列里包含添加或删除的连接）
+    typedef Co_MPSC_NoLockQueue<HeartbeatTask*> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接
 #else
     typedef CoSyncQueue<ReceiverTask*> ReceiverTaskQueue; // 用于从Acceptor向Receiver传递建立的连接fd
     typedef CoSyncQueue<SenderTask*> SenderTaskQueue; // 用于向Sender发送任务
-    typedef CoSyncQueue<std::shared_ptr<Connection>> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接（TODO：队列里包含添加或删除的连接）
+    typedef CoSyncQueue<HeartbeatTask*> HeartbeatQueue; // 用于向Heartbeater发送需要心跳的连接
 #endif
     
     // Receiver负责rpc连接的数据接受
@@ -535,11 +536,6 @@ namespace corpc {
     
     // singleton
     class Heartbeater {
-        struct HeartbeatItem {
-            std::shared_ptr<Connection> connection;
-            uint64_t nexttime;
-        };
-        
     public:
         static Heartbeater& Instance() {
             static Heartbeater heartbeater;
@@ -548,6 +544,7 @@ namespace corpc {
         }
         
         void addConnection(std::shared_ptr<Connection>& connection);
+        void removeConnection(std::shared_ptr<Connection>& connection);
         
     private:
         Heartbeater();
@@ -566,7 +563,7 @@ namespace corpc {
         HeartbeatQueue _queue;
         std::thread _t;
         
-        std::list<HeartbeatItem> _heartbeatList;
+        TimeoutList<std::shared_ptr<Connection>> _heartbeatList;
         
         bool _heartbeatRoutineHang; // 心跳协程是否挂起
         stCoRoutine_t* _heartbeatRoutine; // 心跳协程

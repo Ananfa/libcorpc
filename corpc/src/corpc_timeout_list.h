@@ -86,6 +86,7 @@ namespace corpc {
         void remove(Node* node);
         Node* getLast();
         Node* getNode(uint64_t id);
+        bool empty();
 
     private:
         uint32_t randomLevel() {
@@ -256,6 +257,11 @@ namespace corpc {
         }
 
         return nullptr;
+    }
+
+    template <typename T>
+    bool TimeoutList<T>::empty() {
+        return m_pHeader->links[0].next == m_pTail;
     }
 }
 
