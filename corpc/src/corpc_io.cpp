@@ -1130,12 +1130,12 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         auto node = self->_heartbeatList.getLast();
         uint64_t expireTime = node->expireTime;
         std::shared_ptr<Connection> conn = node->data;
-        self->_heartbeatList.remove(node);
 
         if (conn->_closed) {
+            self->_heartbeatList.remove(node);
             continue;
         }
-        
+
         if (!conn->getLastRecvHBTime()) {
             // 刚加入心跳队列时初始化心跳时间
             conn->setLastRecvHBTime(nowms);
@@ -1144,25 +1144,27 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         if (nowms - conn->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
             // 心跳超时，断线处理
             ERROR_LOG("Heartbeater::heartbeatRoutine() -- heartbeat timeout for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
+            self->_heartbeatList.remove(node);
             conn->close();
             continue;
         }
         
-        // 注意: 这里有个问题，当连接已经closed时，需要等到心跳时间到达才会被处理，而心跳时长是5秒，因此已断线的连接对象会最长保持5秒
         if (expireTime > nowms) {
+            //if (expireTime - nowms > 100) {
+            //    msleep(100);
+            //} else {
+            //    msleep(expireTime - nowms);
+            //}
             msleep(expireTime - nowms);
-            
-            nowms = mtime();
-        }
-        
-        if (conn->_closed) {
+
             continue;
         }
-        
+
         // 发心跳包
         conn->send(self->_heartbeatmsg);
 
         // 重新加入队列
+        self->_heartbeatList.remove(node);
         // TODO: 不同连接允许不一样的心跳周期
         self->_heartbeatList.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
     }
