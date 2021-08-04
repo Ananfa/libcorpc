@@ -625,7 +625,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
             // 握手成功，创建connection对象
             co_set_timeout(shake_fd, -1, 1000);
             
-            std::shared_ptr<Connection> connection = server->buildAndAddConnection(shake_fd);
+            server->buildAndAddConnection(shake_fd);
             
             shakeOK = true;
         }
