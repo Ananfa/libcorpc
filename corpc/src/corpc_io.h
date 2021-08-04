@@ -554,7 +554,7 @@ namespace corpc {
         
         static void threadEntry( Heartbeater *self );
         
-        static void *dispatchRoutine( void * arg ); // 负责接收新连接
+        static void *dispatchRoutine( void * arg ); // 负责接收新心跳任务
         static void *heartbeatRoutine( void * arg ); // 负责对握过手的连接进行心跳
         
     private:

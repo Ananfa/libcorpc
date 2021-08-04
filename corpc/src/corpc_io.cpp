@@ -326,7 +326,7 @@ void Connection::close() {
         std::shared_ptr<Connection> self = shared_from_this();
         _io->removeConnection(self);
 
-        if (connection->needHB()) {
+        if (self->needHB()) {
             Heartbeater::Instance().removeConnection(self);
         }
     }
@@ -1160,11 +1160,12 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
             continue;
         }
 
+        self->_heartbeatList.remove(node);
+        
         // 发心跳包
         conn->send(self->_heartbeatmsg);
 
         // 重新加入队列
-        self->_heartbeatList.remove(node);
         // TODO: 不同连接允许不一样的心跳周期
         self->_heartbeatList.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
     }
