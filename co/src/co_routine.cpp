@@ -759,6 +759,7 @@ void co_yield( stCoRoutine_t *co )
 	co_yield_env( co->env );
 }
 
+//thread_local uint32_t _t_max_stack_size(0);
 void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
 	///copy out
@@ -769,6 +770,16 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 	{
 		free(occupy_co->save_buffer), occupy_co->save_buffer = NULL;
 	}
+
+//	if (len > _t_max_stack_size) {
+//		_t_max_stack_size = len;
+//		co_log_err("CO_DEBUG: ============= save_stack_buffer  %lu\n", _t_max_stack_size);
+//
+//		if (len > 100 * 1024) {
+//			co_log_err("CO_ERR: ============= save_stack_buffer stack overflow %lu\n", _t_max_stack_size);
+//			exit(0);
+//		}
+//	}
 
 	occupy_co->save_buffer = (char*)malloc(len); //malloc buf;
 	occupy_co->save_size = len;

@@ -288,6 +288,7 @@ namespace corpc {
         PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
     };
 
+    // 另一种形式的非锁实现
     // 注意：该Queue实现只支持多生产者和单消费者情形
     template <typename T>
     class SyncQueue {
@@ -369,6 +370,87 @@ namespace corpc {
         PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
     };
     
+     // 注意：该Queue实现只支持多生产者和单消费者情形
+    template <typename T>
+    class LockQueue {
+    public:
+        LockQueue() {}
+        ~LockQueue() {}
+        
+        void push(T & v) {
+            std::unique_lock<std::mutex> lock( _queueMutex );
+            _inqueue.push_back(v);
+        }
+        
+        void push(T && v) {
+            std::unique_lock<std::mutex> lock( _queueMutex );
+            _inqueue.push_back(std::move(v));
+        }
+        
+        T pop() {
+            T ret(nullptr);
+            
+            if (!_outqueue.empty()) {
+                ret = std::move(_outqueue.front());
+                
+                _outqueue.pop_front();
+            } else {
+                if (!_inqueue.empty()) {
+                    {
+                        std::unique_lock<std::mutex> lock( _queueMutex );
+                        _inqueue.swap(_outqueue);
+                    }
+                    
+                    ret = std::move(_outqueue.front());
+                    
+                    _outqueue.pop_front();
+                }
+            }
+            
+            return ret;
+        }
+        
+    private:
+        std::mutex _queueMutex;
+        std::list<T> _inqueue;
+        std::list<T> _outqueue;
+    };
+    
+    template <typename T>
+    class CoLockQueue: public LockQueue<T> {
+    public:
+        CoLockQueue() {
+            pipe(_queuePipe.pipefd);
+            
+            co_register_fd(_queuePipe.pipefd[1]);
+            co_set_nonblock(_queuePipe.pipefd[1]);
+        }
+        ~CoLockQueue() {
+            close(_queuePipe.pipefd[0]);
+            close(_queuePipe.pipefd[1]);
+        }
+        
+        int getReadFd() { return _queuePipe.pipefd[0]; }
+        int getWriteFd() { return _queuePipe.pipefd[1]; }
+        
+        void push(T & v) {
+            SyncQueue<T>::push(v);
+            
+            char buf = 'K';
+            write(getWriteFd(), &buf, 1);
+        }
+        
+        void push(T && v) {
+            SyncQueue<T>::push(std::move(v));
+            
+            char buf = 'K';
+            write(getWriteFd(), &buf, 1);
+        }
+        
+    private:
+        PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
+    };
+
     template <typename T>
     class NormalLink {
     public:

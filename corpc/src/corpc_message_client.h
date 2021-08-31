@@ -26,7 +26,7 @@
 namespace corpc {
     class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
-        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvHBTime(0), _lastSendHBTime(0) {}
+        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter) {}
         virtual ~MessageClient() {}
         
         virtual bool start() = 0;
@@ -37,6 +37,8 @@ namespace corpc {
 
         void join();
         void detach();
+        void close();
+        bool isRunning() { return _running; };
         
         void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
         void recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
@@ -61,15 +63,15 @@ namespace corpc {
         int _s;
         std::thread _t;
         
-        SyncQueue<MessageInfo*> _sendQueue;
-        SyncQueue<MessageInfo*> _recvQueue;
+        LockQueue<MessageInfo*> _sendQueue;
+        LockQueue<MessageInfo*> _recvQueue;
         
         std::map<int16_t, MessageInfo> _registerMessageMap;
         
-        uint64_t _lastRecvHBTime; // 最后一次收到心跳的时间
-        uint64_t _lastSendHBTime; // 最后一次发送心跳的时间
+        uint64_t _lastRecvHBTime = 0; // 最后一次收到心跳的时间
+        uint64_t _lastSendHBTime = 0; // 最后一次发送心跳的时间
 
-        // TODO: 实现运行状态标志
+        bool _running = false;
     };
 
     class TcpClient: public MessageClient {
@@ -81,6 +83,8 @@ namespace corpc {
 
     private:
         static void threadEntry( TcpClient *self ); // 数据收发线程
+
+
         
     private:
         std::string _host;
