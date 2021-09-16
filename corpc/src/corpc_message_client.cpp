@@ -24,6 +24,22 @@
 
 using namespace corpc;
 
+MessageClient::~MessageClient() {
+    MessageInfo *info = _sendQueue.pop();
+    while (info) {
+        WARN_LOG("MessageClient::~MessageClient() something in send queue need to delete\n");
+        delete info;
+        info = _sendQueue.pop();
+    }
+
+    info = _recvQueue.pop();
+    while (info) {
+        WARN_LOG("MessageClient::~MessageClient() something in recv queue need to delete\n");
+        delete info;
+        info = _recvQueue.pop();
+    }
+}
+
 void MessageClient::close() {
     if (_running) {
         _running = false;
@@ -740,11 +756,12 @@ void *UdpClient::workRoutine( void * arg ) {
             
             info->proto->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
             
-            if (self->_crypter != nullptr) {
+            if (info->needCrypter) {
+                assert(self->_crypter);
                 self->_crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-
-                uint16_t flag = CORPC_MESSAGE_FLAG_CRYPT;
-                *(uint16_t *)(buf + 8) = htobe16(flag);
+                *(uint16_t *)(buf + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
+            } else {
+                *(uint16_t *)(buf + 8) = 0;
             }
 
             *(uint32_t *)buf = htobe32(msgSize);

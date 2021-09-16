@@ -116,6 +116,10 @@ int main(int argc, const char * argv[]) {
     server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
+        
+        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        readyMsg->set_status(1);
+        conn->send(3, false, true, 0, readyMsg);
     });
 
     server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {

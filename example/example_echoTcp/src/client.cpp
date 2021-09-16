@@ -26,33 +26,50 @@ void *testRoutine(void *arg) {
     delete serverAddr;
 
     std::string key("1234567fvxcvc");
-    std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
+    std::shared_ptr<Crypter> crypter = std::shared_ptr<Crypter>(new SimpleXORCrypter(key));
     std::shared_ptr<TcpClient> client(new TcpClient(host, port, true, true, true, true, crypter));
     client->registerMessage(1, std::shared_ptr<google::protobuf::Message>(new FooResponse));
     client->registerMessage(2, std::shared_ptr<google::protobuf::Message>(new BanResponse));
+    client->registerMessage(3, std::shared_ptr<google::protobuf::Message>(new ServerReady));
     
-    client->start();
+    if (!client->start()) {
+        ERROR_LOG("connect to message server failed\n");
+        return nullptr;
+    }
     
     // send/recv data to/from client
+    bool serverReady = false;
+    int16_t rType;
     uint16_t sendTag = 0;
     uint16_t recvTag = 0;
     while (true) {
-        // send FooRequest
-        std::shared_ptr<FooRequest> request(new FooRequest);
-        request->set_text("hello world!");
-        request->set_times(10);
-        
-        client->send(1, ++sendTag, true, std::static_pointer_cast<google::protobuf::Message>(request));
-        
-        int16_t rType;
+        if (serverReady) {
+            // send FooRequest
+            std::shared_ptr<FooRequest> request(new FooRequest);
+            request->set_text("hello world!");
+            request->set_times(10);
+            
+            client->send(1, ++sendTag, true, std::static_pointer_cast<google::protobuf::Message>(request));
+        }
+
         std::shared_ptr<google::protobuf::Message> rMsg;
         do {
-            usleep(100);
             client->recv(rType, recvTag, rMsg);
+            if (!rType) {
+                if (!client->isRunning()) {
+                    ERROR_LOG("client->recv connection closed\n");
+
+                    // TODO: 断线处理
+                    exit(0);
+                    return nullptr;
+                }
+
+                msleep(1);
+            }
         } while (!rType);
 
-        if (sendTag != recvTag) {
-            printf("Error: tag not match\n");
+        if (serverReady && sendTag != recvTag) {
+            ERROR_LOG("tag not match\n");
         }
         
         switch (rType) {
@@ -63,6 +80,12 @@ void *testRoutine(void *arg) {
             }
             case 2: {
                 std::shared_ptr<BanResponse> response = std::static_pointer_cast<BanResponse>(rMsg);
+                //printf("ban %d\n", response->type());
+                break;
+            }
+            case 3: {
+                std::shared_ptr<ServerReady> response = std::static_pointer_cast<ServerReady>(rMsg);
+                serverReady = true;
                 //printf("ban %d\n", response->type());
                 break;
             }
@@ -111,7 +134,7 @@ int main(int argc, const char * argv[])
     for (int i = 0; i < threadNum; i++) {
         threads.push_back(std::thread(testThread, host, port, clientPerThread));
     }
-        
+    
     RoutineEnvironment::runEventLoop();
     return 0;
 }

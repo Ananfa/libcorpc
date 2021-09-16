@@ -26,7 +26,7 @@ namespace corpc {
     class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
         MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter) {}
-        virtual ~MessageClient() {}
+        virtual ~MessageClient();
         
         virtual bool start() = 0;
         
