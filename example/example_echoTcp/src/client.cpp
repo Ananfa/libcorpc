@@ -6,17 +6,32 @@
 //Copyright © 2018年 Dena. All rights reserved.
 //
 
+#include "corpc_routine_env.h"
 #include "corpc_message_client.h"
 #include "echo.pb.h"
+#include <signal.h>
+#include <thread>
 
-void testThread(std::string host, uint16_t port) {
+using namespace corpc;
+
+struct Address {
+    std::string host;
+    uint16_t port;
+};
+
+void *testRoutine(void *arg) {
+    Address *serverAddr = (Address *)arg;
+    std::string host = serverAddr->host;
+    uint16_t port = serverAddr->port;
+    delete serverAddr;
+
     std::string key("1234567fvxcvc");
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
-    corpc::TcpClient client(host, port, true, true, true, true, crypter);
-    client.registerMessage(1, std::shared_ptr<google::protobuf::Message>(new FooResponse));
-    client.registerMessage(2, std::shared_ptr<google::protobuf::Message>(new BanResponse));
+    std::shared_ptr<TcpClient> client(new TcpClient(host, port, true, true, true, true, crypter));
+    client->registerMessage(1, std::shared_ptr<google::protobuf::Message>(new FooResponse));
+    client->registerMessage(2, std::shared_ptr<google::protobuf::Message>(new BanResponse));
     
-    client.start();
+    client->start();
     
     // send/recv data to/from client
     uint16_t sendTag = 0;
@@ -27,13 +42,13 @@ void testThread(std::string host, uint16_t port) {
         request->set_text("hello world!");
         request->set_times(10);
         
-        client.send(1, ++sendTag, true, std::static_pointer_cast<google::protobuf::Message>(request));
+        client->send(1, ++sendTag, true, std::static_pointer_cast<google::protobuf::Message>(request));
         
         int16_t rType;
         std::shared_ptr<google::protobuf::Message> rMsg;
         do {
             usleep(100);
-            client.recv(rType, recvTag, rMsg);
+            client->recv(rType, recvTag, rMsg);
         } while (!rType);
 
         if (sendTag != recvTag) {
@@ -48,17 +63,34 @@ void testThread(std::string host, uint16_t port) {
             }
             case 2: {
                 std::shared_ptr<BanResponse> response = std::static_pointer_cast<BanResponse>(rMsg);
-                //printf("%s\n", response->text().c_str());
+                //printf("ban %d\n", response->type());
                 break;
             }
             default:
                 assert(false);
         }
     }
+
+    return nullptr;
+}
+
+void testThread(std::string host, uint16_t port, int num) {
+    for (int i = 0; i < num; i++) {
+        Address *addr = new Address;
+        addr->host = host;
+        addr->port = port;
+        RoutineEnvironment::startCoroutine(testRoutine, (void*)addr);
+    }
+
+    LOG("thread %d running...\n", GetPid());
+
+    RoutineEnvironment::runEventLoop();
 }
 
 int main(int argc, const char * argv[])
 {
+    co_start_hook();
+
     if(argc<3){
         printf("Usage:\n"
                "echoUdpclt [HOST] [PORT]\n");
@@ -73,16 +105,14 @@ int main(int argc, const char * argv[])
     sigaction( SIGPIPE, &sa, NULL );
 
     // 启动多个线程创建client
-    int clientNum = 20;
+    int threadNum = 4;
+    int clientPerThread = 20;
     std::vector<std::thread> threads;
-    for (int i = 0; i < clientNum; i++) {
-        threads.push_back(std::thread(testThread, host, port));
+    for (int i = 0; i < threadNum; i++) {
+        threads.push_back(std::thread(testThread, host, port, clientPerThread));
     }
-    
-    for (int i = 0; i < clientNum; i++) {
-        threads[i].join();
-    }
-    
+        
+    RoutineEnvironment::runEventLoop();
     return 0;
 }
 

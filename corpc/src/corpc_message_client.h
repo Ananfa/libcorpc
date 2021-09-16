@@ -20,7 +20,6 @@
 #include "corpc_define.h"
 #include "corpc_crypter.h"
 #include <google/protobuf/message.h>
-#include <thread>
 #include <memory>
 
 namespace corpc {
@@ -35,8 +34,6 @@ namespace corpc {
             return shared_from_this();
         }
 
-        void join();
-        void detach();
         void close();
         bool isRunning() { return _running; };
         
@@ -61,10 +58,9 @@ namespace corpc {
         std::shared_ptr<Crypter> _crypter;
 
         int _s;
-        std::thread _t;
         
-        LockQueue<MessageInfo*> _sendQueue;
-        LockQueue<MessageInfo*> _recvQueue;
+        MPSC_NoLockQueue<MessageInfo*> _sendQueue;
+        MPSC_NoLockQueue<MessageInfo*> _recvQueue;
         
         std::map<int16_t, MessageInfo> _registerMessageMap;
         
@@ -82,10 +78,8 @@ namespace corpc {
         virtual bool start();
 
     private:
-        static void threadEntry( TcpClient *self ); // 数据收发线程
+        static void *workRoutine( void * arg ); // 数据收发协程
 
-
-        
     private:
         std::string _host;
         uint16_t _port;
@@ -99,7 +93,7 @@ namespace corpc {
         virtual bool start();
 
     private:
-        static void threadEntry( UdpClient *self ); // 数据收发线程
+        static void *workRoutine( void * arg ); // 数据收发协程
         
     private:
         std::string _host;

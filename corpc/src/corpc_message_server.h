@@ -62,7 +62,6 @@ namespace corpc {
         typedef std::function<void(int16_t type, uint16_t tag, std::shared_ptr<std::string>, std::shared_ptr<Connection>)> OtherMessageHandle;
         
         struct RegisterMessageInfo {
-            //int16_t type;
             google::protobuf::Message *proto;
             MessageHandle handle;
             bool needCoroutine;

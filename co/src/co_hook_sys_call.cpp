@@ -907,7 +907,7 @@ int usleep(useconds_t usec)
     
     struct pollfd pf = { 0 };
     pf.fd = -1;
-    poll( &pf,1,usec / 1000 );
+    poll( &pf,1, (usec + 999) / 1000 );
     
     return 0;
 }
