@@ -73,6 +73,60 @@ static void *redis_routine( void *arg )
         }
 
         char cmd[] = "\
+            local vals = redis.call('hmget',KEYS[1],'a','b','c')\
+            if not vals[1] or vals[1] ~= '1' then\
+              return 1\
+            end\
+            if not vals[2] then\
+              return 2\
+            end\
+            if not vals[3] then\
+              return 3\
+            end\
+            return tonumber(vals[3])";
+        reply = (redisReply *)redisCommand(redis, "eval %s 1 pp:%d", cmd, 123);
+        if (!reply) {
+            ERROR_LOG("cmd reply failed\n");
+            proxy.put(redis, true);
+            return nullptr;
+        }
+        if (reply->type != REDIS_REPLY_INTEGER) {
+            ERROR_LOG("cmd return type not array\n");
+            freeReplyObject(reply);
+            proxy.put(redis, false);
+            return nullptr;
+        }
+        LOG("eval return %d\n", reply->integer);
+        freeReplyObject(reply);
+
+        g_cnt++;
+        
+        // 归还连接
+        proxy.put(redis, false);
+    //}
+    
+    return NULL;
+}
+
+static void *redis_routine3( void *arg )
+{
+    co_enable_hook_sys();
+    
+    RedisConnectPool *redisPool = (RedisConnectPool*)arg;
+    RedisConnectPool::Proxy& proxy = redisPool->proxy;
+    
+    redisReply *reply;
+    //while (1)
+    //{
+        // 获取连接
+        redisContext *redis = proxy.take();
+        
+        if (!redis) {
+            ERROR_LOG("can't take redis handle\n");
+            return NULL;
+        }
+
+        char cmd[] = "\
             local ret = redis.call('exists',KEYS[1])\
             if ret==0 then\
               return {}\
@@ -373,7 +427,7 @@ void clientThread(RedisConnectPool *redisPool) {
 int main(int argc, const char * argv[]) {
     co_start_hook();
 
-    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.92.3", 6379, 0, 8);
+    RedisConnectPool *redisPool = RedisConnectPool::create("192.168.11.152", 6379, 0, 8);
     
     /*
     // 开两个线程进行多线程访问

@@ -41,6 +41,11 @@ namespace corpc {
     };
 
     class LockGuard {
+    private:
+        // 禁止在堆中创建对象
+        void* operator new(size_t t) {}
+        void operator delete(void* ptr) {}
+
     public:
         LockGuard(Mutex &lock): _lock(lock) { _lock.lock(); }
         ~LockGuard() { _lock.unlock(); }
