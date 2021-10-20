@@ -44,7 +44,7 @@ namespace corpc {
             void scrapMessages(uint32_t serial); // 擦除已确认消息
             
             // 注意：此send方法使用了消息缓存，非线程安全
-            void send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg);
+            void send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
             void resend(); // 重发消息缓存中所有消息
         private:
             MessageServer *_server;

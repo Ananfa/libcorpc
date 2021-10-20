@@ -717,7 +717,7 @@ void *Receiver::connectionRoutine( void * arg ) {
     IO *io = connection->_io;
     
     int fd = connection->getfd();
-    LOG("start Receiver::connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
+    DEBUG_LOG("start Receiver::connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
     
     std::string buffs(CORPC_MAX_BUFFER_SIZE,0);
     uint8_t *buf = (uint8_t *)buffs.data();
@@ -737,8 +737,8 @@ void *Receiver::connectionRoutine( void * arg ) {
                 }
             }
             
-            // 出错处理
-            WARN_LOG("Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
+            // 出错处理（断线）
+            DEBUG_LOG("Receiver::connectionRoutine -- read reqhead fd %d ret %d errno %d (%s)\n",
                    fd, ret, errno, strerror(errno));
             
             break;
@@ -895,7 +895,7 @@ void *Sender::connectionRoutine( void * arg ) {
     std::shared_ptr<Connection> connection = task->connection;
     delete task;
     
-    LOG("start Sender::connectionRoutine for fd:%d in thread:%d\n", connection->getfd(), GetPid());
+    DEBUG_LOG("start Sender::connectionRoutine for fd:%d in thread:%d\n", connection->getfd(), GetPid());
     
     connection->_routine = co_self();
     connection->_routineHang = false;
@@ -957,7 +957,7 @@ void *Sender::connectionRoutine( void * arg ) {
     shutdown(connection->_fd, SHUT_RD);
     connection->_canClose = true;
     
-    WARN_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
+    DEBUG_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
     
     return NULL;
 }

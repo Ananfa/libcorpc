@@ -25,16 +25,16 @@
 namespace corpc {
     class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
-        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter) {}
+        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvSerial(lastRecvSerial) {}
         virtual ~MessageClient();
         
         virtual bool start() = 0;
+        void stop() { _running = false; }
         
         std::shared_ptr<MessageClient> getPtr() {
             return shared_from_this();
         }
 
-        void close();
         bool isRunning() { return _running; };
         
         void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
@@ -42,6 +42,12 @@ namespace corpc {
         
         bool registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto);
         
+        uint32_t getLastRecvSerial() { return _lastRecvSerial; }
+        uint32_t getLastSendSerial() { return _lastSendSerial; }
+
+    protected:
+        void close();
+
     protected:
         struct MessageInfo {
             int16_t type;
@@ -54,6 +60,9 @@ namespace corpc {
         bool _enableSendCRC; // 是否需要发包时校验CRC码
         bool _enableRecvCRC; // 是否需要收包时校验CRC码
         bool _enableSerial;  // 是否需要消息序号
+
+        uint32_t _lastRecvSerial = 0;
+        uint32_t _lastSendSerial = 0;
         
         std::shared_ptr<Crypter> _crypter;
 
@@ -72,7 +81,7 @@ namespace corpc {
 
     class TcpClient: public MessageClient {
     public:
-        TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter), _host(host), _port(port) {}
+        TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), _host(host), _port(port) {}
         ~TcpClient() {}
         
         virtual bool start();
@@ -87,7 +96,7 @@ namespace corpc {
 
     class UdpClient: public MessageClient {
     public:
-        UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter), _host(host), _port(port), _local_port(local_port) {}
+        UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), _host(host), _port(port), _local_port(local_port) {}
         ~UdpClient() {}
 
         virtual bool start();

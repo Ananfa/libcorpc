@@ -41,10 +41,11 @@ MessageClient::~MessageClient() {
 }
 
 void MessageClient::close() {
-    if (_running) {
-        _running = false;
+    //if (_running) {
+    //    _running = false;
+        LOG("MessageClient::close fd: %d\n", _s);
         ::close(_s);
-    }
+    //}
 }
 
 void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg) {
@@ -148,9 +149,6 @@ void *TcpClient::workRoutine( void * arg ) {
     int16_t msgType = 0;
     uint16_t tag = 0;
     uint16_t flag = 0;
-
-    uint32_t lastRecvSerial = 0;
-    uint32_t lastSendSerial = 0;
     
     uint64_t nowms = 0;
     // 开始定时心跳，以及接收／发送数据包
@@ -161,7 +159,7 @@ void *TcpClient::workRoutine( void * arg ) {
     //   4.若到心跳时间，发心跳
     //   5.查看是否有数据需要发送，有则发送
     //   6.回第1步
-    while (true) {
+    while (self->_running) {
         ret = poll(&fd_in, 1, 4);
 
         if (self->_needHB) {
@@ -172,6 +170,7 @@ void *TcpClient::workRoutine( void * arg ) {
             nowms += now.tv_usec / 1000;
         }
         
+        // BUG: 当连接在其他地方close时，poll会返回0，死循环。而且还会在文件描述符被重新打开时错误读取信息。
         if (ret) {
             if (ret < 0) {
                 if (errno == EINTR) {
@@ -191,7 +190,7 @@ void *TcpClient::workRoutine( void * arg ) {
                     continue;
                 }
                 
-                ERROR_LOG("read data\n");
+                ERROR_LOG("read data error, fd: %d\n");
                 self->close();
                 return nullptr;
             }
@@ -254,44 +253,47 @@ void *TcpClient::workRoutine( void * arg ) {
                     } else if (msgType < 0) {
                         // 其他连接控制消息，不做处理
                     } else {
-                        assert(bodySize > 0);
+                        //assert(bodySize > 0);
                         // 校验序列号
                         if (self->_enableSerial) {
                             uint32_t serial = *(uint32_t *)(buf + 14);
                             serial = be32toh(serial);
 
-                            if (serial != ++lastRecvSerial) {
-                                ERROR_LOG("serial check failed, need:%d, get:%d\n", lastRecvSerial, serial);
+                            if (serial != 0 && serial != ++self->_lastRecvSerial) {
+                                ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial, serial);
                                 self->close();
                                 return nullptr;
                             }
 
                         }
 
-                        // 校验CRC
-                        if (self->_enableRecvCRC) {
-                            uint16_t crc = *(uint16_t *)(buf + 18);
-                            crc = be16toh(crc);
+                        if (bodySize > 0) {
+                            // 校验CRC
+                            if (self->_enableRecvCRC) {
+                                uint16_t crc = *(uint16_t *)(buf + 18);
+                                crc = be16toh(crc);
 
-                            uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
+                                uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
 
-                            if (crc != crc1) {
-                                ERROR_LOG("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, bodySize, crc, crc1);
-                                self->close();
-                                return nullptr;
-                            }
-                        }
-
-                        // 解密
-                        if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
-                            if (self->_crypter == nullptr) {
-                                ERROR_LOG("cant decrypt message for crypter not exist\n");
-                                self->close();
-                                return nullptr;
+                                if (crc != crc1) {
+                                    ERROR_LOG("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, bodySize, crc, crc1);
+                                    self->close();
+                                    return nullptr;
+                                }
                             }
 
-                            self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                            // 解密
+                            if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                                if (self->_crypter == nullptr) {
+                                    ERROR_LOG("cant decrypt message for crypter not exist\n");
+                                    self->close();
+                                    return nullptr;
+                                }
+
+                                self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                            }
                         }
+                        
                         
                         // 解码数据
                         auto iter = self->_registerMessageMap.find(msgType);
@@ -301,12 +303,15 @@ void *TcpClient::workRoutine( void * arg ) {
                             return nullptr;
                         }
                         
-                        std::shared_ptr<google::protobuf::Message> msg(iter->second.proto->New());
-                        if (!msg->ParseFromArray(bodyBuf, bodySize)) {
-                            // 出错处理
-                            ERROR_LOG("parse body fail for message: %d\n", msgType);
-                            self->close();
-                            return nullptr;
+                        std::shared_ptr<google::protobuf::Message> msg = nullptr;
+                        if (bodySize > 0) {
+                            msg.reset(iter->second.proto->New());
+                            if (!msg->ParseFromArray(bodyBuf, bodySize)) {
+                                // 出错处理
+                                ERROR_LOG("parse body fail for message: %d\n", msgType);
+                                self->close();
+                                return nullptr;
+                            }
                         }
                         
                         MessageInfo *info = new MessageInfo;
@@ -338,7 +343,7 @@ void *TcpClient::workRoutine( void * arg ) {
             
             if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
                 if (self->_enableSerial) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(lastRecvSerial);
+                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->_lastRecvSerial);
                 }
 
                 if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
@@ -384,8 +389,8 @@ void *TcpClient::workRoutine( void * arg ) {
                 *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
                 if (self->_enableSerial) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(lastRecvSerial);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++lastSendSerial);
+                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->_lastRecvSerial);
+                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->_lastSendSerial);
                 }
 
                 if (self->_enableSendCRC) {
@@ -431,6 +436,9 @@ void *TcpClient::workRoutine( void * arg ) {
             sendNum = 0;
         }
     }
+
+    self->close();
+    return nullptr;
 }
 
 
@@ -577,9 +585,6 @@ void *UdpClient::workRoutine( void * arg ) {
     int16_t msgType = 0;
     uint16_t tag = 0;
     uint16_t flag = 0;
-
-    uint32_t lastRecvSerial = 0;
-    uint32_t lastSendSerial = 0;
     
     uint64_t nowms = 0;
 
@@ -592,7 +597,7 @@ void *UdpClient::workRoutine( void * arg ) {
     //   4.若到心跳时间，发心跳
     //   5.查看是否有数据需要发送，有则发送
     //   6.回第1步
-    while (true) {
+    while (self->_running) {
         ret = poll(&fd, 1, 4);
 
         struct timeval now = { 0 };
@@ -661,8 +666,8 @@ void *UdpClient::workRoutine( void * arg ) {
                         uint32_t serial = *(uint32_t *)(buf + 14);
                         serial = be32toh(serial);
 
-                        if (serial != ++lastRecvSerial) {
-                            ERROR_LOG("serial check failed, fd:%d, need:%d, get:%d\n", s, lastRecvSerial, serial);
+                        if (serial != ++self->_lastRecvSerial) {
+                            ERROR_LOG("serial check failed, fd:%d, need:%d, get:%d\n", s, self->_lastRecvSerial, serial);
                             self->close();
                             return nullptr;
                         }
@@ -770,7 +775,7 @@ void *UdpClient::workRoutine( void * arg ) {
             *(uint16_t *)(buf + 6) = htobe16(info->tag);
 
             if (self->_enableSerial) {
-                *(uint32_t *)(buf + 14) = htobe32(++lastSendSerial);
+                *(uint32_t *)(buf + 14) = htobe32(++self->_lastSendSerial);
             }
 
             if (self->_enableSendCRC) {
@@ -792,4 +797,7 @@ void *UdpClient::workRoutine( void * arg ) {
             info = self->_sendQueue.pop();
         }
     }
+
+    self->close();
+    return nullptr;
 }

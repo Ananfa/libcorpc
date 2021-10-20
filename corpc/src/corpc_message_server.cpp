@@ -27,7 +27,7 @@ MessageServer::Connection::Connection(int fd, MessageServer* server): corpc::Con
 }
 
 MessageServer::Connection::~Connection() {
-    LOG("MessageServer::Connection::~Connection -- fd:%d\n", _fd);
+    DEBUG_LOG("MessageServer::Connection::~Connection -- fd:%d\n", _fd);
 }
 
 void MessageServer::Connection::onClose() {
@@ -41,7 +41,7 @@ void MessageServer::Connection::scrapMessages(uint32_t serial) {
     }
 }
 
-void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, uint16_t tag, std::shared_ptr<void> msg) {
+void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
     if (!isOpen() && !(_server->_enableSerial && _msgBuffer->needBuf())) {
         return;
     }
@@ -53,9 +53,12 @@ void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, u
     sendInfo->tag = tag;
     sendInfo->msg = msg;
 
-    if (_server->_enableSerial) {
+    if (needBuffer && _server->_enableSerial) {
         assert(_msgBuffer);
         _msgBuffer->insertMessage(sendInfo);
+    } else {
+        // 注意：服务器向客户端发的序号为0的消息不进行序号校验，用于给上层发特殊消息
+        sendInfo->serial = 0;
     }
     
     if (isOpen()) {
@@ -98,11 +101,11 @@ void MessageServer::Worker::handleMessage(void *msg) {
 
     switch (task->type) {
         case CORPC_MSG_TYPE_CONNECT: // 新连接建立
-            LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
+            DEBUG_LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", task->connection->getfd());
             // TODO:
             break;
         case CORPC_MSG_TYPE_CLOSE: // 连接断开
-            LOG("MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
+            DEBUG_LOG("MessageServer::Worker::handleMessage -- fd %d close\n", task->connection->getfd());
             // TODO:
             break;
         default:
