@@ -39,8 +39,8 @@ namespace corpc {
     // 协程环境是否应该与线程绑定，约定每个线程只有一个协程环境
     // 每个线程可初始化自己的协程环境，约定只能初始化一次，一般在线程开始时初始化
     class RoutineEnvironment {
-        static const unsigned int SHARE_STACK_COUNT = 50;
-        static const unsigned int SHARE_STACK_SIZE = 128 * 1024;
+        static const unsigned int SHARE_STACK_COUNT = 50; // 这里限制最多50个线程
+        static const unsigned int SHARE_STACK_SIZE = 1024 * 1024;
         
 #ifdef USE_NO_LOCK_QUEUE
         typedef Co_MPSC_NoLockQueue<WaitResumeRPCRoutine *> WaitResumeQueue;
