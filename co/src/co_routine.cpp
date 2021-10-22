@@ -40,6 +40,11 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <limits.h>
+#include <execinfo.h>
+
+#ifdef STACK_PROTECT
+	#include <sys/mman.h>
+#endif
 
 extern "C"
 {
@@ -65,7 +70,7 @@ void co_log_err( const char *fmt,... )
     va_list arg;
     va_start(arg, fmt);
     
-    vfprintf(stderr, fmt, arg);
+    vfprintf(stdout, fmt, arg);
     
     va_end(arg);
 }
@@ -277,10 +282,29 @@ void inline Join( TLink*apLink,TLink *apOther )
 /////////////////for copy stack //////////////////////////
 stStackMem_t* co_alloc_stackmem(unsigned int stack_size)
 {
+#ifdef STACK_PROTECT
+	static uint64_t pagesize = sysconf(_SC_PAGE_SIZE);
+	static uint64_t mask = pagesize - 1;
+#endif
+
 	stStackMem_t* stack_mem = (stStackMem_t*)malloc(sizeof(stStackMem_t));
 	stack_mem->occupy_co= NULL;
 	stack_mem->stack_size = stack_size;
+#ifdef STACK_PROTECT
+	// 加入保护页，堆栈溢出时能第一时间报错
+	// 保护页处于内存块低地址空间，分配的低地址空间的第一个完整页作为保护页
+	// 会有一定内存空间被浪费
+	stack_mem->origin = (char*)malloc(stack_size + pagesize * 2);
+	void *protect_start = (void *)((uint64_t)(stack_mem->origin + pagesize) & ~mask);
+	stack_mem->stack_buffer = (char*)protect_start + pagesize;
+	if (mprotect(protect_start, pagesize, PROT_NONE) == -1) {
+		perror("mprotect");
+        exit(0);
+    }
+
+#else
 	stack_mem->stack_buffer = (char*)malloc(stack_size);
+#endif
 	stack_mem->stack_bp = stack_mem->stack_buffer + stack_size;
 	return stack_mem;
 }
@@ -677,8 +701,12 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 void co_free( stCoRoutine_t *co )
 {
     if (!co->cIsShareStack) 
-    {    
+    {
+#ifdef STACK_PROTECT
+    	free(co->stack_mem->origin);
+#else
         free(co->stack_mem->stack_buffer);
+#endif
         free(co->stack_mem);
     } else {
         // fix by lxk here
@@ -759,27 +787,59 @@ void co_yield( stCoRoutine_t *co )
 	co_yield_env( co->env );
 }
 
-//thread_local uint32_t _t_max_stack_size(0);
+#ifdef CHECK_MAX_STACK
+void print_stacktrace()
+{
+    int size = 16;
+    void * array[16];
+    int stack_num = backtrace(array, size);
+    char ** stacktrace = backtrace_symbols(array, stack_num);
+    for (int i = 0; i < stack_num; ++i)
+    {
+        co_log_err("%s\n", stacktrace[i]);
+    }
+    free(stacktrace);
+}
+
+thread_local uint32_t _t_max_stack_size(0);
+void check_stack_size(stCoRoutine_t* co) {
+// 注意：主协程不会进行栈拷贝，因此不需要校验主协程的栈大小
+	if (co->cIsMain == 1) {
+		return;
+	}
+
+	int len = co->stack_mem->stack_bp - co->stack_sp;
+
+	if (len > _t_max_stack_size) {
+		_t_max_stack_size = len;
+		co_log_err("CO_DEBUG: ============= max stack size %lu\n", _t_max_stack_size);
+		if (len > 10000) {
+			// 注意：这里打印的不是occupy_co的堆栈现场
+			print_stacktrace();
+		}
+	}
+}
+#endif
+
+thread_local uint32_t _t_max_malloc_size(0);
 void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
+	if (occupy_co->cIsMain == 1) {
+		co_log_err("CO_DEBUG: ============= save main stack\n");
+	}
+
 	///copy out
-	stStackMem_t* stack_mem = occupy_co->stack_mem;
-	int len = stack_mem->stack_bp - occupy_co->stack_sp;
+	//stStackMem_t* stack_mem = occupy_co->stack_mem;
+	int len = occupy_co->stack_mem->stack_bp - occupy_co->stack_sp;
+	if (len > _t_max_malloc_size) {
+		_t_max_malloc_size = len;
+		co_log_err("CO_DEBUG: ============= max malloc size %lu\n", _t_max_malloc_size);
+	}
 
 	if (occupy_co->save_buffer)
 	{
 		free(occupy_co->save_buffer), occupy_co->save_buffer = NULL;
 	}
-
-//	if (len > _t_max_stack_size) {
-//		_t_max_stack_size = len;
-//		co_log_err("CO_DEBUG: ============= save_stack_buffer  %lu\n", _t_max_stack_size);
-//
-//		if (len > 100 * 1024) {
-//			co_log_err("CO_ERR: ============= save_stack_buffer stack overflow %lu\n", _t_max_stack_size);
-//			exit(0);
-//		}
-//	}
 
 	occupy_co->save_buffer = (char*)malloc(len); //malloc buf;
 	occupy_co->save_size = len;
@@ -802,6 +862,9 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	}
 	else 
 	{
+#ifdef CHECK_MAX_STACK
+		check_stack_size(curr);
+#endif
 		env->pending_co = pending_co;
 		//get last occupy co on the same stack mem
 		stCoRoutine_t* occupy_co = pending_co->stack_mem->occupy_co;

@@ -39,7 +39,7 @@ namespace corpc {
     // 协程环境是否应该与线程绑定，约定每个线程只有一个协程环境
     // 每个线程可初始化自己的协程环境，约定只能初始化一次，一般在线程开始时初始化
     class RoutineEnvironment {
-        static const unsigned int SHARE_STACK_COUNT = 50; // 这里限制最多50个线程
+        static const unsigned int SHARE_STACK_COUNT = 50; //多个共享栈可以降低栈数据切换
         static const unsigned int SHARE_STACK_SIZE = 1024 * 1024;
         
 #ifdef USE_NO_LOCK_QUEUE
@@ -65,6 +65,7 @@ namespace corpc {
         
     public:
         //void destroy(); // 清理当前线程协程环境
+        static void init();
         static stCoRoutine_t *startCoroutine(pfn_co_routine_t pfn,void *arg);
         static stCoRoutine_t *startKeyCoroutine(pfn_co_routine_t pfn,void *arg);
         static void resumeCoroutine( pid_t pid, stCoRoutine_t *co, uint64_t expireTime = 0, int err = 0 ); // 用于跨线程唤醒RPC协程

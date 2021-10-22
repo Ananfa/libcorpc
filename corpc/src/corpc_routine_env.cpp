@@ -62,6 +62,10 @@ RoutineEnvironment *RoutineEnvironment::getEnv() {
     return env;
 }
 
+void RoutineEnvironment::init() {
+    co_start_hook();
+}
+
 RoutineEnvironment *RoutineEnvironment::initialize() {
     pid_t pid = GetPid();
     assert(!g_routineEnvPerThread[pid]);

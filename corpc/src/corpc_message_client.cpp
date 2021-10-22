@@ -122,8 +122,9 @@ bool TcpClient::start() {
 void *TcpClient::workRoutine( void * arg ) {
     std::shared_ptr<TcpClient> self = std::static_pointer_cast<TcpClient>(((TcpClient*)arg)->getPtr());
 
-    uint8_t buf[CORPC_MAX_MESSAGE_SIZE];
-    
+    std::string buffs(CORPC_MAX_MESSAGE_SIZE,0);
+    uint8_t *buf = (uint8_t *)buffs.data();
+
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
@@ -565,7 +566,9 @@ bool UdpClient::start() {
 void *UdpClient::workRoutine( void * arg ) {
     std::shared_ptr<UdpClient> self = std::static_pointer_cast<UdpClient>(((UdpClient*)arg)->getPtr());
 
-    uint8_t buf[CORPC_MAX_UDP_MESSAGE_SIZE];
+    std::string buffs(CORPC_MAX_UDP_MESSAGE_SIZE,0);
+    uint8_t *buf = (uint8_t *)buffs.data();
+
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);

@@ -21,6 +21,10 @@
 
 #include "co_routine.h"
 #include "coctx.h"
+
+#define STACK_PROTECT
+#define CHECK_MAX_STACK
+
 struct stCoRoutineEnv_t;
 struct stCoSpec_t
 {
@@ -33,7 +37,9 @@ struct stStackMem_t
 	int stack_size;
 	char* stack_bp; //stack_buffer + stack_size
 	char* stack_buffer;
-
+#ifdef STACK_PROTECT
+	char* origin;
+#endif
 };
 
 struct stShareStack_t

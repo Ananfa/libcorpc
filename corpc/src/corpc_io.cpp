@@ -496,7 +496,9 @@ void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
 void *UdpAcceptor::acceptRoutine( void * arg ) {
     UdpAcceptor *self = (UdpAcceptor *)arg;
     int listen_fd = self->_listen_fd;
-    char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
+    
+    std::string bufstring(CORPC_MAX_UDP_MESSAGE_SIZE, 0);
+    uint8_t *buf = (uint8_t *)bufstring.data();
     
     co_register_fd(listen_fd);
     co_set_timeout(listen_fd, -1, 1000);
