@@ -814,7 +814,6 @@ void check_stack_size(stCoRoutine_t* co) {
 		_t_max_stack_size = len;
 		co_log_err("CO_DEBUG: ============= max stack size %lu\n", _t_max_stack_size);
 		if (len > 10000) {
-			// 注意：这里打印的不是occupy_co的堆栈现场
 			print_stacktrace();
 		}
 	}
@@ -881,7 +880,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
     assert(pending_co->env);
     
 	//swap context
-	coctx_swap(&(curr->ctx),&(pending_co->ctx) );
+	coctx_swap(&(curr->ctx),&(pending_co->ctx) ); // 注意：执行这一句切换后本函数中所有变量的值都没意义了，需要重新赋值
     
 	//stack buffer may be overwrite, so get again;
 	stCoRoutineEnv_t* curr_env = co_get_curr_thread_env();
@@ -895,7 +894,30 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		//resume stack buffer
 		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
 		{
-			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size);
+			// 注意：执行这句memcpy后，函数中所有变量都可能被覆盖掉了，因为编译优化函数内变量在栈上的位置顺序是不定的，即stack_sp的位置不一定在所有函数变量的前面
+			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size); 
+
+#ifdef CHECK_MAX_STACK
+			// 下面两个问题的原因可能是因为编译器的编译优化调整了函数内变量在栈上的布局顺序导致的
+			//assert(update_pending_co == curr); // 问题一： 这里为什么能false? 
+			//if (update_pending_co->save_size > 10000) {
+			//	co_log_err("CO_DEBUG: ============= resume stack size %lu\n", update_pending_co->save_size); // 问题二：这里打印的大小值明显大得离谱，为什么？
+			//	print_stacktrace();
+			//}
+			stCoRoutineEnv_t* curr_env1 = co_get_curr_thread_env();
+			stCoRoutine_t* update_pending_co1 = curr_env1->pending_co;
+			// assert(update_pending_co1 == curr); // 问题三： 这里为什么还是false? 是否可能是因curr参数存在某个没恢复的寄存器中？
+			if (update_pending_co1 == curr) {
+				co_log_err("CO_DEBUG: ============= update_pending_co1 == curr\n");
+			} else {
+				co_log_err("CO_DEBUG: ============= update_pending_co1 != curr\n");
+				assert(update_pending_co1 == curr);
+			}
+			if (update_pending_co1->save_size > 10000) {
+				co_log_err("CO_DEBUG: ============= resume stack size %lu\n", update_pending_co1->save_size);
+				print_stacktrace();
+			}
+#endif
 		}
 	}
 }
