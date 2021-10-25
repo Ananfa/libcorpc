@@ -23,7 +23,7 @@
 #include "coctx.h"
 
 #define STACK_PROTECT
-#define CHECK_MAX_STACK
+#define CHECK_MAX_STACK 10000
 
 struct stCoRoutineEnv_t;
 struct stCoSpec_t

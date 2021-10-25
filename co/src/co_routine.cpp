@@ -779,7 +779,6 @@ void co_yield_env( stCoRoutineEnv_t *env )
 
 void co_yield_ct()
 {
-
 	co_yield_env( co_get_curr_thread_env() );
 }
 void co_yield( stCoRoutine_t *co )
@@ -787,7 +786,7 @@ void co_yield( stCoRoutine_t *co )
 	co_yield_env( co->env );
 }
 
-#ifdef CHECK_MAX_STACK
+#ifdef CHECK_MAX_STACK > 0
 void print_stacktrace()
 {
     int size = 16;
@@ -813,7 +812,7 @@ void check_stack_size(stCoRoutine_t* co) {
 	if (len > _t_max_stack_size) {
 		_t_max_stack_size = len;
 		co_log_err("CO_DEBUG: ============= max stack size %lu\n", _t_max_stack_size);
-		if (len > 10000) {
+		if (len > CHECK_MAX_STACK) {
 			print_stacktrace();
 		}
 	}
@@ -823,21 +822,24 @@ void check_stack_size(stCoRoutine_t* co) {
 thread_local uint32_t _t_max_malloc_size(0);
 void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
-	if (occupy_co->cIsMain == 1) {
-		co_log_err("CO_DEBUG: ============= save main stack\n");
-	}
+	assert(occupy_co->cIsMain == 0);
 
 	///copy out
-	//stStackMem_t* stack_mem = occupy_co->stack_mem;
 	int len = occupy_co->stack_mem->stack_bp - occupy_co->stack_sp;
 	if (len > _t_max_malloc_size) {
 		_t_max_malloc_size = len;
-		co_log_err("CO_DEBUG: ============= max malloc size %lu\n", _t_max_malloc_size);
 	}
+
+#if CHECK_MAX_STACK > 0
+	if (len > CHECK_MAX_STACK) {
+		co_log_err("CO_WARN: ============= malloc size %lu\n", len);
+	}
+#endif
 
 	if (occupy_co->save_buffer)
 	{
-		free(occupy_co->save_buffer), occupy_co->save_buffer = NULL;
+		//free(occupy_co->save_buffer), occupy_co->save_buffer = NULL;
+		free(occupy_co->save_buffer);
 	}
 
 	occupy_co->save_buffer = (char*)malloc(len); //malloc buf;
@@ -854,6 +856,10 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	char c;
 	curr->stack_sp= &c;
 
+#ifdef CHECK_MAX_STACK > 0
+		check_stack_size(curr);
+#endif
+
 	if (!pending_co->cIsShareStack)
 	{
 		env->pending_co = NULL;
@@ -861,9 +867,6 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	}
 	else 
 	{
-#ifdef CHECK_MAX_STACK
-		check_stack_size(curr);
-#endif
 		env->pending_co = pending_co;
 		//get last occupy co on the same stack mem
 		stCoRoutine_t* occupy_co = pending_co->stack_mem->occupy_co;
@@ -873,7 +876,16 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		env->occupy_co = occupy_co;
 		if (occupy_co && occupy_co != pending_co)
 		{
-			save_stack_buffer(occupy_co);
+			// change by lxk, 对已结束的协程就不进行栈拷贝了
+			if (occupy_co->cEnd) { // 协程已结束，清理缓存栈数据
+				// 清理协程缓存栈
+				if (occupy_co->save_buffer)
+				{
+					free(occupy_co->save_buffer), occupy_co->save_buffer = NULL;
+				}
+			} else {
+				save_stack_buffer(occupy_co);
+			}
 		}
 	}
 
@@ -894,27 +906,27 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 		//resume stack buffer
 		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
 		{
+#ifdef CHECK_MAX_STACK > 0
+			if (update_pending_co->save_size > CHECK_MAX_STACK) {
+				co_log_err("CO_WARN: ============= resuming stack size %lu\n", update_pending_co->save_size);
+			}
+#endif
+
 			// 注意：执行这句memcpy后，函数中所有变量都可能被覆盖掉了，因为编译优化函数内变量在栈上的位置顺序是不定的，即stack_sp的位置不一定在所有函数变量的前面
 			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size); 
 
-#ifdef CHECK_MAX_STACK
+#ifdef CHECK_MAX_STACK > 0
 			// 下面两个问题的原因可能是因为编译器的编译优化调整了函数内变量在栈上的布局顺序导致的
 			//assert(update_pending_co == curr); // 问题一： 这里为什么能false? 
-			//if (update_pending_co->save_size > 10000) {
+			//if (update_pending_co->save_size > CHECK_MAX_STACK) {
 			//	co_log_err("CO_DEBUG: ============= resume stack size %lu\n", update_pending_co->save_size); // 问题二：这里打印的大小值明显大得离谱，为什么？
 			//	print_stacktrace();
 			//}
 			stCoRoutineEnv_t* curr_env1 = co_get_curr_thread_env();
 			stCoRoutine_t* update_pending_co1 = curr_env1->pending_co;
-			// assert(update_pending_co1 == curr); // 问题三： 这里为什么还是false? 是否可能是因curr参数存在某个没恢复的寄存器中？
-			if (update_pending_co1 == curr) {
-				co_log_err("CO_DEBUG: ============= update_pending_co1 == curr\n");
-			} else {
-				co_log_err("CO_DEBUG: ============= update_pending_co1 != curr\n");
-				assert(update_pending_co1 == curr);
-			}
-			if (update_pending_co1->save_size > 10000) {
-				co_log_err("CO_DEBUG: ============= resume stack size %lu\n", update_pending_co1->save_size);
+			// assert(update_pending_co1 == curr); // 问题三： 这里为什么还是false? 调试发现参数curr的地址值比变量c的地址值小，因此栈恢复时不会恢复curr值，其他函数内的局部变量地址也都比变量c的地址小，因此都没有被恢复
+			if (update_pending_co1->save_size > CHECK_MAX_STACK) {
+				co_log_err("CO_WARN: ============= resumed stack size %lu\n", update_pending_co1->save_size);
 				print_stacktrace();
 			}
 #endif
