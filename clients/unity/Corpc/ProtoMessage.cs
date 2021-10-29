@@ -1,35 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using ProtoBuf;
+using Google.Protobuf;
 
 namespace Corpc
 {
     public class ProtoMessage
     {
-        readonly int type;
-        readonly IExtensible data;
+        public short Type { get; }
+        public ushort Tag { get; }
+        public IMessage Data { get; }
 
-        public int Type
-        {
-            get
-            {
-                return type;
-            }
-        }
+        // NeedCrypter只用于发送时
+        public bool NeedCrypter { get; }
 
-        public IExtensible Data
+        public ProtoMessage(short type, ushort tag, IMessage data, bool needCrypter)
         {
-            get
-            {
-                return data;
-            }
-        }
-
-        public ProtoMessage(int type, IExtensible data)
-        {
-            this.type = type;
-            this.data = data;
+            Type = type;
+            Tag = tag;
+            Data = data;
+            NeedCrypter = needCrypter;
         }
     }
 }

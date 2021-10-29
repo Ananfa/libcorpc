@@ -1,10 +1,11 @@
+syntax = "proto3";
 
 message FooRequest {
-    required string text = 1;
-    optional int32 times = 2;
+    string text = 1;
+    int32 times = 2;
 }
 
 message FooResponse {
-    required string text = 1;
-    optional bool result = 2;
+    string text = 1;
+    bool result = 2;
 }

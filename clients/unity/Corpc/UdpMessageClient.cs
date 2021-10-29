@@ -5,7 +5,7 @@ using System.Text;
 using System.Net.Sockets;
 using System.Threading;
 using System.IO;
-using ProtoBuf;
+using Google.Protobuf;
 using UnityEngine;
 
 namespace Corpc
@@ -246,7 +246,7 @@ namespace Corpc
 
                     Debug.Assert(i == Constants.CORPC_MESSAGE_HEAD_SIZE + msgLen);
 
-                    IExtensible protoData = null;
+                    IMessage protoData = null;
                     if (msgLen > 0)
                     {
                         protoData = Deserialize(msgType, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, msgLen);
@@ -313,7 +313,7 @@ namespace Corpc
         }
 
         // 异步发送数据
-        public void Send (int type, IExtensible msg)
+        public void Send (int type, IMessage msg)
         {
             _sendMsgQueue.Enqueue (new ProtoMessage (type, msg));
         }
@@ -321,11 +321,11 @@ namespace Corpc
         private void Serialize (MemoryStream ms, ProtoMessage msg)
         {
             if (msg.Data != null) {
-                Serializer.Serialize<IExtensible> (ms, msg.Data);
+                Serializer.Serialize<IMessage> (ms, msg.Data);
             }
         }
 
-        private IExtensible Deserialize (int type, byte[] data, int index, int count)
+        private IMessage Deserialize (int type, byte[] data, int index, int count)
         {
             return _parser.parse (type, data, index, count);
         }

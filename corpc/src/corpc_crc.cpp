@@ -66,7 +66,7 @@ void CRC::InitTable(uint16_t polynomial) {
             if ((crc & 0x01) != 0){
                 crc = reverse_poly ^ (crc >> 1);
             }else{
-                crc = crc >> 1;
+                crc >>= 1;
             }
         }
         MbTable[i] = crc;

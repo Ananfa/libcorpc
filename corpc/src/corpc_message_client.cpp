@@ -260,12 +260,12 @@ void *TcpClient::workRoutine( void * arg ) {
                             uint32_t serial = *(uint32_t *)(buf + 14);
                             serial = be32toh(serial);
 
-                            if (serial != 0 && serial != ++self->_lastRecvSerial) {
+                            if (serial != 0 && serial != self->_lastRecvSerial + 1) {
                                 ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial, serial);
                                 self->close();
                                 return nullptr;
                             }
-
+                            self->_lastRecvSerial++;
                         }
 
                         if (bodySize > 0) {
@@ -284,7 +284,7 @@ void *TcpClient::workRoutine( void * arg ) {
                             }
 
                             // 解密
-                            if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                            if (flag & CORPC_MESSAGE_FLAG_CRYPT) {
                                 if (self->_crypter == nullptr) {
                                     ERROR_LOG("cant decrypt message for crypter not exist\n");
                                     self->close();
