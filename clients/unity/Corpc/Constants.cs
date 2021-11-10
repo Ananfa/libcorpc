@@ -14,12 +14,13 @@ namespace Corpc
 		public const int CORPC_HEARTBEAT_PERIOD = 5000;
 		public const int CORPC_MAX_NO_HEARTBEAT_TIME = 15000;
 
-        public const int CORPC_MSG_TYPE_DISCONNECT = -1;
-        public const int CORPC_MSG_TYPE_UDP_UNSHAKE = -110;
-        public const int CORPC_MSG_TYPE_UDP_HANDSHAKE_1 = -111;
-        public const int CORPC_MSG_TYPE_UDP_HANDSHAKE_2 = -112;
-        public const int CORPC_MSG_TYPE_UDP_HANDSHAKE_3 = -113;
-		public const int CORPC_MSG_TYPE_HEARTBEAT = -115;
+        public const short CORPC_MSG_TYPE_DISCONNECT = -1;
+        public const short CORPC_MSG_TYPE_UDP_UNSHAKE = -110;
+        public const short CORPC_MSG_TYPE_UDP_HANDSHAKE_1 = -111;
+        public const short CORPC_MSG_TYPE_UDP_HANDSHAKE_2 = -112;
+        public const short CORPC_MSG_TYPE_UDP_HANDSHAKE_3 = -113;
+        public const short CORPC_MSG_TYPE_UDP_HANDSHAKE_4 = -114;
+		public const short CORPC_MSG_TYPE_HEARTBEAT = -115;
 
 	}
 }

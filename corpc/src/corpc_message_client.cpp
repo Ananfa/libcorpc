@@ -643,12 +643,14 @@ void *UdpClient::workRoutine( void * arg ) {
                         //printf("recv heartbeat\n");
                         self->_lastRecvHBTime = nowms;
                     } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
-                        // 重发handshake_3
-                        DEBUG_LOG("resend handshake3, fd:%d\n", s);
-                        if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
-                            ERROR_LOG("can't send handshake3, fd:%d\n", s);
-                            self->close();
-                            return nullptr;
+                        if (!shakeOK) {
+                            // 重发handshake_3
+                            DEBUG_LOG("resend handshake3, fd:%d\n", s);
+                            if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+                                ERROR_LOG("can't send handshake3, fd:%d\n", s);
+                                self->close();
+                                return nullptr;
+                            }
                         }
                     } else if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_4) {
                         shakeOK = true;
@@ -778,11 +780,12 @@ void *UdpClient::workRoutine( void * arg ) {
             *(uint16_t *)(buf + 6) = htobe16(info->tag);
 
             if (self->_enableSerial) {
+                *(uint32_t *)(buf + 10) = htobe32(self->_lastRecvSerial); // 由于UDP的包顺序会错乱，无法通过序号来删除缓存序号靠前的消息
                 *(uint32_t *)(buf + 14) = htobe32(++self->_lastSendSerial);
             }
 
             if (self->_enableSendCRC) {
-                uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, 18);
+                uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, CORPC_MESSAGE_HEAD_SIZE - 2);
                 crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                 *(uint16_t *)(buf + 18) = htobe16(crc);
             }

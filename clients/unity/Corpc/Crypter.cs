@@ -4,8 +4,8 @@ namespace Corpc
 {   
     public interface ICrypter
     {
-        void encrypt(byte[] src, byte[] dst, uint size);
-        void decrypt(byte[] src, byte[] dst, uint size);
+        void encrypt(byte[] src, int srcOff, byte[] dst, int dstOff, uint size);
+        void decrypt(byte[] src, int srcOff, byte[] dst, int dstOff, uint size);
     }
 
     public class SimpleXORCrypter: ICrypter
@@ -18,16 +18,16 @@ namespace Corpc
             _keySize = _key.Length;
         }
 
-        public void encrypt(byte[] src, byte[] dst, uint size)
+        public void encrypt(byte[] src, int srcOff, byte[] dst, int dstOff, uint size)
         {
             for (int i = 0; i < size; i++) {
-                dst[i] = (byte)(src[i]^_key[i%_keySize]);
+                dst[i + dstOff] = (byte)(src[i + srcOff]^_key[i%_keySize]);
             }
         }
 
-        public void decrypt(byte[] src, byte[] dst, uint size)
+        public void decrypt(byte[] src, int srcOff, byte[] dst, int dstOff, uint size)
         {
-            encrypt(src, dst, size);
+            encrypt(src, srcOff, dst, dstOff, size);
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Corpc
 {
-    class BlockingDequeueProtoMessageQueue
+    public class BlockingDequeueProtoMessageQueue
     {
         Queue<ProtoMessage> q = new Queue<ProtoMessage>();
 

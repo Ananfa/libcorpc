@@ -1,5 +1,9 @@
 syntax = "proto3";
 
+message ServerReady {
+	int32 status = 1;
+}
+
 message FooRequest {
     string text = 1;
     int32 times = 2;
@@ -8,4 +12,8 @@ message FooRequest {
 message FooResponse {
     string text = 1;
     bool result = 2;
+}
+
+message BanResponse {
+	int32 type = 1;
 }

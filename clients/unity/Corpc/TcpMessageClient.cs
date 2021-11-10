@@ -9,35 +9,16 @@ using UnityEngine;
 
 namespace Corpc
 {   
-    public class TcpMessageClient : MessageManager
+    public class TcpMessageClient : MessageClient
     {
-        private LockProtoMessageQueue _recvMsgQueue = new LockProtoMessageQueue (); // 接收消息队列
-        private BlockingDequeueProtoMessageQueue _sendMsgQueue = new BlockingDequeueProtoMessageQueue (); // 发送消息队列
         private TcpClient _tcpClient = null; // 与服务器的连接通道
         private Stream _stream = null; // 与服务器间的数据流
-        private Thread _recvMsgThread = null; // 接收消息线程
-        private Thread _sendMsgThread = null; // 发送消息线程
 
         private string _host;
         private int _port;
 
-        private bool _needHB;           // 是否需要心跳
-        private bool _enableSendCRC;    // 是否需要发包时校验CRC码
-        private bool _enableRecvCRC;    // 是否需要收包时校验CRC码
-        private bool _enableSerial;     // 是否需要消息序号
-
-        private int _lastRecvSerial = 0;
-        private int _lastSendSerial = 0;
-
-        private long _lastRecvHBTime;   // 最后一次收到心跳的时间
-        private long _lastSendHBTime;   // 最后一次发送心跳的时间
-
-        private bool _running = false;
-
-        private ICrypter _crypter = null;
-
         // private constructor
-        public TcpMessageClient(string host, int port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial)
+        public TcpMessageClient(string host, int port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial): base(needHB, enableSendCRC, enableRecvCRC, enableSerial)
         {
             _host = host;
             _port = port;
@@ -45,22 +26,6 @@ namespace Corpc
             _enableSendCRC = enableSendCRC;
             _enableRecvCRC = enableRecvCRC;
             _enableSerial = enableSerial;
-        }
-
-        public bool Running
-        {
-            get
-            {
-                //Some other code
-                return _running;
-            }
-        }
-
-        public ICrypter Crypter {
-            set
-            {
-                _crypter = value;
-            }
         }
 
         public bool Start()
@@ -249,10 +214,10 @@ namespace Corpc
                                     return;
                                 }
 
-                                _crypter.decrypt(data, data, msgLen);
+                                _crypter.decrypt(data, 0, data, 0, msgLen);
                             }
 
-                            protoData = Deserialize(msgType, data, (int)msgLen);
+                            protoData = Deserialize(msgType, data, 0, (int)msgLen);
                         }
                     }
 
@@ -296,15 +261,21 @@ namespace Corpc
                         }
 
                         byte[] buf = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength];
-                        ushort flag = 0;
-                        // 加密
-                        if (msg.NeedCrypter)
-                        {
-                            _crypter.encrypt(data, data, dataLength);
-                            flag |= Constants.CORPC_MESSAGE_FLAG_CRYPT;
-                        }
 
-                        Array.Copy(data, 0, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, dataLength);
+                        ushort flag = 0;
+                        if (dataLength > 0)
+                        {
+                            // 加密
+                            if (msg.NeedCrypter)
+                            {
+                                _crypter.encrypt(data, 0, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, dataLength);
+                                flag |= Constants.CORPC_MESSAGE_FLAG_CRYPT;
+                            }
+                            else
+                            {
+                                Array.Copy(data, 0, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, dataLength);
+                            }
+                        }
 
                         // 设置头部
                         buf[0] = (byte)((dataLength >> 24) & 0xFF);
@@ -350,12 +321,6 @@ namespace Corpc
                     return;
                 }
             }
-        }
-
-        // 异步发送数据
-        public void Send(short type, ushort tag, IMessage msg, bool needCrypter)
-        {
-            _sendMsgQueue.Enqueue(new ProtoMessage(type, tag, msg, needCrypter));
         }
 
     }
