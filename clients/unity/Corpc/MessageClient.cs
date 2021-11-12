@@ -78,7 +78,7 @@ namespace Corpc
 		{
 			if (_registerTable.ContainsKey(type))
             {
-				Debug.LogErrorFormat("duplicate register message [%d]!!!", type);
+				Debug.LogErrorFormat("duplicate register message [{0}]!!!", type);
 				return false;
             }
 
@@ -97,7 +97,7 @@ namespace Corpc
 		{
 			if (!_registerTable.ContainsKey(type))
 			{
-				Debug.LogWarningFormat("Handle unknown message [%d]!!!", type);
+				Debug.LogWarningFormat("Handle unknown message [{0}]!!!", type);
 				return;
 			}
 
@@ -111,7 +111,7 @@ namespace Corpc
 				return msg.Data.ToByteArray();
 			}
 
-			Debug.LogErrorFormat("Serialize empty msg [%d]!!!", msg.Type);
+			Debug.LogErrorFormat("Serialize empty msg [{0}]!!!", msg.Type);
 			return null;
 		}
 
@@ -119,7 +119,7 @@ namespace Corpc
 		{
 			if (!_registerTable.ContainsKey(type))
             {
-				Debug.LogErrorFormat("Deserialize unknown handle message [%d]!!!", type);
+				Debug.LogErrorFormat("Deserialize unknown handle message [{0}]!!!", type);
 				return null;
             }
 

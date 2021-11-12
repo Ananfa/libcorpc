@@ -119,7 +119,7 @@ int main(int argc, const char * argv[]) {
         
         std::shared_ptr<ServerReady> readyMsg(new ServerReady);
         readyMsg->set_status(1);
-        conn->send(3, false, true, 0, readyMsg);
+        conn->send(3, false, true, false, 0, readyMsg);
     });
 
     server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
@@ -131,7 +131,7 @@ int main(int argc, const char * argv[]) {
         std::shared_ptr<BanResponse> response(new BanResponse);
         response->set_type(type);
 
-        conn->send(2, false, true, tag, response);
+        conn->send(2, false, true, false, tag, response);
     });
 
     server->registerMessage(1, new FooRequest, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
@@ -146,7 +146,7 @@ int main(int argc, const char * argv[]) {
             str += (" " + tmp);
         response->set_text(str);
 
-        conn->send(1, false, true, tag, response);
+        conn->send(1, false, true, false, tag, response);
     });
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
