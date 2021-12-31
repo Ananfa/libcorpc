@@ -46,6 +46,7 @@ void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *metho
     assert(care_response || done); // not_care_response need done
     if (care_response) {
         assert(response != NULL);
+        assert(controller != NULL); // 需要返回值的RPC的controller不能为NULL，否则无法通知错误
         req->rpcTask->response = response;
         if (timeout > 0) {
             req->rpcTask->response_1 = response->New();
@@ -83,12 +84,6 @@ void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *metho
             done->Run();
         }
     }
-}
-
-InnerRpcServer* InnerRpcServer::create(bool startInNewThread) {
-    InnerRpcServer *server = new InnerRpcServer();
-    server->start(startInNewThread);
-    return server;
 }
 
 bool InnerRpcServer::registerService(::google::protobuf::Service *rpcService) {
@@ -217,9 +212,10 @@ void *InnerRpcServer::requestQueueRoutine( void * arg ) {
                         // 唤醒协程处理结果
                         RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
                     } else {
-                        // not_care_response类型的rpc需要在这里触发回调清理request
-                        assert(request->rpcTask->done);
-                        request->rpcTask->done->Run();
+                        // not_care_response类型的rpc需要在这里触发回调清理request，除非没有要清理的资源
+                        if (request->rpcTask->done) {
+                            request->rpcTask->done->Run();
+                        }
                     }
                     
                     delete request;

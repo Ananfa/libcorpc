@@ -33,7 +33,7 @@ void MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
     }
 }
 
-void MessageBuffer::traversal(MessageBuffer::MessageHandle handle) {
+void MessageBuffer::traverse(MessageBuffer::MessageHandle handle) {
     if (_needBuf) {
         for (auto it = _bufMsglink.begin(); it != _bufMsglink.end(); ++it) {
             if (!handle(it->data)) {

@@ -56,14 +56,16 @@ const char descriptor_table_protodef_corpc_5foption_2eproto[] PROTOBUF_SECTION_V
   ".protobuf.MethodOptions\030\222N \001(\010\210\001\001:=\n\021not"
   "_care_response\022\036.google.protobuf.MethodO"
   "ptions\030\223N \001(\010\210\001\001:3\n\007timeout\022\036.google.pro"
-  "tobuf.MethodOptions\030\224N \001(\r\210\001\001b\006proto3"
+  "tobuf.MethodOptions\030\224N \001(\r\210\001\001::\n\016delete_"
+  "in_done\022\036.google.protobuf.MethodOptions\030"
+  "\225N \001(\010\210\001\001b\006proto3"
   ;
 static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor_table_corpc_5foption_2eproto_deps[1] = {
   &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
 };
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_corpc_5foption_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_corpc_5foption_2eproto = {
-  false, false, 317, descriptor_table_protodef_corpc_5foption_2eproto, "corpc_option.proto", 
+  false, false, 377, descriptor_table_protodef_corpc_5foption_2eproto, "corpc_option.proto", 
   &descriptor_table_corpc_5foption_2eproto_once, descriptor_table_corpc_5foption_2eproto_deps, 1, 1,
   schemas, file_default_instances, TableStruct_corpc_5foption_2eproto::offsets,
   file_level_metadata_corpc_5foption_2eproto, file_level_enum_descriptors_corpc_5foption_2eproto, file_level_service_descriptors_corpc_5foption_2eproto,
@@ -240,6 +242,9 @@ PROTOBUF_ATTRIBUTE_INIT_PRIORITY ::PROTOBUF_NAMESPACE_ID::internal::ExtensionIde
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY ::PROTOBUF_NAMESPACE_ID::internal::ExtensionIdentifier< ::google::protobuf::MethodOptions,
     ::PROTOBUF_NAMESPACE_ID::internal::PrimitiveTypeTraits< ::PROTOBUF_NAMESPACE_ID::uint32 >, 13, false >
   timeout(kTimeoutFieldNumber, 0u);
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY ::PROTOBUF_NAMESPACE_ID::internal::ExtensionIdentifier< ::google::protobuf::MethodOptions,
+    ::PROTOBUF_NAMESPACE_ID::internal::PrimitiveTypeTraits< bool >, 8, false >
+  delete_in_done(kDeleteInDoneFieldNumber, false);
 
 // @@protoc_insertion_point(namespace_scope)
 }  // namespace corpc

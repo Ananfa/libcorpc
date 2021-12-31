@@ -148,7 +148,10 @@ void RpcClient::Connection::cleanDataOnClosing(std::shared_ptr<void>& data) {
     
     // not_care_response类型rpc调用需要通过回调清理request
     if (!rpcTask->response) {
-        rpcTask->controller->SetFailed(strerror(ENETDOWN));
+        if (rpcTask->controller != NULL) {
+            rpcTask->controller->SetFailed(strerror(ENETDOWN));
+        }
+        
         rpcTask->done->Run();
     }
 }
@@ -346,7 +349,10 @@ void *RpcClient::connectionRoutine( void * arg ) {
                         
                         // 对于not_care_response类型的rpc需要在这里调用回调处理
                         if (!rpcTask->response) {
-                            rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                            if (rpcTask->controller) {
+                                rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                            }
+                            
                             rpcTask->done->Run();
                         }
                     }
@@ -431,13 +437,17 @@ void *RpcClient::connectionRoutine( void * arg ) {
                             std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                             connection->_waitSendTaskCoList.pop_front();
                             
-                            if (!task->rpcTask->expireTime) {
-                                task->rpcTask->controller->SetFailed(strerror(errno));
-                            }
-                            
                             if (task->rpcTask->response) {
+                                if (!task->rpcTask->expireTime) {
+                                    task->rpcTask->controller->SetFailed(strerror(errno));
+                                }
+
                                 RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, task->rpcTask->expireTime, errno);
                             } else {
+                                if (task->rpcTask->controller) {
+                                    task->rpcTask->controller->SetFailed(strerror(errno));
+                                }
+
                                 // not_care_response类型的rpc需要在这里触发回调清理request
                                 assert(task->rpcTask->done);
                                 task->rpcTask->done->Run();
@@ -550,6 +560,10 @@ void *RpcClient::taskHandleRoutine(void *arg) {
                     
                     RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, task->rpcTask->expireTime, ENETDOWN);
                 } else {
+                    if (task->rpcTask->controller) {
+                        task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
+                    }
+
                     // not_care_response类型的rpc需要在这里触发回调清理request
                     assert(task->rpcTask->done);
                     task->rpcTask->done->Run();

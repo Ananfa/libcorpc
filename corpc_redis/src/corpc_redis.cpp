@@ -30,11 +30,6 @@ void RedisConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
-void RedisConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
-    delete controller;
-    delete request;
-}
-
 redisContext* RedisConnectPool::Proxy::take() {
     Void *request = new Void();
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
@@ -223,8 +218,9 @@ RedisConnectPool* RedisConnectPool::create(const char *host, uint16_t port, uint
 }
 
 void RedisConnectPool::init() {
-    _server = InnerRpcServer::create();
+    _server = new InnerRpcServer();
     _server->registerService(this);
+    _server->start();
     proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);

@@ -41,7 +41,7 @@ namespace corpc {
         void insertMessage(std::shared_ptr<SendMessageInfo> &msg);
 
         // 遍历所有消息执行handle，如果handle返回false则中断遍历
-        void traversal(MessageHandle handle);
+        void traverse(MessageHandle handle);
 
         // 删除某个消息序号之前的所有消息（包括消息序号消息）
         void scrapMessages(uint32_t serial);

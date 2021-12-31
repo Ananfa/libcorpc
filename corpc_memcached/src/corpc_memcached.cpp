@@ -30,11 +30,6 @@ void MemcachedConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
     _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
-void MemcachedConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
-    delete controller;
-    delete request;
-}
-
 memcached_st* MemcachedConnectPool::Proxy::take() {
     Void *request = new Void();
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
@@ -212,8 +207,9 @@ MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServ
 }
 
 void MemcachedConnectPool::init() {
-    _server = InnerRpcServer::create();
+    _server = new InnerRpcServer();
     _server->registerService(this);
+    _server->start();
     proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);

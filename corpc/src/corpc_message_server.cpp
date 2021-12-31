@@ -68,7 +68,7 @@ void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, b
 
 void MessageServer::Connection::resend() {
     if (_msgBuffer) {
-        _msgBuffer->traversal([this](std::shared_ptr<SendMessageInfo> &sendInfo) -> bool {
+        _msgBuffer->traverse([this](std::shared_ptr<SendMessageInfo> &sendInfo) -> bool {
             if (!isOpen()) {
                 return false;
             }

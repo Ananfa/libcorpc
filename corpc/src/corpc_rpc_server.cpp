@@ -52,7 +52,7 @@ void RpcServer::Connection::onClose() {
 void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
     WorkerTask *task = (WorkerTask *)arg;
     
-    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
     
     if (task->rpcTask->response != NULL) {
         // 处理结果发给sender处理
@@ -74,7 +74,7 @@ void RpcServer::MultiThreadWorker::handleMessage(void *msg) {
         RoutineEnvironment::startCoroutine(taskCallRoutine, task);
     } else {
         // rpc处理方法调用
-        task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+        task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
         
         if (task->rpcTask->response != NULL) {
             // 处理结果发给sender处理
@@ -88,7 +88,7 @@ void RpcServer::MultiThreadWorker::handleMessage(void *msg) {
 void *RpcServer::CoroutineWorker::taskCallRoutine( void * arg ) {
     WorkerTask *task = (WorkerTask *)arg;
     
-    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
     
     if (task->rpcTask->response != NULL) {
         // 处理结果发给sender处理
@@ -110,7 +110,7 @@ void RpcServer::CoroutineWorker::handleMessage(void *msg) {
         RoutineEnvironment::startCoroutine(taskCallRoutine, task);
     } else {
         // rpc处理方法调用
-        task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, NULL);
+        task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
         
         if (task->rpcTask->response != NULL) {
             // 处理结果发给sender处理
@@ -164,20 +164,17 @@ void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
     // 根据serverId和methodId查表
     const MethodData *methodData = server->getMethod(serviceId, methodId);
     if (methodData != NULL) {
-        const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
-        
         google::protobuf::Message *request = methodData->request_proto->New();
-        google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
-        Controller *controller = new Controller();
         if (!request->ParseFromArray(body, size)) {
             // 出错处理
             ERROR_LOG("RpcServer::decode -- parse request body fail\n");
             delete request;
-            delete response;
-            delete controller;
             
             return nullptr;
         }
+
+        const google::protobuf::MethodDescriptor *method_descriptor = methodData->method_descriptor;
+        google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
         
         // 将收到的请求传给worker
         WorkerTask *task = new WorkerTask;
@@ -186,8 +183,14 @@ void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
         task->rpcTask->service = server->getService(serviceId);
         task->rpcTask->method_descriptor = method_descriptor;
         task->rpcTask->request = request;
-        task->rpcTask->response = response;
-        task->rpcTask->controller = controller;
+        if (response) {
+            task->rpcTask->response = response;
+            task->rpcTask->controller = new Controller();
+
+            if (method_descriptor->options().GetExtension(corpc::delete_in_done)) {
+                task->rpcTask->done = google::protobuf::NewCallback(&callDoneHandle, request, (Controller*)task->rpcTask->controller);
+            }
+        }
         task->rpcTask->callId = callId;
         task->rpcTask->expireTime = expireTime;
         

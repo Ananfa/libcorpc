@@ -22,6 +22,8 @@
 #include <sys/poll.h>
 #include <sys/time.h>
 
+#include "corpc_controller.h"
+
 inline void msleep(int msec)
 {
     struct pollfd pf = { 0 };
@@ -41,6 +43,8 @@ inline uint64_t mtime()
 
 namespace corpc {
     int setKeepAlive(int fd, int interval);
+    
+    void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
 
     void setLogPath(const char *path);
     void debuglog(const char *format, ...);

@@ -40,13 +40,13 @@ namespace corpc {
         uint64_t expireTime;
 
     public:
-    	~RpcClientTask() {
-    		if (expireTime > 0) {
-    			delete response_1;
+        ~RpcClientTask() {
+            if (expireTime > 0) {
+                delete response_1;
                 delete request_1;
                 delete controller_1;
-    		}
-    	}
+            }
+        }
     };
 
     class RpcServerTask {
@@ -56,18 +56,22 @@ namespace corpc {
         const google::protobuf::Message* request;
         google::protobuf::Message* response;
         google::protobuf::RpcController *controller;
+        google::protobuf::Closure *done;
         uint64_t callId;
         uint64_t expireTime;
 
     public:
-        RpcServerTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL) {}
+        RpcServerTask(): service(NULL), method_descriptor(NULL), request(NULL), response(NULL), controller(NULL), done(NULL) {}
         ~RpcServerTask() {
-            delete request;
             delete response;
-            delete controller;
+
+            if (done == NULL) {
+                delete request;
+                delete controller;
+            }
         }
     };
-        
+    
 }
 
 #endif /* corpc_rpc_common_h */

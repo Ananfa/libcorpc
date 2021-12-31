@@ -131,8 +131,8 @@ static void *log_routine( void *arg )
     return NULL;
 }
 
-static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
-    if (controller->Failed()) {
+static void callDoneHandle1(::google::protobuf::Message *request, corpc::Controller *controller) {
+    if (controller && controller->Failed()) {
         iBazFailCnt++;
     } else {
         iBazSuccCnt++;
@@ -140,7 +140,10 @@ static void callDoneHandle(::google::protobuf::Message *request, corpc::Controll
     
     iTotalBazDone++;
     
-    delete controller;
+    if (controller) {
+        delete controller;
+    }
+    
     delete request;
 }
 
@@ -226,14 +229,14 @@ static void *baz_routine( void *arg )
 
     while (true) {
         BazRequest *request = new BazRequest();
-        Controller *controller = new Controller();
+        Controller *controller = nullptr;//new Controller();
         
         request->set_text("Hello Baz");
         
         // not_care_response类型的rpc实际上是单向消息传递，不关心成功与否，一般用于GameServer和GatewayServer之间的消息传递。
         // 注意：not_care_response类型的rpc调用是异步的，request和controller对象在回调处理中才能删除，不能在调用语句后面马上删除。
         // 因此not_care_response类型的rpc调用必须提供回调对象
-        testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
+        testStubs->baz_clt->Baz(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle1, request, controller));
         
         iTotalBazSend++;
         

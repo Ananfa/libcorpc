@@ -54,7 +54,9 @@ namespace corpc {
     
     class InnerRpcServer {
     public:
-        static InnerRpcServer* create(bool startInNewThread = false);
+        InnerRpcServer() {}
+        
+        void start(bool startInNewThread = false);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -65,10 +67,7 @@ namespace corpc {
         void destroy() { delete this; } // 销毁Server
         
     private:
-        InnerRpcServer() {}
         ~InnerRpcServer() {}  // 不允许在栈上创建server
-        
-        void start(bool startInNewThread = false);
         
         static void threadEntry( InnerRpcServer * self );
         

@@ -25,11 +25,6 @@ MysqlConnectPool::Proxy::~Proxy() {
     }
 }
 
-void MysqlConnectPool::Proxy::callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
-    delete controller;
-    delete request;
-}
-
 void MysqlConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
     InnerRpcChannel *channel = new InnerRpcChannel(server);
     
@@ -209,8 +204,9 @@ MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, c
 }
 
 void MysqlConnectPool::init() {
-    _server = InnerRpcServer::create();
+    _server = new InnerRpcServer();
     _server->registerService(this);
+    _server->start();
     proxy.init(_server);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);

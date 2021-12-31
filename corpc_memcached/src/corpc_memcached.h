@@ -45,8 +45,6 @@ namespace corpc {
             
             void init(InnerRpcServer *server);
             
-            static void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
-            
         private:
             thirdparty::ThirdPartyService::Stub *_stub;
             

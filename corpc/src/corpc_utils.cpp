@@ -138,6 +138,11 @@ namespace corpc {
         return 0;
     }
 
+    void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller) {
+        delete controller;
+        delete request;
+    }
+
     void setLogPath(const char *path)
     {
         if (access(path, F_OK) != 0)

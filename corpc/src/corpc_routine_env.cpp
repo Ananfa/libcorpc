@@ -281,7 +281,7 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
             // 校验协程的expireTime是否一致
             if (wr->expireTime) {
                 auto node = curenv->_timeoutList.getNode(uint64_t(wr->co));
-                if (node && node->expireTime == wr->expireTime) {
+                if (node && node->expireTime == wr->expireTime) { // 因为使用协程对象指针地址作为标识，协程对象销毁后地址会被复用，因此通过过期时间来确定是协程本身
                     if (wr->err) {
                         node->data->controller->SetFailed(strerror(wr->err));
                     } else if (node->data->controller_1 != NULL && node->data->controller_1->Failed()) {
