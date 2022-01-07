@@ -45,6 +45,7 @@ namespace corpc {
     int setKeepAlive(int fd, int interval);
     
     void callDoneHandle(::google::protobuf::Message *request, corpc::Controller *controller);
+    void callDoneHandle(::google::protobuf::Message *request);
     void callDoneHandle(std::shared_ptr<::google::protobuf::Closure> done);
 
     void setLogPath(const char *path);

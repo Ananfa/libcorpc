@@ -186,10 +186,8 @@ void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
         if (response) {
             task->rpcTask->response = response;
             task->rpcTask->controller = new Controller();
-
-            if (method_descriptor->options().GetExtension(corpc::delete_in_done)) {
-                task->rpcTask->done = google::protobuf::NewCallback(&callDoneHandle, request, (Controller*)task->rpcTask->controller);
-            }
+        } else if (method_descriptor->options().GetExtension(corpc::delete_in_done)) {
+            task->rpcTask->done = google::protobuf::NewCallback<google::protobuf::Message *>(&callDoneHandle, request);
         }
         task->rpcTask->callId = callId;
         task->rpcTask->expireTime = expireTime;

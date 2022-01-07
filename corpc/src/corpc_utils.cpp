@@ -143,6 +143,10 @@ namespace corpc {
         delete request;
     }
 
+    void callDoneHandle(::google::protobuf::Message *request) {
+        delete request;
+    }
+
     void callDoneHandle(std::shared_ptr<::google::protobuf::Closure> done) {
         // 这里只是用于保持done对象不被释放
     }
