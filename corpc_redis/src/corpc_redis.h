@@ -63,10 +63,10 @@ namespace corpc {
                          ::google::protobuf::Closure* done);
         
     public:
-        static RedisConnectPool* create(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
+        static RedisConnectPool* create(const char *host, const char *pwd, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
         
     private:
-        RedisConnectPool(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
+        RedisConnectPool(const char *host, const char *pwd, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum);
         ~RedisConnectPool() {}
         
         void init();
@@ -78,6 +78,7 @@ namespace corpc {
         
     private:
         std::string _host;
+        std::string _passwd;
         uint16_t _port;
         uint16_t _dbIndex;
         

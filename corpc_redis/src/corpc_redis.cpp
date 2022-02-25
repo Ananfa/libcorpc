@@ -68,7 +68,7 @@ void RedisConnectPool::Proxy::put(redisContext* redis, bool error) {
     _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
 }
 
-RedisConnectPool::RedisConnectPool(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum): _host(host), _port(port), _dbIndex(dbIndex), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
+RedisConnectPool::RedisConnectPool(const char *host, const char *pwd, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum): _host(host), _passwd(pwd), _port(port), _dbIndex(dbIndex), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
     
 }
 
@@ -89,20 +89,35 @@ void RedisConnectPool::take(::google::protobuf::RpcController* controller,
         redisContext *redis = redisConnectWithTimeout(_host.c_str(), _port, timeout);
         
         if (redis && !redis->err) {
-            // 选择分库
-            if (_dbIndex) {
-                redisReply *reply = (redisReply *)redisCommand(redis,"SELECT %d", _dbIndex);
+            // 身份认证
+            if (!_passwd.empty()) {
+                redisReply *reply = (redisReply *)redisCommand(redis,"AUTH %s", _passwd.c_str());
                 if (reply == NULL) {
-                    controller->SetFailed("can't select index");
+                    controller->SetFailed("auth failed");
 
                     redisFree(redis);
                     redis = NULL;
                 } else {
                     freeReplyObject(reply);
+                }
+            }
+
+            if (redis) {
+                // 选择分库
+                if (_dbIndex) {
+                    redisReply *reply = (redisReply *)redisCommand(redis,"SELECT %d", _dbIndex);
+                    if (reply == NULL) {
+                        controller->SetFailed("can't select index");
+
+                        redisFree(redis);
+                        redis = NULL;
+                    } else {
+                        freeReplyObject(reply);
+                        response->set_handle((intptr_t)redis);
+                    }
+                } else {
                     response->set_handle((intptr_t)redis);
                 }
-            } else {
-                response->set_handle((intptr_t)redis);
             }
         } else if (redis) {
             std::string reason = "can't connect to redis server for ";
@@ -210,8 +225,8 @@ void RedisConnectPool::put(::google::protobuf::RpcController* controller,
     }
 }
 
-RedisConnectPool* RedisConnectPool::create(const char *host, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum) {
-    RedisConnectPool *pool = new RedisConnectPool(host, port, dbIndex, maxConnectNum);
+RedisConnectPool* RedisConnectPool::create(const char *host, const char *pwd, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum) {
+    RedisConnectPool *pool = new RedisConnectPool(host, pwd, port, dbIndex, maxConnectNum);
     pool->init();
     
     return pool;
