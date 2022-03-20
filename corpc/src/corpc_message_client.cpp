@@ -260,12 +260,15 @@ void *TcpClient::workRoutine( void * arg ) {
                             uint32_t serial = *(uint32_t *)(buf + 14);
                             serial = be32toh(serial);
 
-                            if (serial != 0 && serial != self->_lastRecvSerial + 1) {
-                                ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial, serial);
-                                self->close();
-                                return nullptr;
+                            if (serial != 0) {
+                                if (serial != self->_lastRecvSerial + 1) {
+                                    ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial+1, serial);
+                                    self->close();
+                                    return nullptr;
+                                }
+
+                                self->_lastRecvSerial++;
                             }
-                            self->_lastRecvSerial++;
                         }
 
                         if (bodySize > 0) {
