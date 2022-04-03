@@ -32,16 +32,19 @@ std::shared_ptr<Timer> Timer::create(uint32_t timeout_ms, const std::function<vo
         EnableMakeShared(uint32_t timeout_ms, const std::function<void()> &cb): Timer(timeout_ms, cb) {}
     };
 
-    TimerPtr *timerPtr = new TimerPtr;
-    timerPtr->timer = std::static_pointer_cast<Timer>(std::make_shared<EnableMakeShared>(timeout_ms, cb));
+    std::shared_ptr<Timer> timer = std::static_pointer_cast<Timer>(std::make_shared<EnableMakeShared>(timeout_ms, cb));
+    
+    TimerRoutineArg *arg = new TimerRoutineArg;
+    arg->timer = timer;
+    corpc::RoutineEnvironment::startCoroutine(timerRoutine, arg);
 
-    corpc::RoutineEnvironment::startCoroutine(timerRoutine, timerPtr);
+    return timer;
 }
 
 void *Timer::timerRoutine(void *arg) {
-    TimerPtr *timerPtr = (TimerPtr *)arg;
-    std::shared_ptr<Timer> timer = timerPtr->timer;
-    delete timerPtr;
+    TimerRoutineArg *routineArg = (TimerRoutineArg *)arg;
+    std::shared_ptr<Timer> timer = routineArg->timer;
+    delete routineArg;
 
     if (timer->_timeout_ms > 0) {
         timer->_cond.wait(timer->_timeout_ms);

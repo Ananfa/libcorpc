@@ -25,7 +25,7 @@
 // 注意：此条件计时器的实现不能跨线程使用
 namespace corpc {
     class Timer {
-        struct TimerPtr {
+        struct TimerRoutineArg {
             std::shared_ptr<Timer> timer;
         };
 
@@ -37,7 +37,7 @@ namespace corpc {
         void stop();
     private:
         Timer(uint32_t timeout_ms, const std::function<void()> &cb): _timeout_ms(timeout_ms), _cb(cb) {}
-        ~Timer() {}
+        virtual ~Timer() {}
 
     private:
         Cond _cond;
