@@ -215,20 +215,20 @@ void *TcpClient::workRoutine( void * arg ) {
                     }
                     
                     if (headNum == CORPC_MESSAGE_HEAD_SIZE) {
-                        bodySize = *(uint32_t *)buf;
+                        bodySize = *(uint32_t *)headBuf;
                         bodySize = be32toh(bodySize);
-                        msgType = *(int16_t *)(buf + 4);
+                        msgType = *(int16_t *)(headBuf + 4);
                         msgType = be16toh(msgType);
-                        tag = *(uint16_t *)(buf + 6);
+                        tag = *(uint16_t *)(headBuf + 6);
                         tag = be16toh(tag);
-                        flag = *(uint16_t *)(buf + 8);
+                        flag = *(uint16_t *)(headBuf + 8);
                         flag = be16toh(flag);
                     } else {
                         assert(remainNum == 0);
                         break;
                     }
                 }
-                
+
                 // 解析消息体
                 if (remainNum > 0) {
                     if (bodyNum < bodySize) {
@@ -257,7 +257,7 @@ void *TcpClient::workRoutine( void * arg ) {
                         //assert(bodySize > 0);
                         // 校验序列号
                         if (self->_enableSerial) {
-                            uint32_t serial = *(uint32_t *)(buf + 14);
+                            uint32_t serial = *(uint32_t *)(headBuf + 14);
                             serial = be32toh(serial);
 
                             if (serial != 0) {
@@ -274,7 +274,7 @@ void *TcpClient::workRoutine( void * arg ) {
                         if (bodySize > 0) {
                             // 校验CRC
                             if (self->_enableRecvCRC) {
-                                uint16_t crc = *(uint16_t *)(buf + 18);
+                                uint16_t crc = *(uint16_t *)(headBuf + 18);
                                 crc = be16toh(crc);
 
                                 uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
