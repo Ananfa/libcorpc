@@ -22,18 +22,19 @@ using namespace corpc;
 
 PubsubService* PubsubService::_service = nullptr;
 
-PubsubService::PubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics): _redisPool(redisPool), _subCon(nullptr) {
-    for (auto it = subTopics.cbegin(); it != subTopics.cend(); ++it) {
-        _subTopicMap[*it] = true;
-    }
+PubsubService::PubsubService(RedisConnectPool *redisPool): _redisPool(redisPool), _subCon(nullptr) {
+    pipe(_pipe.pipefd);
+    
+    co_register_fd(_pipe.pipefd[1]);
+    co_set_nonblock(_pipe.pipefd[1]);
 }
 
-bool PubsubService::StartPubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics) {
+bool PubsubService::StartPubsubService(RedisConnectPool *redisPool) {
     if (_service != nullptr) {
         return false;
     }
 
-    _service = new PubsubService(redisPool, subTopics);
+    _service = new PubsubService(redisPool);
     _service->_start();
 
     return true;
@@ -63,40 +64,110 @@ void PubsubService::threadEntry(PubsubService *self) {
 
 void *PubsubService::subscribeRoutine(void *arg) {
     PubsubService *self = (PubsubService *)arg;
-    
-    std::string commandStr = "SUBSCRIBE";
-    for (auto it = self->_subTopicMap.begin(); it != self->_subTopicMap.end(); ++it) {
-        commandStr += " ";
-        commandStr += it->first;
-    }
+    int pReadFd = self->_pipe.pipefd[0];
+    co_register_fd(pReadFd);
+    co_set_timeout(pReadFd, -1, 1000);
+
+    std::vector<char> buf(16);
+    std::string commandStr;
 
     RedisConnectPool::Proxy& proxy = self->_redisPool->proxy;
-    // Get redisContext from pool
+
+    redisContext *redis = nullptr;
+    redisReply *reply = nullptr;
+
+    struct pollfd fds[2];
+    fds[0].fd = pReadFd;
+    fds[0].events = POLLIN;
     while (true) {
-        redisContext *redis = proxy.take();
-        redisReply *reply = (redisReply *)redisCommand(redis, commandStr.c_str());
-        co_set_timeout(redis->fd, -1, 1000);
-        freeReplyObject(reply);
-        while (redisGetReply(redis, (void**)&reply) == REDIS_OK) {
-            // 向订阅主题环境发消息
-            assert(reply->elements == 3);
-            if (strcmp(reply->element[0]->str, "message") == 0) {
-                auto it = self->_topicToEnvsMap.find(reply->element[1]->str);
-                if (it != self->_topicToEnvsMap.end()) {
-                    std::shared_ptr<TopicMessage> tmsg(new TopicMessage());
-                    tmsg->topic.assign(reply->element[1]->str, reply->element[1]->len);
-                    tmsg->message.assign(reply->element[2]->str, reply->element[2]->len);
-                    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-                        (*it1)->_queue.push(tmsg);
-                    }
-                }
+        int nfds = 1;
+        if (self->_topicToEnvsMap.size() > 0) {
+            //DEBUG_LOG("PubsubService::subscribeRoutine -- redis SUBSCRIBE\n");
+            commandStr = "SUBSCRIBE";
+            for (auto it = self->_topicToEnvsMap.begin(); it != self->_topicToEnvsMap.end(); ++it) {
+                commandStr += " ";
+                commandStr += it->first;
             }
+
+            if (!redis) {
+                redis = proxy.take();
+            }
+
+            reply = (redisReply *)redisCommand(redis, commandStr.c_str());
+
+            //DEBUG_LOG("PubsubService::subscribeRoutine -- SUBSCRIBE elements: %d\n", reply->elements);
+            //DEBUG_LOG("PubsubService::subscribeRoutine -- SUBSCRIBE reply: %s %s %s-%d\n",reply->element[0]->str,reply->element[1]->str, reply->element[2]->str, reply->element[2]->type);
             
             freeReplyObject(reply);
+
+            fds[1].fd = redis->fd;
+            fds[1].events = POLLIN;
+            nfds = 2;
         }
-        proxy.put(redis, true);
-        // 出错后等待1秒重连
-        sleep(1);
+
+        while (true) {
+            int ret = poll(fds, nfds, 1000); // 每秒检测一次
+            if (ret < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+
+                ERROR_LOG("PubsubService::subscribeRoutine -- poll ret:%d\n", ret);
+                exit(0);
+            } else if (ret > 0) {
+                if (nfds == 2) {
+                    // 先处理订阅消息
+                    // 增加订阅主题消息应该是在服务器启动时，此时应该没有订阅消息产生
+                    if ((fds[1].revents & POLLIN) == POLLIN) {
+                        //DEBUG_LOG("PubsubService::subscribeRoutine -- fds[1] pollin\n");
+                        if (redisGetReply(redis, (void**)&reply) == REDIS_OK) {
+                            // 向订阅主题环境发消息
+                            assert(reply->elements == 3);
+                            //DEBUG_LOG("PubsubService::subscribeRoutine -- redisGetReply: %s %s %s\n",reply->element[0]->str,reply->element[1]->str, reply->element[2]->str);
+                            if (strcmp(reply->element[0]->str, "message") == 0) {
+                                auto it = self->_topicToEnvsMap.find(reply->element[1]->str);
+                                if (it != self->_topicToEnvsMap.end()) {
+                                    std::shared_ptr<TopicMessage> tmsg(new TopicMessage());
+                                    tmsg->topic.assign(reply->element[1]->str, reply->element[1]->len);
+                                    tmsg->message.assign(reply->element[2]->str, reply->element[2]->len);
+                                    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
+                                        (*it1)->_queue.push(tmsg);
+                                    }
+                                } else {
+                                    ERROR_LOG("PubsubService::subscribeRoutine -- unknown topic: %s\n", reply->element[1]->str);
+                                }
+                            }
+                            
+                            freeReplyObject(reply);
+                        } else {
+                            ERROR_LOG("PubsubService::subscribeRoutine -- redisGetReply failed\n");
+                            // redis连接故障，需要重新连接
+                            proxy.put(redis, true);
+                            redis = nullptr;
+                            break;
+                        }
+                    }
+                }
+
+                // 再处理订阅主题变化消息（如果有主题消息增删(注意：目前没有删)，退到上层循环）
+                if ((fds[0].revents & POLLIN) == POLLIN) {
+                    //DEBUG_LOG("PubsubService::subscribeRoutine -- fds[0] pollin\n");
+                    ret = read(pReadFd, &buf[0], 16);
+                    //DEBUG_LOG("PubsubService::subscribeRoutine -- fds[0] pollin ret:%d\n", ret);
+                    assert(ret > 0);
+                    
+                    if (redis) {
+                        //DEBUG_LOG("PubsubService::subscribeRoutine -- redis UNSUBSCRIBE\n");
+                        reply = (redisReply *)redisCommand(redis, "UNSUBSCRIBE");
+                        //DEBUG_LOG("PubsubService::subscribeRoutine -- UNSUBSCRIBE elements: %d\n", reply->elements);
+                        //DEBUG_LOG("PubsubService::subscribeRoutine -- UNSUBSCRIBE reply: %s %s %s-%d\n",reply->element[0]->str,reply->element[1]->str, reply->element[2]->str, reply->element[2]->type);
+                        freeReplyObject(reply);
+                    }
+
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -131,6 +202,11 @@ void *PubsubService::registerRoutine(void *arg) {
         // 登记主题订阅环境
         TopicRegisterMessage *msg = queue.pop();
         while (msg) {
+            if (self->_topicToEnvsMap.find(msg->topic) == self->_topicToEnvsMap.end()) {
+                char buf = 'X';
+                write(self->_pipe.pipefd[1], &buf, 1);
+            }
+            
             self->_topicToEnvsMap[msg->topic].push_back(msg->env);
             delete msg;
             msg = queue.pop();
@@ -139,22 +215,13 @@ void *PubsubService::registerRoutine(void *arg) {
 }
 
 void PubsubService::_start() {
-    if (_subTopicMap.size() > 0) {
-        // 启动处理线程
-        _t = std::thread(threadEntry, this);
-    }
+    // 启动处理线程
+    _t = std::thread(threadEntry, this);
 }
 
 bool PubsubService::_subscribe(const std::string& topic, bool needCoroutine, SubcribeCallback callback) {
     if (_service == nullptr) {
         ERROR_LOG("PubsubService::_subscribe -- service not start\n");
-        return false;
-    }
-
-    // 判断主题是否在主题表中
-    auto it = _subTopicMap.find(topic);
-    if (it == _subTopicMap.end()) {
-        ERROR_LOG("PubsubService::_subscribe -- topic invalid\n");
         return false;
     }
 

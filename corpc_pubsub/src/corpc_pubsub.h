@@ -69,12 +69,12 @@ namespace corpc {
     class PubsubService {
     public:
         // 要使用发布订阅服务需要先进行初始化，创建服务单例对象。启动处理线程，并在处理线程中启动发布协程，若有订阅主题则启动订阅协程
-        static bool StartPubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics); 
+        static bool StartPubsubService(RedisConnectPool *redisPool); 
         static bool Subscribe(const std::string& topic, bool needCoroutine, SubcribeCallback callback); // 注意：只能订阅已有的主题，回调方法会在调用该Subscribe的线程中执行
         static bool Publish(const std::string& topic, const std::string& msg); // 发布主题消息
 
     private:
-        PubsubService(RedisConnectPool *redisPool, const std::list<std::string>& subTopics);
+        PubsubService(RedisConnectPool *redisPool);
         ~PubsubService() {}
 
         void _start();
@@ -90,8 +90,8 @@ namespace corpc {
         static PubsubService* _service;
 
         RedisConnectPool *_redisPool;
-        std::map<std::string, bool> _subTopicMap;
 
+        PipeType _pipe; // 用于通知有新主题需要订阅
         std::thread _t; // 任务处理线程
 
         redisContext *_subCon; // 订阅连接
