@@ -103,8 +103,10 @@ namespace corpc {
 
         void setOtherMessageHandle(OtherMessageHandle handle) { _otherMessageHandle = handle; };
 
-        bool banMessage(int type);
-        bool unbanMessage(int type);
+        // TODO: 改造成接收完整的封禁列表
+        bool setBanMessages(std::list<int> &msgTypes);
+        //bool banMessage(int type);
+        //bool unbanMessage(int type);
         
         static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         

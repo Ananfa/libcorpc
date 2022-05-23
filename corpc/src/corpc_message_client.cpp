@@ -178,7 +178,7 @@ void *TcpClient::workRoutine( void * arg ) {
                     continue;
                 }
 
-                ERROR_LOG("poll fd_in\n");
+                DEBUG_LOG("poll fd_in\n");
                 self->close();
                 return nullptr;
             }
@@ -191,7 +191,7 @@ void *TcpClient::workRoutine( void * arg ) {
                     continue;
                 }
                 
-                ERROR_LOG("read data error, fd: %d\n");
+                DEBUG_LOG("read data error, fd: %d\n");
                 self->close();
                 return nullptr;
             }

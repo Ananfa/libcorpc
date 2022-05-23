@@ -173,23 +173,42 @@ bool MessageServer::registerMessage(int type,
     return true;
 }
 
-bool MessageServer::banMessage(int type) {
-    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
-        return false;
+bool MessageServer::setBanMessages(std::list<int> &msgTypes) {
+    std::map<int, bool> msgTypeM;
+    for (auto msgType : msgTypes) {
+        msgTypeM[msgType] = true;
     }
 
-    _registerMessageMap[type].banned = true;
-    return true;
-}
-
-bool MessageServer::unbanMessage(int type) {
-    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
-        return false;
+    for (auto &kv : _registerMessageMap) {
+        if (msgTypeM.find(kv.first) != msgTypeM.end()) {
+            if (!kv.second.banned) {
+                kv.second.banned = true;
+            }
+        } else {
+            if (kv.second.banned) {
+                kv.second.banned = false;
+            }
+        }
     }
-
-    _registerMessageMap[type].banned = false;
-    return true;
 }
+
+//bool MessageServer::banMessage(int type) {
+//    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
+//        return false;
+//    }
+//
+//    _registerMessageMap[type].banned = true;
+//    return true;
+//}
+//
+//bool MessageServer::unbanMessage(int type) {
+//    if (_registerMessageMap.find(type) == _registerMessageMap.end()) {
+//        return false;
+//    }
+//
+//    _registerMessageMap[type].banned = false;
+//    return true;
+//}
 
 corpc::Connection *MessageServer::buildConnection(int fd) {
     return new Connection(fd, this);

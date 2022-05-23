@@ -74,15 +74,16 @@ static void *ban_routine( void *arg )
     while (true) {
         sleep(5);
 
+        std::list<int> banMsgs;
         if (banned) {
             LOG("unban message\n");
-            server->unbanMessage(1);
-            banned = false;
         } else {
             LOG("ban message\n");
-            server->banMessage(1);
-            banned = true;
+            banMsgs.push_back(1);
         }
+
+        server->banMessages(banMsgs);
+        banned = !banned;
     }
 
     return NULL;
