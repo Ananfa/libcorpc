@@ -106,7 +106,7 @@ void *PubsubService::subscribeRoutine(void *arg) {
         }
 
         while (true) {
-            int ret = poll(fds, nfds, 1000); // 每秒检测一次
+            int ret = poll(fds, nfds, 60000); // 每60秒检测一次
             if (ret < 0) {
                 if (errno == EINTR) {
                     continue;
