@@ -12,6 +12,14 @@ set(CMAKE_MACOSX_RPATH 0)
 # Set lib version
 set(LIBCO_VERSION   1)
 
+if (CMAKE_BUILD_TYPE)
+else()
+    set(CMAKE_BUILD_TYPE RELEASE)
+endif()
+
+message("------------ Options -------------")
+message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+
 # Set cflags
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=gnu++11 -fPIC -Wall -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -O0 -DDEBUG=1 ${CMAKE_CXX_FLAGS}")

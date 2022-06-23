@@ -289,7 +289,7 @@ namespace corpc {
     };
 
     // 另一种形式的非锁实现
-    // 注意：该Queue实现只支持多生产者和单消费者情形
+    // 注意：该Queue实现只支持多生产者和单消费者情形（因为对同一fd的poll操作要唯一）
     template <typename T>
     class SyncQueue {
     public:

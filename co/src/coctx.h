@@ -20,17 +20,28 @@
 #define __CO_CTX_H__
 #include <stdlib.h>
 typedef void* (*coctx_pfn_t)( void* s, void* s2 );
+#if defined(__i386__)
 struct coctx_param_t
 {
 	const void *s1;
 	const void *s2;
 };
+#elif defined(__aarch64__)
+struct coctx_param_t
+{
+	const void *fp;
+	const void *lr;
+};
+#endif
+
 struct coctx_t
 {
 #if defined(__i386__)
 	void *regs[ 8 ];
-#else
+#elif defined(__x86_64__)
 	void *regs[ 14 ];
+#elif defined(__aarch64__)
+	void *regs[ 15 ];
 #endif
 	size_t ss_size;
 	char *ss_sp;

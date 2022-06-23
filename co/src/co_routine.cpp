@@ -743,8 +743,6 @@ void co_resume( stCoRoutine_t *co )
 	}
 	env->pCallStack[ env->iCallStackSize++ ] = co;
 	co_swap( lpCurrRoutine, co );
-
-
 }
 
 void ActiveProcess( stTimeoutItem_t * ap )
@@ -773,7 +771,6 @@ void co_yield_env( stCoRoutineEnv_t *env )
 	stCoRoutine_t *curr = env->pCallStack[ env->iCallStackSize - 1 ];
 
 	env->iCallStackSize--;
-
 	co_swap( curr, last);
 }
 
@@ -819,16 +816,16 @@ void check_stack_size(stCoRoutine_t* co) {
 }
 #endif
 
-thread_local uint32_t _t_max_malloc_size(0);
+//thread_local uint32_t _t_max_malloc_size(0);
 void save_stack_buffer(stCoRoutine_t* occupy_co)
 {
 	assert(occupy_co->cIsMain == 0);
 
 	///copy out
 	int len = occupy_co->stack_mem->stack_bp - occupy_co->stack_sp;
-	if (len > _t_max_malloc_size) {
-		_t_max_malloc_size = len;
-	}
+	//if (len > _t_max_malloc_size) {
+	//	_t_max_malloc_size = len;
+	//}
 
 #if CHECK_MAX_STACK > 0
 	if (len > CHECK_MAX_STACK) {
@@ -845,16 +842,34 @@ void save_stack_buffer(stCoRoutine_t* occupy_co)
 	occupy_co->save_buffer = (char*)malloc(len); //malloc buf;
 	occupy_co->save_size = len;
 
+	//co_log_err("CO_DEBUG: ============= save stack buffer:%llu sp:%llu size%lu cur_co:%llu\n", occupy_co->save_buffer, occupy_co->stack_sp, len, occupy_co);
+
 	memcpy(occupy_co->save_buffer, occupy_co->stack_sp, len);
 }
+
+#if defined(__aarch64__)
+char* get_sp() {
+	char c;
+	return &c;
+}
+
+#endif
 
 void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 {
  	stCoRoutineEnv_t* env = co_get_curr_thread_env();
 
 	//get curr stack sp
+	// change by lxk，对aarch64架构的支持
+	// 注意：由于x86和arm的函数返回地址在栈中的位置不同
+	//       x86的函数返回地址是在调用帧末尾，因此当前函数栈帧不用保存（其实也可以保存，不保存是为了省点内存资源）
+	//       arm的函数返回地址是在被调用帧（当前函数栈帧）的末尾
+#if defined(__aarch64__)
+	curr->stack_sp = get_sp(); // 必须保证函数返回地址在保存的区间中
+#else
 	char c;
-	curr->stack_sp= &c;
+	curr->stack_sp = &c
+#endif
 
 #ifdef CHECK_MAX_STACK > 0
 		check_stack_size(curr);
@@ -916,7 +931,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size); 
 
 #ifdef CHECK_MAX_STACK > 0
-			// 下面两个问题的原因可能是因为编译器的编译优化调整了函数内变量在栈上的布局顺序导致的
+			// 下面两个问题的原因可能是因为编译器的编译优化调整了函数内变量在栈上的布局顺序导致的（注意：其实是因为当前函数的栈帧没有保存导致的，只要连当前栈帧也保存就没有问题了）
 			//assert(update_pending_co == curr); // 问题一： 这里为什么能false? 
 			//if (update_pending_co->save_size > CHECK_MAX_STACK) {
 			//	co_log_err("CO_DEBUG: ============= resume stack size %lu\n", update_pending_co->save_size); // 问题二：这里打印的大小值明显大得离谱，为什么？

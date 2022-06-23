@@ -294,10 +294,11 @@ int main(int argc, const char * argv[]) {
     bar_routine_num = atoi( argv[2] );
     baz_routine_num = atoi( argv[3] );
 
-    InnerRpcServer *server = InnerRpcServer::create();
+    InnerRpcServer *server = new InnerRpcServer();
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
+    server->start(false);
     
     InnerRpcChannel *channel = new InnerRpcChannel(server);
     
