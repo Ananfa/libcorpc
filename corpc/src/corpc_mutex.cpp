@@ -31,18 +31,20 @@ void Mutex::lock() {
                 // 尝试把_lock值从0改成2（防止此时锁被其他线程解锁，导致本协程进入不会被唤醒的等待）
                 if (_lock.compare_exchange_weak(v, 2)) {
                     //assert(v == 0);
+                    stCoRoutine_t *coSelf = co_self();
                     // 若改成功，将本协程插入等待唤醒队列（由于只会有一个协程成功将_lock改为2，因此这里不需要用锁或者CAS机制），然后将_lock从2改为0（这里必然一次成功），yeld协程等待唤醒，退出
-                    _waitRoutines.push_back({GetPid(), co_self()});
+                    _waitRoutines.push_back({GetPid(), coSelf});
 
                     //assert(_lock.load() == 2);
 
                     v = 2;
                     while (!_lock.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Mutex::lock -- cant change _lock from 2 to 0, v= %d, \n", v);
+                        ERROR_LOG("Mutex::lock -- cant change _lock from 2 to 0, v= %d\n", v);
                         v = 2;
                     }
 
                     co_yield_ct(); // 等待锁让出给当前协程时唤醒
+                    _owner = coSelf; // 设置拥有者
                     return;
                 }
 
@@ -58,6 +60,7 @@ void Mutex::lock() {
                 // 尝试把_lock值从1改成0
                 if (_lock.compare_exchange_weak(v, 0)) {
                     // 若改成功则获得锁，退出
+                    _owner = co_self(); // 记录锁的拥有者协程，释放时必须是拥有者协程才能释放
                     return;
                 }
                 // 若改不成功时，跳回第一步
@@ -77,13 +80,19 @@ void Mutex::lock() {
 
 void Mutex::unlock() {
     // 释放锁，只能由获得锁的协程来释放
+    if (!_owner || _owner != co_self()) {
+        ERROR_LOG("Mutex::unlock -- cant unlock for not owner\n");
+        return;
+    }
+
     int retryTimes = 0;
     while (true) {
         int v = _lock.load();
         if (v == 0) {
             // 尝试把_lock值从0改为3
             if (_lock.compare_exchange_weak(v, 3)) {
-                // 若改成功，判断待唤醒队列是否有元素
+                // 若改成功，清除拥有者，并判断待唤醒队列是否有元素
+                _owner = nullptr;
                 if (_waitRoutines.empty()) {
                     // 若没有元素，将_lock值从3改为1，退出
 
@@ -91,7 +100,7 @@ void Mutex::unlock() {
 
                     v = 3;
                     while (!_lock.compare_exchange_weak(v, 1)) {
-                        ERROR_LOG("Mutex::lock -- cant change _lock from 3 to 1, v = %d\n", v);
+                        ERROR_LOG("Mutex::unlock -- cant change _lock from 3 to 1, v = %d\n", v);
                         v = 3;
                     }
                 } else {
@@ -103,7 +112,7 @@ void Mutex::unlock() {
 
                     v = 3;
                     while (!_lock.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Mutex::lock -- cant change _lock from 3 to 0, v= %d\n", v);
+                        ERROR_LOG("Mutex::unlock -- cant change _lock from 3 to 0, v= %d\n", v);
                         v = 3;
                     }
 

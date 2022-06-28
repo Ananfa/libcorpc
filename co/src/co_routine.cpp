@@ -720,6 +720,9 @@ void co_free( stCoRoutine_t *co )
             free(co->save_buffer), co->save_buffer = NULL;
         }
     }
+
+    // 此处引用修复记录描述： std::function<void* (void*)> 捕获的参数可能需要析构。我在捕获的参数里包括了智能指针，没能正确释放，由此发现了此问题。
+    co->pfn = NULL; //joezzhu fix the memory leak bug at 2022-03-09
     free( co );
 }
 
@@ -1016,7 +1019,7 @@ void co_init_curr_thread_env()
 	g_coRoutineEnv->iCallStackSize = 0;
 	struct stCoRoutine_t *self = co_create_env( g_coRoutineEnv, NULL, NULL,NULL );
 	self->cIsMain = 1;
-
+	
 	g_coRoutineEnv->pending_co = NULL;
 	g_coRoutineEnv->occupy_co = NULL;
 

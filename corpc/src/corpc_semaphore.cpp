@@ -37,7 +37,7 @@ void Semaphore::wait() {
 
                 v = -1;
                 while (!_res.compare_exchange_weak(v, 0)) {
-                    ERROR_LOG("Mutex::lock -- cant change _res from -1 to 0, v= %d, \n", v);
+                    ERROR_LOG("Mutex::lock -- cant change _res from -1 to 0, v= %d\n", v);
                     v = -1;
                 }
 
@@ -69,7 +69,6 @@ void Semaphore::wait() {
 }
 
 void Semaphore::post() {
-    // 释放锁，只能由获得锁的协程来释放
     int retryTimes = 0;
     while (true) {
         int v = _res.load();
@@ -84,7 +83,7 @@ void Semaphore::post() {
 
                     v = -2;
                     while (!_res.compare_exchange_weak(v, 1)) {
-                        ERROR_LOG("Mutex::lock -- cant change _res from -2 to 1, v = %d\n", v);
+                        ERROR_LOG("Semaphore::post -- cant change _res from -2 to 1, v = %d\n", v);
                         v = -2;
                     }
                 } else {
@@ -96,13 +95,23 @@ void Semaphore::post() {
 
                     v = -2;
                     while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Mutex::lock -- cant change _res from -2 to 0, v= %d\n", v);
+                        ERROR_LOG("Semaphore::post -- cant change _res from -2 to 0, v= %d\n", v);
                         v = -2;
                     }
 
                     RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
                 }
                 return;
+            }
+        } else if (v > 0) {
+            int u = v + 1;
+            if (_res.compare_exchange_weak(v, -2)) {
+                assert(_waitRoutines.empty()); // 这里应该不会有等待信号量的协程
+                v = -2;
+                while (!_res.compare_exchange_weak(v, u)) {
+                    ERROR_LOG("Semaphore::post -- cant change _res from -2 to %d, v = %d\n", u, v);
+                    v = -2;
+                }
             }
         }
 

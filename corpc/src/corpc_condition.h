@@ -1,5 +1,5 @@
 /*
- * Created by Xianke Liu on 2021/6/22.
+ * Created by Xianke Liu on 2022/6/28.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,47 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef corpc_mutex_h
-#define corpc_mutex_h
+#ifndef corpc_condition_h
+#define corpc_condition_h
 
-#include "co_routine.h"
-#include <list>
-#include <atomic>
+#include "corpc_mutex.h"
 
+// 注意：此条件变量的实现可能跨线程使用
 namespace corpc {
-    class Mutex {
+    class Condition {
         struct RoutineInfo {
             pid_t pid;
             stCoRoutine_t *co;
         };
 
     public:
-        Mutex(): _lock(1) {}
-        ~Mutex() {}
+        Condition(): _res(0) {}
+        ~Condition() {}
         
-        void lock();
-        void unlock();
+        void wait(Mutex &lock);
+        void signal();
+        void broadcast();
 
     private:
-        std::atomic<int> _lock;
+    	std::atomic<int> _res;
         std::list<RoutineInfo> _waitRoutines;
-
-        volatile stCoRoutine_t *_owner = nullptr;
-    };
-
-    class LockGuard {
-    private:
-        // 禁止在堆中创建对象
-        void* operator new(size_t t) {}
-        void operator delete(void* ptr) {}
-
-    public:
-        LockGuard(Mutex &lock): _lock(lock) { _lock.lock(); }
-        ~LockGuard() { _lock.unlock(); }
-
-    private:
-        Mutex &_lock;
     };
 }
 
-#endif /* corpc_mutex_h */
+#endif /* corpc_condition_h */
