@@ -35,26 +35,22 @@ void Semaphore::wait() {
 
                 //assert(_res.load() == -1);
 
-                v = -1;
-                while (!_res.compare_exchange_weak(v, 0)) {
-                    ERROR_LOG("Mutex::lock -- cant change _res from -1 to 0, v= %d\n", v);
-                    v = -1;
-                }
+                _res.store(0);
 
                 co_yield_ct(); // 等待锁让出给当前协程时唤醒
                 return;
             }
 
-            // 若改不成功，跳回第1步（此时_lock的值是大于0或-1，这里需要切出协程，防止死循环占用CPU）
+            // 若改不成功，自旋重来（自旋多次后，这里需要切出协程，防止死循环占用CPU）
             retryTimes++;
             if (retryTimes >= 5) {
+                // 如果_res的状态被其他线程修改，然后该线程又刚好被系统切出得不到执行，这里retryTimes自旋次数再多也没用，最好可以用通知方式
                 msleep(1); // 让出协程，防止死循环占用CPU
                 retryTimes = 0;
             }
         } else if (v > 0) {
-            // 尝试把_lock值从1改成0
             if (_res.compare_exchange_weak(v, v-1)) {
-                // 若改成功则获得锁，退出
+                // 若改成功则获得信号量，退出
                 return;
             }
             // 若改不成功时，跳回第一步
@@ -78,49 +74,37 @@ void Semaphore::post() {
                 // 若改成功，判断待唤醒队列是否有元素
                 if (_waitRoutines.empty()) {
                     // 若没有元素，将_lock值从-2改为1，退出
-
-                    //assert(_res.load() == -2);
-
-                    v = -2;
-                    while (!_res.compare_exchange_weak(v, 1)) {
-                        ERROR_LOG("Semaphore::post -- cant change _res from -2 to 1, v = %d\n", v);
-                        v = -2;
-                    }
+                    _res.store(1);
                 } else {
                     // 若有元素，从待唤醒队列pop出头部元素，将_lock值从-2改为0，唤醒头部元素协程，退出
                     RoutineInfo info = _waitRoutines.front();
                     _waitRoutines.pop_front();
 
-                    //assert(_res.load() == -2);
-
-                    v = -2;
-                    while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Semaphore::post -- cant change _res from -2 to 0, v= %d\n", v);
-                        v = -2;
-                    }
+                    _res.store(0);
 
                     RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
                 }
                 return;
             }
+
+            // 若改不成功，跳回第1步（这里需要切出协程，防止死循环占用CPU）
+            retryTimes++;
+            if (retryTimes >= 5) {
+                msleep(1); // 让出协程，防止死循环占用CPU
+                retryTimes = 0;
+            }
         } else if (v > 0) {
-            int u = v + 1;
-            if (_res.compare_exchange_weak(v, -2)) {
-                assert(_waitRoutines.empty()); // 这里应该不会有等待信号量的协程
-                v = -2;
-                while (!_res.compare_exchange_weak(v, u)) {
-                    ERROR_LOG("Semaphore::post -- cant change _res from -2 to %d, v = %d\n", u, v);
-                    v = -2;
-                }
+            if (_res.compare_exchange_weak(v, v+1)) {
+                // 若改成功则返还信号量，退出
                 return;
             }
-        }
-
-        // 若改不成功，跳回第1步（这里需要切出协程，防止死循环占用CPU）
-        retryTimes++;
-        if (retryTimes >= 5) {
-            msleep(1); // 让出协程，防止死循环占用CPU
-            retryTimes = 0;
+        } else {
+            // 若改不成功，跳回第1步（这里需要切出协程，防止死循环占用CPU）
+            retryTimes++;
+            if (retryTimes >= 5) {
+                msleep(1); // 让出协程，防止死循环占用CPU
+                retryTimes = 0;
+            }
         }
     }
 }

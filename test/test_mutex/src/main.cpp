@@ -25,17 +25,20 @@ using namespace corpc;
 
 Mutex lk;
 int threadNum = 5;
-int routineNumPerThread = 30;
+int routineNumPerThread = 100;
 std::atomic<int> g_count;
 
 static void *log_routine( void *arg )
 {
     pid_t pid = GetPid();
     stCoRoutine_t *co = co_self();
+    int lastCount = 0;
     while (true) {
         sleep(1);
         
-        LOG("log in pid:%d, co: %d\n", pid, co);
+        int count = g_count.load();
+        LOG("log in pid:%d, co: %d, numPerSecond:%d\n", pid, co, count-lastCount);
+        lastCount = count;
     }
     
     return NULL;
@@ -53,9 +56,9 @@ static void *thread2_routine( void *arg )
         //msleep(1);
         //LOG("thread2_routine doing, pid:%d, co: %d\n", pid, co);
         int count = g_count.fetch_add(1);
-        if (count % 10000 == 0) {
-            LOG("thread2_routine doing, pid:%d, co: %d, count: %d\n", pid, co, count);
-        }
+        //if (count % 10000 == 0) {
+        //    LOG("thread2_routine doing, pid:%d, co: %d, count: %d\n", pid, co, count);
+        //}
     }
 
     LOG("thread2_routine end, pid:%d, co: %d\n", pid, co);
@@ -79,6 +82,7 @@ int main(int argc, const char * argv[]) {
     co_start_hook();
     
     //g_count = 0;
+    RoutineEnvironment::startCoroutine(log_routine, NULL);
 
     std::vector<std::thread> threads;
     for (int i = 0; i < threadNum; i++) {
