@@ -22,6 +22,7 @@
 #include <atomic>
 
 namespace corpc {
+    // 可重入锁
     class Mutex {
         struct RoutineInfo {
             pid_t pid;
@@ -29,7 +30,7 @@ namespace corpc {
         };
 
     public:
-        Mutex(): _lock(1) {}
+        Mutex(): _lock(1), _owner(nullptr) {}
         ~Mutex() {}
         
         void lock();
@@ -39,7 +40,8 @@ namespace corpc {
         std::atomic<int> _lock;
         std::list<RoutineInfo> _waitRoutines;
 
-        volatile stCoRoutine_t *_owner = nullptr;
+        std::atomic<stCoRoutine_t*> _owner;
+        int _ownCount = 0;
     };
 
     class LockGuard {

@@ -112,6 +112,7 @@ void Semaphore::post() {
                     ERROR_LOG("Semaphore::post -- cant change _res from -2 to %d, v = %d\n", u, v);
                     v = -2;
                 }
+                return;
             }
         }
 

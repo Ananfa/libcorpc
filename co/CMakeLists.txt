@@ -29,6 +29,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Add source files
 set(SOURCE_FILES
+		src/co_comm.cpp
         src/co_epoll.cpp
         src/co_hook_sys_call.cpp
         src/co_routine.cpp

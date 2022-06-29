@@ -32,19 +32,33 @@ void Mutex::lock() {
                 if (_lock.compare_exchange_weak(v, 2)) {
                     //assert(v == 0);
                     stCoRoutine_t *coSelf = co_self();
-                    // 若改成功，将本协程插入等待唤醒队列（由于只会有一个协程成功将_lock改为2，因此这里不需要用锁或者CAS机制），然后将_lock从2改为0（这里必然一次成功），yeld协程等待唤醒，退出
-                    _waitRoutines.push_back({GetPid(), coSelf});
 
-                    //assert(_lock.load() == 2);
+                    // 重入判断
+                    if (_owner == coSelf) {
+                        // 增加拥有计数
+                        _ownCount++;
 
-                    v = 2;
-                    while (!_lock.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Mutex::lock -- cant change _lock from 2 to 0, v= %d\n", v);
                         v = 2;
+                        while (!_lock.compare_exchange_weak(v, 0)) {
+                            ERROR_LOG("Mutex::lock -- cant change _lock from 2 to 0, v= %d\n", v);
+                            v = 2;
+                        }
+                    } else {
+                        // 若改成功，将本协程插入等待唤醒队列（由于只会有一个协程成功将_lock改为2，因此这里不需要用锁或者CAS机制），然后将_lock从2改为0（这里必然一次成功），yeld协程等待唤醒，退出
+                        _waitRoutines.push_back({GetPid(), coSelf});
+
+                        //assert(_lock.load() == 2);
+
+                        v = 2;
+                        while (!_lock.compare_exchange_weak(v, 0)) {
+                            ERROR_LOG("Mutex::lock -- cant change _lock from 2 to 0, v= %d\n", v);
+                            v = 2;
+                        }
+
+                        co_yield_ct(); // 等待锁让出给当前协程时唤醒
+                        _owner = coSelf; // 设置拥有者
                     }
 
-                    co_yield_ct(); // 等待锁让出给当前协程时唤醒
-                    _owner = coSelf; // 设置拥有者
                     return;
                 }
 
@@ -80,7 +94,7 @@ void Mutex::lock() {
 
 void Mutex::unlock() {
     // 释放锁，只能由获得锁的协程来释放
-    if (!_owner || _owner != co_self()) {
+    if (_owner == nullptr || _owner != co_self()) {
         ERROR_LOG("Mutex::unlock -- cant unlock for not owner\n");
         return;
     }
@@ -91,6 +105,19 @@ void Mutex::unlock() {
         if (v == 0) {
             // 尝试把_lock值从0改为3
             if (_lock.compare_exchange_weak(v, 3)) {
+                // 重入处理
+                if (_ownCount > 0) {
+                    _ownCount--;
+
+                    v = 3;
+                    while (!_lock.compare_exchange_weak(v, 1)) {
+                        ERROR_LOG("Mutex::unlock -- cant change _lock from 3 to 1, v = %d\n", v);
+                        v = 3;
+                    }
+
+                    return;
+                }
+
                 // 若改成功，清除拥有者，并判断待唤醒队列是否有元素
                 _owner = nullptr;
                 if (_waitRoutines.empty()) {

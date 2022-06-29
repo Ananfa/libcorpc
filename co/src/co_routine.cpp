@@ -871,7 +871,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	curr->stack_sp = get_sp(); // 必须保证函数返回地址在保存的区间中
 #else
 	char c;
-	curr->stack_sp = &c
+	curr->stack_sp = &c;
 #endif
 
 #ifdef CHECK_MAX_STACK > 0

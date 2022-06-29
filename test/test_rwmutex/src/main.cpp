@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "corpc_mutex.h"
+#include "corpc_rwmutex.h"
 #include "corpc_utils.h"
 #include "corpc_routine_env.h"
 
@@ -23,54 +23,61 @@
 
 using namespace corpc;
 
-Mutex lk;
+RWMutex lk;
+int syncData = 0;
 int threadNum = 5;
 int routineNumPerThread = 30;
 std::atomic<int> g_count;
 
-static void *log_routine( void *arg )
+static void *write_routine( void *arg )
 {
     pid_t pid = GetPid();
     stCoRoutine_t *co = co_self();
     while (true) {
         sleep(1);
-        
-        LOG("log in pid:%d, co: %d\n", pid, co);
+        LOG("write_routine 1\n");
+        lk.lock();
+        LOG("write_routine 2\n");
+        syncData++;
+        lk.unlock();
+        LOG("write_routine pid:%d, co: %d, data:%d\n", pid, co, syncData);
     }
     
     return NULL;
 }
 
-static void *thread2_routine( void *arg )
+static void *read_routine( void *arg )
 {
     pid_t pid = GetPid();
     stCoRoutine_t *co = co_self();
-    LOG("thread2_routine begin, pid:%d, co: %d\n", pid, co);
+    LOG("read_routine begin, pid:%d, co: %d\n", pid, co);
+    int lastData = syncData;
     while (true)
     {
-        LockGuard guard(lk);
+        lk.rlock();
 
-        //msleep(1);
-        //LOG("thread2_routine doing, pid:%d, co: %d\n", pid, co);
         int count = g_count.fetch_add(1);
-        if (count % 10000 == 0) {
-            LOG("thread2_routine doing, pid:%d, co: %d, count: %d\n", pid, co, count);
+
+        if (lastData != syncData) {
+            lastData = syncData;
+            //LOG("read_routine doing, pid:%d, co: %d, count: %d\n", pid, co, count);
         }
+        msleep(1);
+
+        lk.runlock();
     }
 
-    LOG("thread2_routine end, pid:%d, co: %d\n", pid, co);
+    LOG("read_routine end, pid:%d, co: %d\n", pid, co);
     
     return NULL;
 }
 
-void thread2() {
-    LOG("thread2 %d running...\n", GetPid());
+void readThread() {
+    LOG("readThread %d running...\n", GetPid());
     
     for (int i = 0; i < routineNumPerThread; i++) {
-        RoutineEnvironment::startCoroutine(thread2_routine, NULL);
+        RoutineEnvironment::startCoroutine(read_routine, NULL);
     }
-
-    //RoutineEnvironment::startCoroutine(log_routine, NULL);
     
     RoutineEnvironment::runEventLoop();
 }
@@ -78,11 +85,11 @@ void thread2() {
 int main(int argc, const char * argv[]) {
     co_start_hook();
     
-    //g_count = 0;
+    RoutineEnvironment::startCoroutine(write_routine, NULL);
 
     std::vector<std::thread> threads;
     for (int i = 0; i < threadNum; i++) {
-        threads.push_back(std::thread(thread2));
+        threads.push_back(std::thread(readThread));
     }
 
     RoutineEnvironment::runEventLoop();
