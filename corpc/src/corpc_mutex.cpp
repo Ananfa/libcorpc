@@ -15,130 +15,261 @@
  */
 
 #include "corpc_mutex.h"
-#include "corpc_utils.h"
 #include "corpc_routine_env.h"
 
 using namespace corpc;
 
-// 这里的Mutex采用自旋锁方式，实现逻辑保证按申请锁的顺序获得锁，可重入
-// 在释放锁的时候，如果有等待申请，不进行锁释放，直接唤醒等待申请的协程执行并转移锁的所有权
-// 是否要参考go中Mutex的实现进行改造？---没有类似go的runtime_SemacquireMutex机制
 void Mutex::lock() {
-    // 判断是否能直接获得锁
-    // _lock值：为0时表示已上锁，为1时表示未上锁，为2时表示有协程正在排队，为3时表示正在解锁
-    pid_t pid = GetPid();
+    int32_t v = 0;
+    if (_state.compare_exchange_weak(v, MUTEXLOCKED)) {
+        return;
+    }
+
+    lockSlow();
+}
+
+void Mutex::lockSlow() {
     stCoRoutine_t *coSelf = co_self();
-    int retryTimes = 0;
+
+    struct timeval t;
+    int64_t waitStartTime = 0;
+    bool starving = false;
+    bool awoke = false;
+    int iter = 0;
+
+    int32_t oldV = _state.load();
     while (true) {
-        int v = _lock.load();
-        switch (v) {
-            case 0: {
-                // 尝试把_lock值从0改成2（防止此时锁被其他线程解锁，导致本协程进入不会被唤醒的等待）
-                if (_lock.compare_exchange_weak(v, 2)) {
-                    //assert(v == 0);
-                    // 重入判断
-                    if (_owner == coSelf) {
-                        // 增加拥有计数
-                        _ownCount++;
+        // Don't spin in starvation mode, ownership is handed off to waiters
+        // so we won't be able to acquire the mutex anyway.
+        if ((oldV & (MUTEXLOCKED | MUTEXSTARVING)) == MUTEXLOCKED && iter < 4) {
+            // Active spinning makes sense.
+            // Try to set mutexWoken flag to inform Unlock
+            // to not wake other blocked goroutines.
+            if (!awoke && (oldV & MUTEXWOKEN == 0) && (oldV >> MUTEXWAITERSHIFT != 0) &&
+                _state.compare_exchange_weak(oldV, oldV | MUTEXWOKEN)) {
+                awoke = true;
+            }
 
-                        _lock.store(0);
-                    } else {
-                        // 若改成功，将本协程插入等待唤醒队列（由于只会有一个协程成功将_lock改为2，因此这里不需要用锁或者CAS机制），然后将_lock从2改为0（这里必然一次成功），yeld协程等待唤醒，退出
-                        _waitRoutines.push_back({pid, coSelf});
+            // 自旋一会
+            for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+                corpc_cpu_pause();
+            }
 
-                        //assert(_lock.load() == 2);
+            iter++;
+            oldV = _state.load();
+            continue;
+        }
 
-                        _lock.store(0);
+        // 判断当前是否有长时间等待的MUTEXWOKEN协程，防止同线程的协程得不到运行
+        if (!awoke && (oldV & MUTEXWOKEN) != 0) {
+            if (_lastco == coSelf) {
+                gettimeofday(&t, NULL);
+                int64_t curTime = t.tv_sec * 1000000 + t.tv_usec;
+                if ((curTime - _beginTm) > 1000) {
+                    RoutineEnvironment::pause();
+                    continue;
+                }
+            }
+        }
 
-                        co_yield_ct(); // 等待锁让出给当前协程时唤醒
-                        _owner = coSelf; // 设置拥有者
+        int32_t newV = oldV;
+        // Don't try to acquire starving mutex, new arriving goroutines must queue.
+        if ((oldV & MUTEXSTARVING) == 0) {
+            newV |= MUTEXLOCKED;
+        }
+        if ((oldV & (MUTEXLOCKED | MUTEXSTARVING)) != 0) {
+            newV += 1 << MUTEXWAITERSHIFT;
+        }
+        // The current goroutine switches mutex to starvation mode.
+        // But if the mutex is currently unlocked, don't do the switch.
+        // Unlock expects that starving mutex has waiters, which will not
+        // be true in this case.
+        if (starving && (oldV & MUTEXLOCKED) != 0) {
+            newV |= MUTEXSTARVING;
+        }
+        if (awoke) {
+            // The goroutine has been woken from sleep,
+            // so we need to reset the flag in either case.
+            if ((newV & MUTEXWOKEN) == 0) {
+                ERROR_LOG("Mutex::lock -- inconsistent mutex state\n");
+                abort();
+            }
+            newV &= ~MUTEXWOKEN;
+        }
+        if (_state.compare_exchange_weak(oldV, newV)) {
+            if ((oldV & (MUTEXLOCKED | MUTEXSTARVING)) == 0) {
+                if (_lastco == nullptr) {
+                    if ((oldV & MUTEXWOKEN) != 0) {
+                        _lastco = coSelf;
+                        gettimeofday(&t, NULL);
+                        _beginTm = t.tv_sec * 1000000 + t.tv_usec;
                     }
-
-                    return;
+                } else if (_lastco != coSelf) {
+                    _lastco = nullptr;
+                    _beginTm = 0;
                 }
 
-                // 若改不成功，跳回第1步（此时_lock的值是1或2或3，这里需要切出协程，防止死循环占用CPU，让当前线程中的其他协程也得能运行）
-                retryTimes++;
-                if (retryTimes >= 5) {
-                    msleep(1); // 让出协程，防止死循环占用CPU（这样实现所在协程的性能会受点影响）
-                    retryTimes = 0;
+                break; // locked the mutex with CAS
+            }
+            // If we were already waiting before, queue at the front of the queue.
+            bool queueLifo = waitStartTime != 0;
+            if (waitStartTime == 0) {
+                gettimeofday(&t, NULL);
+                waitStartTime = t.tv_sec * 1000000 + t.tv_usec;
+            }
+
+            wait(queueLifo);
+
+            if (!starving) {
+                gettimeofday(&t, NULL);
+                int64_t curTime = t.tv_sec * 1000000 + t.tv_usec;
+                starving = (curTime - waitStartTime) > 1000;
+            }
+            
+            oldV = _state.load();
+
+            if ((oldV & MUTEXSTARVING) != 0) {
+                // If this goroutine was woken and mutex is in starvation mode,
+                // ownership was handed off to us but mutex is in somewhat
+                // inconsistent state: mutexLocked is not set and we are still
+                // accounted as waiter. Fix that.
+                if ((oldV & (MUTEXLOCKED | MUTEXWOKEN)) != 0 || (oldV >> MUTEXWAITERSHIFT) == 0) {
+                    ERROR_LOG("Mutex::lock -- inconsistent mutex state\n");
+                    abort();
                 }
+
+                int32_t delta = int32_t(MUTEXLOCKED - (1 << MUTEXWAITERSHIFT));
+                if (!starving || (oldV >> MUTEXWAITERSHIFT) == 1) {
+                    // Exit starvation mode.
+                    // Critical to do it here and consider wait time.
+                    // Starvation mode is so inefficient, that two goroutines
+                    // can go lock-step infinitely once they switch mutex
+                    // to starvation mode.
+                    delta -= MUTEXSTARVING;
+                }
+
+                _state.fetch_add(delta);
+                
+                if (_lastco != nullptr) {
+                    _lastco = nullptr;
+                    _beginTm = 0;
+                }
+
                 break;
             }
-            case 1: {
-                // 尝试把_lock值从1改成0
-                if (_lock.compare_exchange_weak(v, 0)) {
-                    // 若改成功则获得锁，退出
-                    _owner = coSelf; // 记录锁的拥有者协程，释放时必须是拥有者协程才能释放
-                    return;
-                }
-                // 若改不成功时，跳回第一步
-                break;
-            }
-            default: {
-                retryTimes++;
-                if (retryTimes >= 5) {
-                    // 如果_lock的状态被其他线程修改，然后该线程又刚好被系统切出得不到执行，这里retryTimes自旋次数再多也没用，最好可以用通知方式
-                    msleep(1); // 让出协程，防止死循环占用CPU（这样实现所在协程的性能会受点影响）
-                    retryTimes = 0;
-                }
-                break;
-            }
+            awoke = true;
+            iter = 0;
+        } else {
+            oldV = _state.load();
         }
     }
 }
 
 void Mutex::unlock() {
-    // 释放锁，只能由获得锁的协程来释放
-    if (_owner == nullptr || _owner != co_self()) {
-        ERROR_LOG("Mutex::unlock -- cant unlock for not owner\n");
-        return;
+    // Fast path: drop lock bit.
+    int32_t newV = _state.fetch_add(-MUTEXLOCKED) - MUTEXLOCKED;
+    if (newV != 0) {
+        // Outlined slow path to allow inlining the fast path.
+        // To hide unlockSlow during tracing we skip one extra frame when tracing GoUnblock.
+        unlockSlow(newV);
+    }
+}
+
+void Mutex::unlockSlow(int32_t newV) {
+    if (((newV + MUTEXLOCKED) & MUTEXLOCKED) == 0) {
+        ERROR_LOG("Mutex::unlock -- unlock of unlocked mutex\n");
+        abort();
     }
 
-    int retryTimes = 0;
-    while (true) {
-        int v = _lock.load();
-        if (v == 0) {
-            // 尝试把_lock值从0改为3
-            if (_lock.compare_exchange_weak(v, 3)) {
-                // 重入处理
-                if (_ownCount > 0) {
-                    _ownCount--;
-
-                    _lock.store(1);
-
-                    return;
-                }
-
-                // 若改成功，清除拥有者，并判断待唤醒队列是否有元素
-                _owner = nullptr;
-                if (_waitRoutines.empty()) {
-                    // 若没有元素，将_lock值从3改为1，退出
-
-                    //assert(_lock.load() == 3);
-
-                    _lock.store(1);
-                } else {
-                    // 若有元素，从待唤醒队列pop出头部元素，将_lock值从3改为0，唤醒头部元素协程，退出
-                    RoutineInfo info = _waitRoutines.front();
-                    _waitRoutines.pop_front();
-
-                    //assert(_lock.load() == 3);
-
-                    _lock.store(0);
-
-                    RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
-                }
+    if ((newV & MUTEXSTARVING) == 0) {
+        int32_t oldV = newV;
+        while (true) {
+            // If there are no waiters or a goroutine has already
+            // been woken or grabbed the lock, no need to wake anyone.
+            // In starvation mode ownership is directly handed off from unlocking
+            // goroutine to the next waiter. We are not part of this chain,
+            // since we did not observe mutexStarving when we unlocked the mutex above.
+            // So get off the way.
+            if ((oldV >> MUTEXWAITERSHIFT) == 0 || (oldV & (MUTEXLOCKED|MUTEXWOKEN|MUTEXSTARVING)) != 0) {
                 return;
             }
-        }
+            // Grab the right to wake someone.
+            newV = (oldV - (1<<MUTEXWAITERSHIFT)) | MUTEXWOKEN;
 
-        // 若改不成功，跳回第1步（此时_lock的值一定是2，这里需要切出协程，防止死循环占用CPU）
-        assert(v == 2);
-        retryTimes++;
-        if (retryTimes >= 5) {
-            msleep(1); // 让出协程，防止死循环占用CPU（这样实现所在协程的性能会受点影响）
-            retryTimes = 0;
+            if (_state.compare_exchange_weak(oldV, newV)) {
+                post();
+                return;
+            }
+
+            oldV = _state.load();
+        }
+    } else {
+        // Starving mode: handoff mutex ownership to the next waiter, and yield
+        // our time slice so that the next waiter can start to run immediately.
+        // Note: mutexLocked is not set, the waiter will set it after wakeup.
+        // But mutex is still considered locked if mutexStarving is set,
+        // so new coming goroutines won't acquire it.
+        post();
+    }
+}
+
+void Mutex::wait(bool queueLifo) {
+    pid_t pid = GetPid();
+    stCoRoutine_t *coSelf = co_self();
+
+    bool v = false;
+    while (true) {
+        v = false;
+        if (_waitlock.compare_exchange_weak(v, true)) {
+            if (_dontWait) {
+//                ERROR_LOG("Mutex::wait -- dont wait pid:%d co:%d\n", pid, coSelf);
+                _dontWait = false;
+                _waitlock.store(false);
+                return;
+            }
+
+            if (queueLifo) {
+                _waitRoutines.push_front({pid, coSelf});
+            } else {
+                _waitRoutines.push_back({pid, coSelf});
+            }
+            
+            _waitlock.store(false);
+
+            co_yield_ct(); // 等待锁让出给当前协程时唤醒
+            return;
+        } else {
+            // 自旋一会
+            for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+                corpc_cpu_pause();
+            }
         }
     }
 }
+
+void Mutex::post() {
+    while (true) {
+        bool v = false;
+        if (_waitlock.compare_exchange_weak(v, true)) {
+            if (_waitRoutines.empty()) {
+                _dontWait = true;
+                _waitlock.store(false);
+                return;
+            }
+
+            RoutineInfo info = _waitRoutines.front();
+            _waitRoutines.pop_front();
+
+            _waitlock.store(false);
+
+            RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
+            return;
+        } else {
+            // 自旋一会
+            for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+                corpc_cpu_pause();
+            }
+        }
+    }
+}
+

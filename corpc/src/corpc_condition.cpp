@@ -21,21 +21,17 @@
 using namespace corpc;
 
 void Condition::wait(Mutex &lock) {
-    int retryTimes = 0;
     while (true) {
         int v = _res.load();
         if (v == 0) {
             // 尝试把_res值从0改成1（防止此时条件变量被其他线程操作）
             if (_res.compare_exchange_weak(v, 1)) {
                 // 在条件变量处挂起协程等待唤醒，挂起前需要先释放锁
-                lock.unlock();
                 _waitRoutines.push_back({GetPid(), co_self()});
 
-                v = 1;
-                while (!_res.compare_exchange_weak(v, 0)) {
-                    ERROR_LOG("Condition::wait -- cant change _res from 1 to 0, v= %d\n", v);
-                    v = 1;
-                }
+                _res.store(0);
+
+                lock.unlock(); // unlock中没有协程切换
 
                 co_yield_ct(); // 等待锁让出给当前协程时唤醒
                 lock.lock(); // 重新获得锁
@@ -44,17 +40,15 @@ void Condition::wait(Mutex &lock) {
             }
         }
 
-        retryTimes++;
-        if (retryTimes >= 5) {
-            msleep(1); // 让出协程，防止死循环占用CPU
-            retryTimes = 0;
+        // 自旋一会
+        for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+            corpc_cpu_pause();
         }
     }
 }
 
 void Condition::signal() {
     // 唤醒一个等待协程
-    int retryTimes = 0;
     while (true) {
         int v = _res.load();
         if (v == 0) {
@@ -62,23 +56,13 @@ void Condition::signal() {
             if (_res.compare_exchange_weak(v, 1)) {
                 if (_waitRoutines.empty()) {
                     // 没有可以唤醒的协程
-                    v = 1;
-                    while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Condition::signal -- cant change _res from 1 to 0, v= %d\n", v);
-                        v = 1;
-                    }
+                    _res.store(0);
                 } else {
                     // 唤醒一个协程
                     RoutineInfo info = _waitRoutines.front();
                     _waitRoutines.pop_front();
 
-                    //assert(_res.load() == 1);
-
-                    v = 1;
-                    while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Condition::signal -- cant change _res from 1 to 0, v= %d\n", v);
-                        v = 1;
-                    }
+                    _res.store(0);
 
                     RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
                 }
@@ -87,17 +71,15 @@ void Condition::signal() {
             }
         }
 
-        retryTimes++;
-        if (retryTimes >= 5) {
-            msleep(1); // 让出协程，防止死循环占用CPU
-            retryTimes = 0;
+        // 自旋一会
+        for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+            corpc_cpu_pause();
         }
     }
 }
 
 void Condition::broadcast() {
     // 唤醒所有等待协程
-    int retryTimes = 0;
     while (true) {
         int v = _res.load();
         if (v == 0) {
@@ -105,22 +87,12 @@ void Condition::broadcast() {
             if (_res.compare_exchange_weak(v, 1)) {
                 if (_waitRoutines.empty()) {
                     // 没有可以唤醒的协程
-                    v = 1;
-                    while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Condition::signal -- cant change _res from 1 to 0, v= %d\n", v);
-                        v = 1;
-                    }
+                    _res.store(0);
                 } else {
                     // 唤醒所有协程
                     std::list<RoutineInfo> waitRoutines = std::move(_waitRoutines);
 
-                    //assert(_res.load() == 1);
-
-                    v = 1;
-                    while (!_res.compare_exchange_weak(v, 0)) {
-                        ERROR_LOG("Condition::signal -- cant change _res from 1 to 0, v= %d\n", v);
-                        v = 1;
-                    }
+                    _res.store(0);
 
                     for (auto& info : waitRoutines) {
                         RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
@@ -131,10 +103,9 @@ void Condition::broadcast() {
             }
         }
 
-        retryTimes++;
-        if (retryTimes >= 5) {
-            msleep(1); // 让出协程，防止死循环占用CPU
-            retryTimes = 0;
+        // 自旋一会
+        for (int i = 0; i < ACTIVE_SPIN_CNT; i++) {
+            corpc_cpu_pause();
         }
     }
 }

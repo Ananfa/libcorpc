@@ -163,6 +163,12 @@
     #endif
 #endif
 
+#if ( __i386__ || __i386 || __amd64__ || __amd64 )
+#define corpc_cpu_pause()         __asm__ ("pause")
+#elif defined(__x86_64__)
+#define corpc_cpu_pause()         __asm__ (".byte 0xf3, 0x90")
+#endif
+
 namespace corpc {
     
     struct PipeType {

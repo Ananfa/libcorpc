@@ -107,6 +107,11 @@ void RoutineEnvironment::addTimeoutTask( std::shared_ptr<RpcClientTask>& rpcTask
     curenv->_timeoutList.insert(uint64_t(rpcTask->co), rpcTask->expireTime, rpcTask);
 }
 
+void RoutineEnvironment::pause() {
+    resumeCoroutine(GetPid(), co_self());
+    co_yield_ct();
+}
+
 //void RoutineEnvironment::destroy() {
 //    // TODO: 清理当前线程协程环境
 //    // 当线程结束时进行回收工作

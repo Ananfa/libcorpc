@@ -21,8 +21,15 @@
 #include <list>
 #include <atomic>
 
+#define MUTEXLOCKED 1
+#define MUTEXWOKEN 2
+#define MUTEXSTARVING 4
+#define MUTEXWAITERSHIFT 3
+#define STARVATIONTHRESHOLDNS 1000
+#define ACTIVE_SPIN_CNT 30
+
 namespace corpc {
-    // 可重入锁
+    // 本实现参考go的Mutex实现（不可重入）
     class Mutex {
         struct RoutineInfo {
             pid_t pid;
@@ -30,18 +37,28 @@ namespace corpc {
         };
 
     public:
-        Mutex(): _lock(1), _owner(nullptr) {}
+        Mutex(): _state(0), _waitlock(false), _dontWait(false) {}
         ~Mutex() {}
         
         void lock();
         void unlock();
 
     private:
-        std::atomic<int> _lock;
+        void lockSlow();
+        void unlockSlow(int32_t newV);
+
+        void wait(bool queueLifo);
+        void post();
+
+    private:
+        std::atomic<int32_t> _state;
+        std::atomic<bool> _waitlock;
+        bool _dontWait;
         std::list<RoutineInfo> _waitRoutines;
 
-        std::atomic<stCoRoutine_t*> _owner;
-        int _ownCount = 0;
+        // 以下成员用于当有其他协程长时间等待锁无法获得时不抢锁
+        stCoRoutine_t *_lastco = nullptr; // 最近一次获取锁的协程
+        int64_t _beginTm = 0; // MUTEXWOKEN被设置时上面协程连续获得该锁的最早时间
     };
 
     class LockGuard {
