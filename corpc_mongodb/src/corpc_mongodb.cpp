@@ -68,7 +68,7 @@ void MongodbConnectPool::Proxy::put(mongoc_client_t* mongoc, bool error) {
         request->set_error(error);
     }
     
-    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
+    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
 }
 
 MongodbConnectPool::MongodbConnectPool(const char *uri, uint32_t maxConnectNum): _uri(uri), _maxConnectNum(maxConnectNum), _realConnectCount(0) {

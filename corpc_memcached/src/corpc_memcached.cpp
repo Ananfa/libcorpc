@@ -65,7 +65,7 @@ void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
         request->set_error(error);
     }
     
-    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
+    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
 }
 
 MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _realConnectCount(0) {

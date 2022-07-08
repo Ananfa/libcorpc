@@ -65,7 +65,7 @@ void RedisConnectPool::Proxy::put(redisContext* redis, bool error) {
         request->set_error(error);
     }
     
-    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(&callDoneHandle, request, controller));
+    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
 }
 
 RedisConnectPool::RedisConnectPool(const char *host, const char *pwd, uint16_t port, uint16_t dbIndex, uint32_t maxConnectNum): _host(host), _passwd(pwd), _port(port), _dbIndex(dbIndex), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
