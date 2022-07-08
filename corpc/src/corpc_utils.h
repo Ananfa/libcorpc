@@ -23,6 +23,8 @@
 #include <sys/time.h>
 
 #include "corpc_controller.h"
+// 注意：若这里不包含message.h会产生内存泄露，callDoneHandle中释放request时没有释放正确的对象
+#include <google/protobuf/message.h>
 
 inline void msleep(int msec)
 {
