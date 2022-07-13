@@ -19,6 +19,7 @@
 
 #include "co_routine.h"
 #include "corpc_define.h"
+#include "corpc_queue.h"
 #include "corpc_timeout_list.h"
 #include <functional>
 
@@ -45,78 +46,52 @@ namespace corpc {
     typedef std::function<void* (std::shared_ptr<Connection>&, uint8_t*, uint8_t*, int)> DecodeFunction;
     typedef std::function<bool (std::shared_ptr<Connection>&, std::shared_ptr<void>&, uint8_t*, int, int&, std::string&, uint32_t&)> EncodeFunction;
     
-#ifdef USE_NO_LOCK_QUEUE
-    typedef Co_MPSC_NoLockQueue<void*> WorkerMessageQueue;
-#else
-    typedef CoSyncQueue<void*> WorkerMessageQueue;
-#endif
+    typedef MPMC_NoLockBlockQueue<void*> WorkerMessageQueue;
     
     class Worker {
-    protected:
-        struct QueueContext {
-            Worker *_worker;
-            
-            // 消息队列
-            WorkerMessageQueue _queue;
-        };
-        
     public:
         Worker() {}
         virtual ~Worker() = 0;
         
         virtual void start() = 0;
         
-        virtual void addMessage(void *msg) = 0;
+        void addMessage(void *msg);
         
     protected:
         static void *msgHandleRoutine(void * arg);
         
         virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+
+    protected:
+        WorkerMessageQueue _queue;
     };
     
     class MultiThreadWorker: public Worker {
-        // 线程相关数据
-        struct ThreadData {
-            // 消息队列
-            QueueContext _queueContext;
-            
-            // thread对象
-            std::thread _t;
-        };
-        
     public:
-        MultiThreadWorker(uint16_t threadNum): _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
+        MultiThreadWorker(uint16_t threadNum): _threadNum(threadNum), _ts(threadNum) {}
         virtual ~MultiThreadWorker() = 0;
         
         virtual void start();
         
-        virtual void addMessage(void *msg);
-        
     protected:
-        static void threadEntry( ThreadData *tdata );
+        static void threadEntry( Worker *self );
         
         virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
         
     private:
         uint16_t _threadNum;
-        std::atomic<uint16_t> _lastThreadIndex;
-        std::vector<ThreadData> _threadDatas;
+        std::vector<std::thread> _ts;
     };
     
     class CoroutineWorker: public Worker {
     public:
-        CoroutineWorker() { _queueContext._worker = this; }
+        CoroutineWorker() {}
         virtual ~CoroutineWorker() = 0;
         
         virtual void start();
         
-        virtual void addMessage(void *msg);
-        
     protected:
         virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
-        
-    private:
-        QueueContext _queueContext;
     };
     
     class Pipeline {

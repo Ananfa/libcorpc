@@ -112,6 +112,12 @@ void RoutineEnvironment::pause() {
     co_yield_ct();
 }
 
+void RoutineEnvironment::pauseIfRuntimeBusy() {
+    if (co_is_runtime_busy()) {
+        pause();
+    }
+}
+
 //void RoutineEnvironment::destroy() {
 //    // TODO: 清理当前线程协程环境
 //    // 当线程结束时进行回收工作

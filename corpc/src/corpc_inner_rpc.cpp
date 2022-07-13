@@ -81,6 +81,7 @@ void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *metho
         
         // 正确返回
         if (done) {
+//ERROR_LOG("InnerRpcChannel::CallMethod call done\n");
             done->Run();
         }
     }
@@ -133,9 +134,12 @@ const MethodData *InnerRpcServer::getMethod(uint32_t serviceId, uint32_t methodI
     return &(it->second.methods[methodId]);
 }
 
-void InnerRpcServer::start(bool startInNewThread) {
-    if (startInNewThread) {
-        _t = std::thread(threadEntry, this);
+void InnerRpcServer::start(uint32_t workerThreadNum) {
+    if (workerThreadNum > 0) {
+        _ts.resize(workerThreadNum);
+        for (int i=0; i<workerThreadNum; i++) {
+            _ts[i] = std::thread(threadEntry, this);
+        }
     } else {
         RoutineEnvironment::startCoroutine(requestQueueRoutine, this);
     }
@@ -150,98 +154,154 @@ void InnerRpcServer::threadEntry( InnerRpcServer * self ) {
 
 void *InnerRpcServer::requestQueueRoutine( void * arg ) {
     InnerRpcServer *server = (InnerRpcServer*)arg;
-    
     InnerRpcRequestQueue& queue = server->_queue;
-    
-    // 初始化pipe readfd
-    int readFd = queue.getReadFd();
-    co_register_fd(readFd);
-    co_set_timeout(readFd, -1, 1000);
-    
-    int ret;
-    std::vector<char> buf(1024);
+
     while (true) {
-        // 等待处理信号
-        ret = read(readFd, &buf[0], 1024);
-        assert(ret != 0);
-        if (ret < 0) {
-            if (errno == EAGAIN) {
-                continue;
-            } else {
-                // 管道出错
-                ERROR_LOG("InnerServer::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
-                       readFd, ret, errno, strerror(errno));
-                
-                // TODO: 如何处理？退出协程？
-                // sleep 10 milisecond
-                msleep(10);
-            }
-        }
-        
-        struct timeval t1,t2;
-        gettimeofday(&t1, NULL);
-        uint64_t now = t1.tv_sec * 1000 + t1.tv_usec / 1000; // 当前时间（毫秒精度）
-        int count = 0;
-        
         // 处理任务队列
         InnerRpcRequest *request = queue.pop();
-        while (request) {
-            if (request->rpcTask->expireTime != 0 && now >= request->rpcTask->expireTime) {
-                assert(request->rpcTask->response);
-                // 超时
-                RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime, ETIMEDOUT);
+        assert (request != NULL);
 
-                delete request;
-            } else {
-                const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
-                
-                bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
-                
-                if (needCoroutine) {
-                    // 启动协程进行rpc处理
-                    RoutineEnvironment::startCoroutine(requestRoutine, request);
-                } else {
-                    // rpc处理方法调用
-                    if (request->rpcTask->expireTime == 0) {
-                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller, request->rpcTask->request, request->rpcTask->response, NULL);
-                    } else {
-                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
-                    }
-                    
-                    if (request->rpcTask->response) {
-                        // 唤醒协程处理结果
-                        RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
-                    } else {
-                        // not_care_response类型的rpc需要在这里触发回调清理request，除非没有要清理的资源
-                        if (request->rpcTask->done) {
-                            request->rpcTask->done->Run();
-                        }
-                    }
-                    
-                    delete request;
-                }
-            }
+        struct timeval t;
+        gettimeofday(&t, NULL);
+        uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000; // 当前时间（毫秒精度）
+        if (request->rpcTask->expireTime != 0 && now >= request->rpcTask->expireTime) {
+            assert(request->rpcTask->response);
+            // 超时
+            RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime, ETIMEDOUT);
 
-
-            // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，让其他协程处理一下
-            count++;
-            if (count == 100) {
-                gettimeofday(&t2, NULL);
-                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
-                    msleep(1);
-                    
-                    gettimeofday(&t1, NULL);
-                    now = t1.tv_sec * 1000 + t1.tv_usec / 1000;
-                }
-                count = 0;
-            }
+            delete request;
+        } else {
+            const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
             
-            request = queue.pop();
+            bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
+            
+            if (needCoroutine) {
+                // 启动协程进行rpc处理
+                RoutineEnvironment::startCoroutine(requestRoutine, request);
+            } else {
+                // rpc处理方法调用
+                if (request->rpcTask->expireTime == 0) {
+                    server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller, request->rpcTask->request, request->rpcTask->response, NULL);
+                } else {
+                    server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+                }
+                
+                if (request->rpcTask->response) {
+                    // 唤醒协程处理结果
+                    RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
+                } else {
+                    // not_care_response类型的rpc需要在这里触发回调清理request，除非没有要清理的资源
+                    if (request->rpcTask->done) {
+                        request->rpcTask->done->Run();
+                    }
+                }
+                
+                delete request;
+            }
         }
+
+        RoutineEnvironment::pauseIfRuntimeBusy();
     }
     
     return NULL;
 }
+
+
+//void *InnerRpcServer::requestQueueRoutine( void * arg ) {
+//    InnerRpcServer *server = (InnerRpcServer*)arg;
+//    
+//    InnerRpcRequestQueue& queue = server->_queue;
+//    
+//    // 初始化pipe readfd
+//    int readFd = queue.getReadFd();
+//    co_register_fd(readFd);
+//    co_set_timeout(readFd, -1, 1000);
+//    
+//    int ret;
+//    std::vector<char> buf(1024);
+//    while (true) {
+//        // 等待处理信号
+//        ret = read(readFd, &buf[0], 1024);
+//        assert(ret != 0);
+//        if (ret < 0) {
+//            if (errno == EAGAIN) {
+//                continue;
+//            } else {
+//                // 管道出错
+//                ERROR_LOG("InnerServer::taskHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
+//                       readFd, ret, errno, strerror(errno));
+//                
+//                // TODO: 如何处理？退出协程？
+//                // sleep 10 milisecond
+//                msleep(10);
+//            }
+//        }
+//        
+//        struct timeval t1,t2;
+//        gettimeofday(&t1, NULL);
+//        uint64_t now = t1.tv_sec * 1000 + t1.tv_usec / 1000; // 当前时间（毫秒精度）
+//        int count = 0;
+//        
+//        // 处理任务队列
+//        InnerRpcRequest *request = queue.pop();
+//        while (request) {
+//            if (request->rpcTask->expireTime != 0 && now >= request->rpcTask->expireTime) {
+//                assert(request->rpcTask->response);
+//                // 超时
+//                RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime, ETIMEDOUT);
+//
+//                delete request;
+//            } else {
+//                const MethodData *methodData = server->getMethod(request->rpcTask->serviceId, request->rpcTask->methodId);
+//                
+//                bool needCoroutine = methodData->method_descriptor->options().GetExtension(corpc::need_coroutine);
+//                
+//                if (needCoroutine) {
+//                    // 启动协程进行rpc处理
+//                    RoutineEnvironment::startCoroutine(requestRoutine, request);
+//                } else {
+//                    // rpc处理方法调用
+//                    if (request->rpcTask->expireTime == 0) {
+//                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller, request->rpcTask->request, request->rpcTask->response, NULL);
+//                    } else {
+//                        server->getService(request->rpcTask->serviceId)->CallMethod(methodData->method_descriptor, request->rpcTask->controller_1, request->rpcTask->request_1, request->rpcTask->response_1, NULL);
+//                    }
+//                    
+//                    if (request->rpcTask->response) {
+//                        // 唤醒协程处理结果
+//                        RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
+//                    } else {
+//                        // not_care_response类型的rpc需要在这里触发回调清理request，除非没有要清理的资源
+//                        if (request->rpcTask->done) {
+////ERROR_LOG("InnerRpcServer::requestQueueRoutine call done\n");
+//                            request->rpcTask->done->Run();
+//                        }
+//                    }
+//                    
+//                    delete request;
+//                }
+//            }
+//
+//
+//            // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，让其他协程处理一下
+//            count++;
+//            if (count == 100) {
+//                gettimeofday(&t2, NULL);
+//                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
+//                    msleep(1);
+//                    
+//                    gettimeofday(&t1, NULL);
+//                    now = t1.tv_sec * 1000 + t1.tv_usec / 1000;
+//                }
+//                count = 0;
+//            }
+//            
+//            request = queue.pop();
+//        }
+//    }
+//    
+//    return NULL;
+//}
 
 void *InnerRpcServer::requestRoutine( void * arg ) {
     InnerRpcRequest *request = (InnerRpcRequest*)arg;
@@ -259,6 +319,7 @@ void *InnerRpcServer::requestRoutine( void * arg ) {
         // 唤醒协程处理结果
         RoutineEnvironment::resumeCoroutine(request->rpcTask->pid, request->rpcTask->co, request->rpcTask->expireTime);
     } else {
+//ERROR_LOG("InnerRpcServer::requestRoutine call done\n");
         // not_care_response类型的rpc需要在这里触发回调清理request
         assert(request->rpcTask->done);
         request->rpcTask->done->Run();

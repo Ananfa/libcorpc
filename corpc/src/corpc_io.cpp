@@ -26,100 +26,49 @@
 // TODO: 使用统一的Log接口记录Log
 using namespace corpc;
 
-Worker::Worker::~Worker() {
+Worker::~Worker() {
     
 }
 
-// pipe通知版本
+void Worker::addMessage(void *msg) {
+    _queue.push(msg);
+}
+
 void *Worker::msgHandleRoutine( void * arg ) {
-    QueueContext *context = (QueueContext*)arg;
-    
-    WorkerMessageQueue& queue = context->_queue;
-    Worker *self = context->_worker;
-    
-    // 初始化pipe readfd
-    int readFd = queue.getReadFd();
-    co_register_fd(readFd);
-    co_set_timeout(readFd, -1, 1000);
-    
-    int ret;
-    std::vector<char> buf(1024);
+    Worker *self = (Worker *)arg;
+    WorkerMessageQueue& queue = self->_queue;
+
     while (true) {
-        // 等待处理信号
-        ret = (int)read(readFd, &buf[0], 1024);
-        assert(ret != 0);
-        if (ret < 0) {
-            if (errno == EAGAIN) {
-                continue;
-            } else {
-                // 管道出错
-                ERROR_LOG("Worker::msgHandleRoutine read from pipe fd %d ret %d errno %d (%s)\n",
-                       readFd, ret, errno, strerror(errno));
-                
-                // TODO: 如何处理？退出协程？
-                // sleep 10 milisecond
-                msleep(10);
-            }
-        }
-        
-        struct timeval t1,t2;
-        gettimeofday(&t1, NULL);
-        int count = 0;
-        
         // 处理任务队列
         void *msg = queue.pop();
-        while (msg) {
-            self->handleMessage(msg);
-            
-            // 防止其他协程（如：RoutineEnvironment::cleanRoutine）长时间不被调度，让其他协程处理一下
-            count++;
-            if (count == 100) {
-                gettimeofday(&t2, NULL);
-                if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
-                    msleep(1);
-                    gettimeofday(&t1, NULL);
-                }
-                count = 0;
-            }
-            
-            msg = queue.pop();
-        }
+
+        self->handleMessage(msg);
+        
+        RoutineEnvironment::pauseIfRuntimeBusy();
     }
-    
-    return NULL;
 }
 
 MultiThreadWorker::~MultiThreadWorker() {}
 
-void MultiThreadWorker::threadEntry( ThreadData *tdata ) {
+void MultiThreadWorker::threadEntry( Worker *self ) {
     // 启动rpc任务处理协程
-    RoutineEnvironment::startCoroutine(msgHandleRoutine, &tdata->_queueContext);
+    RoutineEnvironment::startCoroutine(msgHandleRoutine, self);
     
     RoutineEnvironment::runEventLoop();
 }
 
 void MultiThreadWorker::start() {
     // 启动线程
-    for (auto& td : _threadDatas) {
-        td._queueContext._worker = this;
-        td._t = std::thread(threadEntry, &td);
+    for (int i = 0; i < _threadNum; i++) {
+        _ts[i] = std::thread(threadEntry, this);
     }
-}
-
-void MultiThreadWorker::addMessage(void *msg) {
-    uint16_t index = (_lastThreadIndex++) % _threadNum;
-    _threadDatas[index]._queueContext._queue.push(msg);
 }
 
 CoroutineWorker::~CoroutineWorker() {}
 
 void CoroutineWorker::start() {
     // 启动rpc任务处理协程
-    RoutineEnvironment::startCoroutine(msgHandleRoutine, &_queueContext);
-}
-
-void CoroutineWorker::addMessage(void *msg) {
-    _queueContext._queue.push(msg);
+    RoutineEnvironment::startCoroutine(msgHandleRoutine, this);
 }
 
 Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker): _connection(connection), _worker(worker) {
@@ -712,6 +661,7 @@ void *Receiver::connectionDispatchRoutine( void * arg ) {
 }
 
 void *Receiver::connectionRoutine( void * arg ) {
+    // TODO: 限流，用滑动窗口算法进行限流，connection中增加限流标记（只对客户端的连接限流），触发限流阈值断线
     ReceiverTask *recvTask = (ReceiverTask *)arg;
     std::shared_ptr<Connection> connection = recvTask->connection;
     delete recvTask;

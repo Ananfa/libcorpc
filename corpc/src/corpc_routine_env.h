@@ -77,7 +77,8 @@ namespace corpc {
         static void quit();
         
         static void addTimeoutTask( std::shared_ptr<RpcClientTask>& rpcTask );
-        static void pause(); // 当前协程暂停一帧再继续执行
+        static void pause(); // 当前协程暂停并下一运行时循环继续执行
+        static void pauseIfRuntimeBusy(); // 当运行时忙时暂停并在下一运行时循环继续执行
 
     private:
         RoutineEnvironment();

@@ -18,9 +18,11 @@
 #define corpc_inner_rpc_h
 
 #include "co_routine.h"
+#include "corpc_queue.h"
 
 #include <thread>
 #include <map>
+#include <vector>
 #include <google/protobuf/service.h>
 #include <google/protobuf/message.h>
 
@@ -34,11 +36,7 @@ namespace corpc {
         std::shared_ptr<RpcClientTask> rpcTask;
     };
     
-#ifdef USE_NO_LOCK_QUEUE
-    typedef Co_MPSC_NoLockQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-#else
-    typedef CoSyncQueue<InnerRpcRequest*> InnerRpcRequestQueue;
-#endif
+    typedef MPMC_NoLockBlockQueue<InnerRpcRequest*> InnerRpcRequestQueue;
     
     class InnerRpcChannel : public google::protobuf::RpcChannel {
     public:
@@ -56,7 +54,7 @@ namespace corpc {
     public:
         InnerRpcServer() {}
         
-        void start(bool startInNewThread = false);
+        void start(uint32_t workerThreadNum = 0);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -79,7 +77,7 @@ namespace corpc {
         
         InnerRpcRequestQueue _queue;
         
-        std::thread _t;
+        std::vector<std::thread> _ts;
     public:
         friend class InnerRpcChannel;
     };
