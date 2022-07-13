@@ -161,6 +161,7 @@ static pid_t GetPid()
 	return p ? *(pid_t*)(p + 18) : getpid();
 }
 */
+
 template <class T,class TLink>
 void RemoveFromLink(T *ap)
 {
@@ -357,6 +358,7 @@ struct stCoEpoll_t
     
 	co_epoll_res *result; 
 
+	unsigned long long lastLoopStartTime;
 };
 
 typedef void (*OnPreparePfn_t)( stTimeoutItem_t *,struct epoll_event &ev, stTimeoutItemLink_t *active );
@@ -1099,6 +1101,7 @@ void co_eventloop( stCoEpoll_t *ctx, pfn_co_eventloop_t pfn, void *arg )
 		}
 
 		unsigned long long now = GetTickMS();
+		ctx->lastLoopStartTime = now; // 记录当前运行时循环开始时间
 		TakeAllTimeout( ctx,now,timeout );
 
 		stTimeoutItem_t *lp = timeout->head;
@@ -1492,4 +1495,8 @@ stCoCondItem_t *co_cond_pop( stCoCond_t *link )
 		PopHead<stCoCondItem_t,stCoCond_t>( link );
 	}
 	return p;
+}
+
+bool co_is_runtime_busy() {
+	return GetTickMS() > co_self()->env->pEpoll->lastLoopStartTime + 100;
 }

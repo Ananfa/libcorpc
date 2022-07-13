@@ -101,6 +101,8 @@ int co_register_fd(int fd);
 int co_set_timeout(int fd, int read_timeout_ms, int write_timeout_ms);
 int co_set_nonblock(int fd);
 
+bool co_is_runtime_busy(); // 当运行时当前循环周期超过100毫秒时返回true
+
 pid_t GetPid();
 
 // 加入start_hook方法是为了在使用LD_PRELOAD=libco时getenv被提前调用导致调用到getpid出错，因此加入开关，等进程初始化完成进入代码逻辑时才打开开关
