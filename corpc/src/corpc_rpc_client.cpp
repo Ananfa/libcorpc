@@ -600,14 +600,13 @@ void *RpcClient::taskHandleRoutine(void *arg) {
             if (count == 100) {
                 gettimeofday(&t2, NULL);
                 if ((t2.tv_sec - t1.tv_sec) * 1000000 + t2.tv_usec - t1.tv_usec > 100000) {
-                    msleep(1);
+                    RoutineEnvironment::pause();
                     
                     gettimeofday(&t1, NULL);
                     now = t1.tv_sec * 1000 + t1.tv_usec / 1000;
                 }
                 count = 0;
             }
-
             
             task = queue.pop();
         }

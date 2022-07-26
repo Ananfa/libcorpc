@@ -298,7 +298,7 @@ int main(int argc, const char * argv[]) {
     server->registerService(&g_fooService);
     server->registerService(&g_barService);
     server->registerService(&g_bazService);
-    server->start(false);
+    server->start(4);
     
     InnerRpcChannel *channel = new InnerRpcChannel(server);
     
