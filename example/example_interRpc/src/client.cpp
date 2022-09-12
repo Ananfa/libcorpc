@@ -192,10 +192,10 @@ static void *baz_routine( void *arg )
         
         iTotalBazSend++;
         
-        // 注意：这里sleep会影响性能测试
-        //if (iTotalBazSend % 10 == 0) {
-            msleep(1);
-        //}
+        // 注意：not_care_response类型的rpc不会产生协程切换，会使得其他协程得不到调度，这里sleep会影响性能测试
+        if (iTotalBazSend % 100 == 0) {
+            RoutineEnvironment::pause();
+        }
     }
 
     return NULL;

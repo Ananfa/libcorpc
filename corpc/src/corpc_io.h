@@ -213,12 +213,19 @@ namespace corpc {
         
         virtual void onClose() = 0;
         virtual void cleanDataOnClosing(std::shared_ptr<void>& data) {}
+
+        virtual void onSenderInit() {}
+        virtual void onReceiverInit() {}
     public:
         void setPipeline(std::shared_ptr<Pipeline> &pipeline) { _pipeline = pipeline; }
         std::shared_ptr<Pipeline> &getPipeline() { return _pipeline; }
         
         int getfd() { return _fd; }
         
+        std::shared_ptr<Connection> getPtr() {
+            return shared_from_this();
+        }
+
         int getSendThreadIndex() { return _sendThreadIndex; }
         void setSendThreadIndex(int threadIndex) { _sendThreadIndex = threadIndex; }
         int getRecvThreadIndex() { return _recvThreadIndex; }
@@ -240,6 +247,9 @@ namespace corpc {
         void popFrontData() { _datas.pop_front(); }
         
         bool isOpen() const { return !(_isClosing || _closed); }
+
+    protected:
+        virtual ssize_t write(const void *buf, size_t nbyte);
         
     protected:
         IO *_io;

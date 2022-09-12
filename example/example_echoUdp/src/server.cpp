@@ -82,7 +82,7 @@ static void *ban_routine( void *arg )
             banMsgs.push_back(1);
         }
 
-        server->banMessages(banMsgs);
+        server->setBanMessages(banMsgs);
         banned = !banned;
     }
 

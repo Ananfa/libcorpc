@@ -474,7 +474,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
                         std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
                         connection->_waitSendTaskCoList.pop_front();
                         
-                        std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(connection);
+                        //std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(connection);
 
                         if (task->rpcTask->response) {
                             // 若rpc任务已超时就不需发给服务器
@@ -487,10 +487,10 @@ void *RpcClient::connectionRoutine( void * arg ) {
                                     connection->_waitResultCoMap[uint64_t(task->rpcTask->co)] = task;
                                 }
 
-                                sender->send(ioConn, task->rpcTask);
+                                sender->send(ioConnection, task->rpcTask);
                             }
                         } else {
-                            sender->send(ioConn, task->rpcTask);
+                            sender->send(ioConnection, task->rpcTask);
                         }
                     }
                     

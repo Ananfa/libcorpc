@@ -281,6 +281,28 @@ void Connection::close() {
     }
 }
 
+ssize_t Connection::write(const void *buf, size_t nbyte) {
+    int ret;
+    uint32_t sentNum = 0;
+    uint32_t leftNum = nbyte;
+    do {
+        ret = (int)::write(_fd, buf + sentNum, leftNum);
+        if (ret > 0) {
+            assert(ret <= leftNum);
+            sentNum += ret;
+            leftNum -= ret;
+        }
+    } while (leftNum > 0 && errno == EAGAIN);
+
+    if (leftNum > 0) {
+        WARN_LOG("Connection::write -- write fd %d ret %d errno %d (%s)\n",
+                   _fd, ret, errno, strerror(errno));
+        return -1;
+    }
+
+    return sentNum;
+}
+
 Server::~Server() {}
 
 std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
@@ -477,7 +499,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
         // 判断是否“连接请求”消息
         if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
             if (msgType == CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
-                // 要求客户端重发握手3消息
+                // 要求客户端重发握手3消息（应该由绑定四元组的new_fd接收握手3消息，但有时会被listen_fd接收）
                 DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake3.\n");
             
                 sendto(listen_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
@@ -653,6 +675,7 @@ void *Receiver::connectionDispatchRoutine( void * arg ) {
         // 处理任务队列
         ReceiverTask* recvTask = queue.pop();
         while (recvTask) {
+            recvTask->connection->onReceiverInit();
             RoutineEnvironment::startCoroutine(connectionRoutine, recvTask);
             
             recvTask = queue.pop();
@@ -801,6 +824,7 @@ void *Sender::taskQueueRoutine( void * arg ) {
         while (task) {
             switch (task->type) {
                 case SenderTask::INIT:
+                    task->connection->onSenderInit();
                     RoutineEnvironment::startCoroutine(connectionRoutine, task);
                     break;
                     
@@ -854,21 +878,21 @@ void *Sender::connectionRoutine( void * arg ) {
     
     std::string buffs(CORPC_MAX_BUFFER_SIZE, 0);
     uint8_t *buf = (uint8_t *)buffs.data();
-    uint32_t startIndex = 0;
-    uint32_t endIndex = 0;
+    //uint32_t startIndex = 0;
+    //uint32_t endIndex = 0;
     
     // 若无数据可以发送则挂起，否则整理发送数据并发送
     while (true) {
-        int tmp = 0;
-        if (!connection->getPipeline()->downflow(buf + endIndex, CORPC_MAX_BUFFER_SIZE - endIndex, tmp)) {
+        int dataSize = 0;
+        if (!connection->getPipeline()->downflow(buf/* + endIndex*/, CORPC_MAX_BUFFER_SIZE/* - endIndex*/, dataSize)) {
             break;
         }
         
-        endIndex += tmp;
+        //endIndex += tmp;
         
-        int dataSize = endIndex - startIndex;
+        //int dataSize = endIndex - startIndex;
         if (dataSize == 0) {
-            assert(startIndex == 0);
+            //assert(startIndex == 0);
             // 等数据发完再关
             if (connection->_isClosing) {
                 break;
@@ -883,26 +907,36 @@ void *Sender::connectionRoutine( void * arg ) {
         }
         
         // 发数据
-        int ret;
-        do {
-            ret = (int)write(connection->_fd, buf + startIndex, dataSize);
-            if (ret > 0) {
-                assert(ret <= dataSize);
-                startIndex += ret;
-                dataSize -= ret;
-            }
-        } while (dataSize > 0 && errno == EAGAIN);
-        
-        if (dataSize > 0) {
-            WARN_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
-                   connection->_fd, ret, errno, strerror(errno));
-            
+        int ret = connection->write(buf/* + startIndex*/, dataSize);
+        if (ret < 0) {
             break;
         }
-        
-        if (startIndex == endIndex) {
-            startIndex = endIndex = 0;
-        }
+
+        assert(ret == dataSize);
+        //startIndex = endIndex = 0;
+
+
+//        int ret;
+//        do {
+//            ret = (int)write(connection->_fd, buf + startIndex, dataSize);
+//            if (ret > 0) {
+//                assert(ret <= dataSize);
+//                startIndex += ret;
+//                dataSize -= ret;
+//            }
+//        } while (dataSize > 0 && errno == EAGAIN);
+//        
+//        if (dataSize > 0) {
+//            WARN_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
+//                   connection->_fd, ret, errno, strerror(errno));
+//            
+//            break;
+//        }
+//        
+//        assert(startIndex == endIndex);
+//        if (startIndex == endIndex) {
+//            startIndex = endIndex = 0;
+//        }
     }
     
     connection->_isClosing = true;

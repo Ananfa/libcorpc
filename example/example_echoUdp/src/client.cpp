@@ -105,6 +105,8 @@ void *testRoutine(void *arg) {
                 assert(false);
         }
     }
+    
+    return nullptr;
 }
 
 void testThread(std::string host, uint16_t port, uint16_t local_port, int num) {

@@ -241,9 +241,9 @@ static void *baz_routine( void *arg )
         iTotalBazSend++;
         
         // 注意：这里sleep会影响性能测试
-        //if (iTotalBazSend % 10 == 0) {
-            msleep(1);
-        //}
+        if (iTotalBazSend % 100 == 0) {
+            RoutineEnvironment::pause();
+        }
     }
 
     return NULL;

@@ -43,6 +43,34 @@ namespace corpc {
         std::atomic<int> _readerCount;
         std::atomic<int> _readerWait;
     };
+
+    class RLockGuard {
+    private:
+        // 禁止在堆中创建对象
+        void* operator new(size_t t) {}
+        void operator delete(void* ptr) {}
+
+    public:
+        RLockGuard(RWMutex &lock): _lock(lock) { _lock.rlock(); }
+        ~RLockGuard() { _lock.runlock(); }
+
+    private:
+        RWMutex &_lock;
+    };
+
+    class WLockGuard {
+    private:
+        // 禁止在堆中创建对象
+        void* operator new(size_t t) {}
+        void operator delete(void* ptr) {}
+
+    public:
+        WLockGuard(RWMutex &lock): _lock(lock) { _lock.lock(); }
+        ~WLockGuard() { _lock.unlock(); }
+
+    private:
+        RWMutex &_lock;
+    };
 }
 
 #endif /* corpc_mutex_h */

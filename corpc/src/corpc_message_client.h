@@ -19,6 +19,7 @@
 
 #include "corpc_define.h"
 #include "corpc_crypter.h"
+#include "ikcp.h"
 #include <google/protobuf/message.h>
 #include <memory>
 
@@ -29,7 +30,7 @@ namespace corpc {
         virtual ~MessageClient();
         
         virtual bool start() = 0;
-        void stop() { _running = false; }
+        void stop() { _running = false; } // TODO: 发个结束消息
         
         std::shared_ptr<MessageClient> getPtr() {
             return shared_from_this();
@@ -68,7 +69,7 @@ namespace corpc {
 
         int _s;
         
-        MPSC_NoLockQueue<MessageInfo*> _sendQueue;
+        Co_MPSC_NoLockQueue<MessageInfo*> _sendQueue;
         MPSC_NoLockQueue<MessageInfo*> _recvQueue;
         
         std::map<int16_t, MessageInfo> _registerMessageMap;
@@ -77,6 +78,8 @@ namespace corpc {
         uint64_t _lastSendHBTime = 0; // 最后一次发送心跳的时间
 
         bool _running = false;
+
+        //static uint8_t _heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     };
 
     class TcpClient: public MessageClient {
@@ -108,6 +111,30 @@ namespace corpc {
         std::string _host;
         uint16_t _port;
         uint16_t _local_port;
+    };
+
+    class KcpClient: public MessageClient {
+    public:
+        KcpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0);
+        ~KcpClient();
+
+        virtual bool start();
+
+        ssize_t write(const void *buf, size_t nbyte);
+    private:
+        //static void *workRoutine(void *arg); // 数据收发协程
+
+        static void *recvRoutine(void *arg); // 数据接收协程
+        static void *sendRoutine(void *arg); // 数据发送协程
+        static void *updateRoutine(void *arg); // 心跳协程
+        
+        static int rawOut(const char *buf, int len, ikcpcb *kcp, void *obj);
+    private:
+        std::string _host;
+        uint16_t _port;
+        uint16_t _local_port;
+
+        ikcpcb* _pkcp;
     };
 }
 
