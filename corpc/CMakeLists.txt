@@ -23,6 +23,7 @@ message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 # Add source files
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SOURCE_FILES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/proto SOURCE_FILES)
+aux_source_directory(${PROJECT_SOURCE_DIR}/src/kcp SOURCE_FILES)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -42,6 +43,7 @@ include_directories(/usr/local/include)
 include_directories(/usr/local/include/co)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/proto)
+include_directories(${PROJECT_SOURCE_DIR}/src/kcp)
 
 # Add static and shared library target
 #add_library(libcorpc_static STATIC ${SOURCE_FILES})
