@@ -18,6 +18,7 @@
 #define corpc_kcp_h
 
 #include "corpc_message_server.h"
+#include "corpc_mutex.h"
 #include "ikcp.h"
 
 namespace corpc {
@@ -30,6 +31,13 @@ namespace corpc {
 
             virtual void onSenderInit();
 
+            void kcpUpdate(uint32_t current);
+            uint32_t kcpCheck(uint32_t current);
+            int kcpInput(const char *data, long size);
+            int kcpSend(const char *buffer, int len);
+            int kcpRecv(char *buffer, int len);
+            void kcpFlush();
+
         protected:
             virtual ssize_t write(const void *buf, size_t nbyte);
 
@@ -40,6 +48,7 @@ namespace corpc {
 
         private:
             ikcpcb* _pkcp;
+            Mutex _kcpMtx; // _pkcp同步访问锁
 
         public:
             friend class KcpPipeline;

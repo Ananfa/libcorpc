@@ -1163,7 +1163,8 @@ void *KcpClient::recvRoutine(void *arg) {
 
                                 if (crc != crc1) {
                                     ERROR_LOG("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, bodySize, crc, crc1);
-                                    goto END_LOOP;                                }
+                                    goto END_LOOP;
+                                }
                             }
 
                             // 解密
@@ -1182,7 +1183,8 @@ void *KcpClient::recvRoutine(void *arg) {
                         auto iter = self->_registerMessageMap.find(msgType);
                         if (iter == self->_registerMessageMap.end()) {
                             ERROR_LOG("unknown message: %d\n", msgType);
-                            goto END_LOOP;                        }
+                            goto END_LOOP;
+                        }
                         
                         std::shared_ptr<google::protobuf::Message> msg = nullptr;
                         if (bodySize > 0) {
@@ -1763,7 +1765,7 @@ ssize_t KcpClient::write(const void *buf, size_t nbyte) {
 
         ret = ikcp_send(_pkcp, (const char *)(buf + sentNum), pkgSize);
         if (ret < 0) {
-            WARN_LOG("KcpMessageServer::Connection::write -- ret %d\n", ret);
+            WARN_LOG("KcpClient::write -- ret %d\n", ret);
 
             return ret;
         }
