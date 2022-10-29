@@ -39,10 +39,9 @@ ssize_t KcpMessageServer::Connection::write(const void *buf, size_t nbyte) {
     do {
         uint32_t pkgSize = (leftNum > CORPC_MAX_KCP_PACKAGE_SIZE)?CORPC_MAX_KCP_PACKAGE_SIZE:leftNum;
 
-        ret = ikcp_send(_pkcp, (const char *)(buf + sentNum), pkgSize);
+        ret = kcpSend((const char *)(buf + sentNum), pkgSize);
         if (ret < 0) {
-            WARN_LOG("KcpMessageServer::Connection::write -- write fd %d ret %d\n",
-                   _fd, ret);
+            WARN_LOG("KcpMessageServer::Connection::write -- kcpSend ret %d\n", ret);
 
             return ret;
         }
@@ -51,16 +50,43 @@ ssize_t KcpMessageServer::Connection::write(const void *buf, size_t nbyte) {
         leftNum -= pkgSize;
     } while(leftNum > 0);
 
-    ikcp_flush(_pkcp);
-    //uint64_t now = mtime();
-    //uint32_t current = (uint32_t)(now & 0xfffffffful);
-    //ikcp_update(_pkcp, current);
+    kcpFlush();
 
     return nbyte;
 }
 
 void KcpMessageServer::Connection::onSenderInit() {
     RoutineEnvironment::startCoroutine(updateRoutine, this);
+}
+
+void KcpMessageServer::Connection::kcpUpdate(uint32_t current) {
+    LockGuard lock(_kcpMtx);
+    ikcp_update(_pkcp, current);
+}
+
+uint32_t KcpMessageServer::Connection::kcpCheck(uint32_t current) {
+    LockGuard lock(_kcpMtx);
+    return ikcp_check(_pkcp, current);
+}
+
+int KcpMessageServer::Connection::kcpInput(const char *data, long size) {
+    LockGuard lock(_kcpMtx);
+    return ikcp_input(_pkcp, data, size);
+}
+
+int KcpMessageServer::Connection::kcpSend(const char *buffer, int len) {
+    LockGuard lock(_kcpMtx);
+    return ikcp_send(_pkcp, buffer, len);
+}
+
+int KcpMessageServer::Connection::kcpRecv(char *buffer, int len) {
+    LockGuard lock(_kcpMtx);
+    return ikcp_recv(_pkcp, buffer, len);
+}
+
+void KcpMessageServer::Connection::kcpFlush() {
+    LockGuard lock(_kcpMtx);
+    ikcp_flush(_pkcp);
 }
 
 void * KcpMessageServer::Connection::updateRoutine( void * arg ) {
@@ -73,9 +99,9 @@ void * KcpMessageServer::Connection::updateRoutine( void * arg ) {
 //DEBUG_LOG("KcpMessageServer::Connection::updateRoutine -- ikcp_update\n");
         uint64_t now = mtime();
         uint32_t current = (uint32_t)(now & 0xfffffffful);
-        ikcp_update(connection->_pkcp, current);
+        connection->kcpUpdate(current);
 
-        uint32_t next = ikcp_check(connection->_pkcp, current);
+        uint32_t next = connection->kcpCheck(current);
         if (next > current) {
             // FixMe：这里会导致要发送的消息得不到立即发送
             //msleep(next-current);
@@ -131,23 +157,23 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
     std::shared_ptr<KcpMessageServer::Connection> kcpCon = std::static_pointer_cast<KcpMessageServer::Connection>(connection);
     assert(kcpCon);
     
-    int ret = ikcp_input(kcpCon->_pkcp, (const char*)buf, size);
+    int ret = kcpCon->kcpInput((const char*)buf, size);
     if (ret < 0) {
-        ERROR_LOG("KcpPipeline::upflow -- ikcp_input failed\n");
+        ERROR_LOG("KcpPipeline::upflow -- kcpInput failed\n");
         
-        return false;
+        //return false;
     }
 
     while (true)
     {
         //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-        ret = ikcp_recv(kcpCon->_pkcp, (char*)_dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
+        ret = kcpCon->kcpRecv((char*)_dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
         if (ret < 0) {
             if (ret == -1) {
                 break;
             }
 
-            ERROR_LOG("KcpPipeline::upflow -- ikcp_recv failed, ret:%d\n", ret);
+            ERROR_LOG("KcpPipeline::upflow -- kcpRecv failed, ret:%d\n", ret);
             return false;
         }
 
@@ -222,10 +248,7 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
         }
     }
 
-    ikcp_flush(kcpCon->_pkcp);
-    //uint64_t now = mtime();
-    //uint32_t current = (uint32_t)(now & 0xfffffffful);
-    //ikcp_update(kcpCon->_pkcp, current);
+    kcpCon->kcpFlush();
     
     return true;
 }
