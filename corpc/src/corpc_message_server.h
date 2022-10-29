@@ -71,7 +71,7 @@ namespace corpc {
         struct WorkerTask {
             int16_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
             uint16_t tag; // 客户端向服务器发带tag消息，服务器对这消息应答消息也需带相同的tag（客户端会等待tag消息返回）
-            uint32_t reqSerial; // 客户端收到的服务器最后消息序号
+            uint32_t reqSerial; // 连接对方收到的最后消息序号
             bool banned; // 屏蔽
             std::shared_ptr<Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
             std::shared_ptr<void> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据

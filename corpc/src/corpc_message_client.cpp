@@ -1257,6 +1257,12 @@ void *KcpClient::sendRoutine(void *arg) {
             }
         }
 
+        // 如果不是kcp消息（断线）
+        if (ret == CORPC_MESSAGE_HEAD_SIZE) {
+            ERROR_LOG("not kcp message\n");
+            goto END_LOOP;
+        }
+
         // 将要发送的数据拼在一起发送，提高效率
         int sendNum = 0;
         // 发送数据
