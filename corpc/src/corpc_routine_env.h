@@ -18,7 +18,7 @@
 #define corpc_routine_env_h
 
 #include "co_routine.h"
-#include "corpc_define.h"
+#include "corpc_queue.h"
 #include "corpc_rpc_common.h"
 #include "corpc_timeout_list.h"
 
