@@ -33,7 +33,6 @@ void RWMutex::lock() {
 }
 
 void RWMutex::unlock() {
-    ERROR_LOG("RWMutex::unlock 1\n");
     int r = _readerCount.fetch_add(RWMUTEXMAXREADERS);
 
     if (r >= 0) {
@@ -43,13 +42,9 @@ void RWMutex::unlock() {
 
     r += RWMUTEXMAXREADERS;
 
-    ERROR_LOG("RWMutex::unlock 2 r:%d\n", r);
-
     for (int i = 0; i < r; i++) {
         _readerSem.post();
     }
-
-    ERROR_LOG("RWMutex::unlock 3\n");
 
     _wlock.unlock();
 }
