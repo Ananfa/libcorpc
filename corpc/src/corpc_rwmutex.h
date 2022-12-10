@@ -27,7 +27,7 @@ namespace corpc {
     class RWMutex {
 
     public:
-        RWMutex():_readerSem(0), _writerSem(0) {}
+        RWMutex():_readerSem(0), _writerSem(0), _readerCount(0), _readerWait(0) {}
         ~RWMutex() {}
         
         void lock();

@@ -169,12 +169,7 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
         //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
         ret = kcpCon->kcpRecv((char*)_dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
         if (ret < 0) {
-            if (ret == -1) {
-                break;
-            }
-
-            ERROR_LOG("KcpPipeline::upflow -- kcpRecv failed, ret:%d\n", ret);
-            return false;
+            break;
         }
 
         // 解析数据

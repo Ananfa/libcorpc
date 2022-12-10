@@ -1090,6 +1090,14 @@ void *KcpClient::recvRoutine(void *arg) {
             goto END_LOOP;
         }
 
+        // TODO: 如果是握手控制消息（消息长度为20），断开连接（因为这里不应该收到握手消息，很可能是服务端已经断开连接，
+        // 后续发给服务器的消息服务器认为需要先握手）
+        if (ret == CORPC_MESSAGE_HEAD_SIZE) {
+            // 不是kcp数据消息，关闭连接
+            ERROR_LOG("KcpClient::recvRoutine -- wrong msg\n");
+            goto END_LOOP;
+        }
+
 //DEBUG_LOG("read data len:%d\n", ret);
 
         // 将收到的数据注入kcp中
@@ -1309,12 +1317,6 @@ void *KcpClient::sendRoutine(void *arg) {
                 // sleep 10 milisecond
                 msleep(10);
             }
-        }
-
-        // 如果不是kcp消息（断线）
-        if (ret == CORPC_MESSAGE_HEAD_SIZE) {
-            ERROR_LOG("not kcp message\n");
-            goto END_LOOP;
         }
 
         // 将要发送的数据拼在一起发送，提高效率
