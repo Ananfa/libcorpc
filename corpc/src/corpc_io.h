@@ -422,7 +422,7 @@ namespace corpc {
         };
         
     public:
-        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _threadDatas(threadNum), _lastThreadIndex(0) {}
+        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
         virtual ~MultiThreadReceiver() {}
         
         virtual bool start();
@@ -488,7 +488,7 @@ namespace corpc {
         };
         
     public:
-        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _threadDatas(threadNum), _lastThreadIndex(0) {}
+        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
         virtual ~MultiThreadSender() {}
         
         virtual bool start();

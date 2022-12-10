@@ -176,7 +176,7 @@ void *TcpClient::workRoutine( void * arg ) {
         // BUG: 当连接在其他地方close时，poll会返回0，死循环。而且还会在文件描述符被重新打开时错误读取信息。
         if (ret) {
             if (ret < 0) {
-                if (errno == EINTR) {
+                if (errno == EAGAIN || errno == EINTR) {
                     continue;
                 }
 
@@ -510,11 +510,23 @@ bool UdpClient::start() {
             return false;
         }
         DEBUG_LOG("send handshake1\n");
-        
+
         // 阶段二：接收handshake2消息
-        ret = poll(&fd, 1, 1000); // 1 second for timeout
+        uint64_t nowms = mtime();
+        uint64_t pollEndAt = nowms + 1000;
+STEP1_POLLAGAIN:
+        ret = poll(&fd, 1, pollEndAt - nowms); // 1 second for timeout
         switch (ret) {
             case -1:
+                if (errno == EAGAIN || errno == EINTR) {
+                    nowms = mtime();
+                    if (nowms < pollEndAt) {
+                        goto STEP1_POLLAGAIN;
+                    }
+
+                    continue;
+                }
+
                 ERROR_LOG("can't recv handshake2\n");
                 ::close(_s);
                 return false;
@@ -553,9 +565,21 @@ STEP2:
         DEBUG_LOG("send handshake3\n");
 
         // 阶段四：接收handshake4消息
-        ret = poll(&fd, 1, 100); // 100 millisecond for timeout
+        uint64_t nowms = mtime();
+        uint64_t pollEndAt = nowms + 100;
+STEP2_POLLAGAIN:
+        ret = poll(&fd, 1, pollEndAt - nowms); // 100 millisecond for timeout
         switch (ret) {
             case -1:
+                if (errno == EAGAIN || errno == EINTR) {
+                    nowms = mtime();
+                    if (nowms < pollEndAt) {
+                        goto STEP2_POLLAGAIN;
+                    }
+
+                    continue;
+                }
+
                 ERROR_LOG("can't recv handshake4\n");
                 ::close(_s);
                 return false;
@@ -647,6 +671,10 @@ void *UdpClient::workRoutine( void * arg ) {
         
         if (ret) {
             if (ret == -1) {
+                if (errno == EAGAIN || errno == EINTR) {
+                    continue;
+                }
+
                 ERROR_LOG("recv data\n");
                 self->close();
                 return nullptr;
@@ -655,7 +683,7 @@ void *UdpClient::workRoutine( void * arg ) {
             ret = (int)read(s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
             if (ret <= 0) {
                 // ret 0 mean disconnected
-                if (ret < 0 && errno == EAGAIN) {
+                if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
                     continue;
                 }
                 
@@ -901,9 +929,21 @@ bool KcpClient::start() {
         DEBUG_LOG("send handshake1\n");
         
         // 阶段二：接收handshake2消息
-        ret = poll(&fd, 1, 1000); // 1 second for timeout
+        uint64_t nowms = mtime();
+        uint64_t pollEndAt = nowms + 1000;
+STEP1_POLLAGAIN:
+        ret = poll(&fd, 1, pollEndAt - nowms); // 1 second for timeout
         switch (ret) {
             case -1:
+                if (errno == EAGAIN || errno == EINTR) {
+                    nowms = mtime();
+                    if (nowms < pollEndAt) {
+                        goto STEP1_POLLAGAIN;
+                    }
+
+                    continue;
+                }
+
                 ERROR_LOG("can't recv handshake2\n");
                 ::close(_s);
                 return false;
@@ -942,9 +982,21 @@ STEP2:
         DEBUG_LOG("send handshake3\n");
 
         // 阶段四：接收handshake4消息
-        ret = poll(&fd, 1, 100); // 100 millisecond for timeout
+        uint64_t nowms = mtime();
+        uint64_t pollEndAt = nowms + 100;
+STEP2_POLLAGAIN:
+        ret = poll(&fd, 1, pollEndAt - nowms); // 1 second for timeout
         switch (ret) {
             case -1:
+                if (errno == EAGAIN || errno == EINTR) {
+                    nowms = mtime();
+                    if (nowms < pollEndAt) {
+                        goto STEP2_POLLAGAIN;
+                    }
+
+                    continue;
+                }
+
                 ERROR_LOG("can't recv handshake4\n");
                 ::close(_s);
                 return false;

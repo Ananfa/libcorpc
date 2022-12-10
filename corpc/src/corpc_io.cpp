@@ -292,7 +292,7 @@ ssize_t Connection::write(const void *buf, size_t nbyte) {
             sentNum += ret;
             leftNum -= ret;
         }
-    } while (leftNum > 0 && errno == EAGAIN);
+    } while (leftNum > 0 && (errno == EAGAIN || errno == EINTR));
 
     if (leftNum > 0) {
         WARN_LOG("Connection::write -- write fd %d ret %d errno %d (%s)\n",
