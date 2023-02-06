@@ -47,7 +47,7 @@ namespace corpc {
     class RLockGuard {
     private:
         // 禁止在堆中创建对象
-        void* operator new(size_t t) {}
+        void* operator new(size_t t) { return nullptr; }
         void operator delete(void* ptr) {}
 
     public:
@@ -61,7 +61,7 @@ namespace corpc {
     class WLockGuard {
     private:
         // 禁止在堆中创建对象
-        void* operator new(size_t t) {}
+        void* operator new(size_t t) { return nullptr; }
         void operator delete(void* ptr) {}
 
     public:

@@ -51,8 +51,8 @@ namespace corpc {
         BufMessageLink _bufMsglink; // 缓存消息链
         std::map<uint64_t, BufMessageLink::Node*> _bufMsgMap; // 按消息序号索引链中消息节点
 
-        uint64_t _lastSendSerial; // 最后发送消息序列号
         bool _needBuf; // 是否缓存消息
+        uint64_t _lastSendSerial; // 最后发送消息序列号
     };
 
 }
