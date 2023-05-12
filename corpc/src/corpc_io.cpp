@@ -170,7 +170,7 @@ bool TcpPipeline::upflow(uint8_t *buf, int size) {
             }
             
             if (_bodySize > _maxBodySize) { // 数据超长
-                ERROR_LOG("TcpPipeline::upflow -- request too large in thread\n");
+                ERROR_LOG("TcpPipeline::upflow -- request too large in thread, %d > %d\n", _bodySize, _maxBodySize);
                 
                 return false;
             }
