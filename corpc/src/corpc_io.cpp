@@ -170,7 +170,7 @@ bool TcpPipeline::upflow(uint8_t *buf, int size) {
             }
             
             if (_bodySize > _maxBodySize) { // 数据超长
-                ERROR_LOG("TcpPipeline::upflow -- request too large in thread\n");
+                ERROR_LOG("TcpPipeline::upflow -- request too large in thread, %d > %d\n", _bodySize, _maxBodySize);
                 
                 return false;
             }
@@ -389,7 +389,7 @@ void *TcpAcceptor::acceptRoutine( void * arg ) {
     
     // 侦听连接，并把接受的连接传给连接处理对象
     while (true) {
-        struct sockaddr_in addr; //maybe sockaddr_un;
+        sockaddr_in addr; //maybe sockaddr_un;
         memset( &addr,0,sizeof(addr) );
         socklen_t len = sizeof(addr);
         
@@ -474,7 +474,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
     co_register_fd(listen_fd);
     co_set_timeout(listen_fd, -1, 1000);
             
-    struct sockaddr_in client_addr;
+    sockaddr_in client_addr;
     socklen_t slen = sizeof(client_addr);
     
     LOG("start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
@@ -490,7 +490,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             
             continue;
         }
-        
+DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
         uint32_t bodySize = *(uint32_t *)buf;
         bodySize = be32toh(bodySize);
         int16_t msgType = *(int16_t *)(buf + 4);
@@ -510,6 +510,13 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             continue;
         }
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake 1 msg.\n");
+
+        // 过滤多余的HANDSHAKE_1消息
+        auto it = self->_shakingClient.find(client_addr);
+        if (it != self->_shakingClient.end()) {
+            ERROR_LOG("UdpAcceptor::acceptRoutine() -- duplicate handshake 1 msg.\n");
+            continue;
+        }
         
         int new_fd = self->_shake_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         
@@ -524,15 +531,24 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             continue;
         }
         
+        self->_shakingClient.insert(std::make_pair(client_addr, true));
+
         // 为new_fd启动握手协程
-        RoutineEnvironment::startCoroutine(handshakeRoutine, self);
+        HandshakeInfo *info = new HandshakeInfo();
+        info->self = self;
+        info->addr = client_addr;
+        RoutineEnvironment::startCoroutine(handshakeRoutine, info);
     }
     
     return NULL;
 }
 
 void *UdpAcceptor::handshakeRoutine( void * arg ) {
-    UdpAcceptor *self = (UdpAcceptor *)arg;
+    HandshakeInfo *info = (HandshakeInfo *)arg;
+    UdpAcceptor *self = info->self;
+    sockaddr_in client_addr = info->addr;
+    delete info;
+
     Server *server = self->_server;
     int shake_fd = self->_shake_fd; // 注意：这里必须立即记录shake_fd，UdpAcceptor::_shake_fd会被后续新连接修改
     
@@ -549,7 +565,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
     
     while (trytimes > 0 && !shakeOK) {
         // 发送“连接确认”给客户的
-        DEBUG_LOG("Send shake 2 msg\n");
+        DEBUG_LOG("Send shake 2 msg, fd %d\n", shake_fd);
         int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
         if (ret != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 2 fail for fd %d ret %d errno %d (%s)\n",
@@ -605,6 +621,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
             shakeOK = true;
         }
     }
+
+    self->_shakingClient.erase(client_addr);
     
     return NULL;
 }
@@ -723,22 +741,25 @@ void *Receiver::connectionRoutine( void * arg ) {
             break;
         }
     }
-   
+DEBUG_LOG("Receiver::connectionRoutine -- 1\n");
     io->_sender->removeConnection(connection); // 通知sender关闭connection
     shutdown(fd, SHUT_WR);  // 让sender中的fd相关协程退出
     
+DEBUG_LOG("Receiver::connectionRoutine -- 2\n");
     // 等待写关闭
     while (!connection->_canClose) {
         // sleep 100 milisecond
         msleep(100);
     }
     
+DEBUG_LOG("Receiver::connectionRoutine -- 3\n");
     close(fd);
     
     connection->_closed = true;
     
+DEBUG_LOG("Receiver::connectionRoutine -- 4\n");
     connection->onClose();
-    
+    DEBUG_LOG("Receiver::connectionRoutine -- routine end for fd %d\n", fd);
     return NULL;
 }
 
@@ -1087,6 +1108,7 @@ void *Heartbeater::dispatchRoutine( void * arg ) {
             } else { // task->type == HeartbeatTask::STOP
                 auto node = self->_heartbeatList.getNode((uint64_t)task->connection.get());
                 if (node) {
+                    DEBUG_LOG("Heartbeater::dispatchRoutine() -- remove conn: %lu fd %d\n", (uint64_t)task->connection.get(), task->connection->getfd());
                     self->_heartbeatList.remove(node);
                 }
             }
@@ -1120,6 +1142,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         std::shared_ptr<Connection> conn = node->data;
 
         if (conn->_closed) {
+            DEBUG_LOG("Heartbeater::heartbeatRoutine() -- remove conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
             self->_heartbeatList.remove(node);
             continue;
         }
@@ -1149,7 +1172,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         }
 
         self->_heartbeatList.remove(node);
-        
+DEBUG_LOG("Heartbeater::heartbeatRoutine() -- send heartbeat for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
         // 发心跳包
         conn->send(self->_heartbeatmsg);
 

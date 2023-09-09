@@ -331,8 +331,29 @@ namespace corpc {
         static void *acceptRoutine( void * arg );
         
     };
+
+    class SockAddrCmp: public std::less<sockaddr_in> {
+    public:
+        bool operator()(const sockaddr_in& s1, const sockaddr_in& s2){
+            if (s1.sin_addr.s_addr != s2.sin_addr.s_addr) {
+                return s1.sin_addr.s_addr < s2.sin_addr.s_addr;
+            }
+
+            if (s1.sin_port != s2.sin_port) {
+                return s1.sin_port < s2.sin_port;
+            }
+
+            return false;
+        }
+    };
     
     class UdpAcceptor: public Acceptor {
+        struct HandshakeInfo {
+            UdpAcceptor *self;
+            
+            sockaddr_in addr;
+        };
+
     public:
         UdpAcceptor(Server *server, const std::string& ip, uint16_t port);
         virtual ~UdpAcceptor() {}
@@ -356,6 +377,8 @@ namespace corpc {
         uint8_t *_shakemsg4buf;
         std::string _unshakemsg;
         uint8_t *_unshakemsg2buf;
+
+        std::map<sockaddr_in, bool, SockAddrCmp> _shakingClient;
     };
     
     struct SenderTask {

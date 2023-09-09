@@ -5,14 +5,14 @@ import "google/protobuf/descriptor.proto";
 package corpc;
 
 extend google.protobuf.ServiceOptions {
-    optional uint32 global_service_id = 10000;
+    uint32 global_service_id = 10000;
 }
 
 extend google.protobuf.MethodOptions {
-    optional bool need_coroutine = 10002;       // 是否新开协程执行方法
-    optional bool not_care_response = 10003;    // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
-    optional uint32 timeout = 10004;            // RPC超时时间，单位：毫秒，0或不设置时表示不超时（注意：超时监测协程的轮询周期为1秒）
-    optional bool delete_in_done = 10005;       // 在done回调方法中释放request和controler对象，并交由接口实现者控制done的调用时机（该选项只在not_care_response为true时有意义）
+    bool need_coroutine = 10002;       // 是否新开协程执行方法
+    bool not_care_response = 10003;    // 是否关心结果，若不关心结果，则相当于单向消息发送且不知道对方是否成功接收
+    uint32 timeout = 10004;            // RPC超时时间，单位：毫秒，0或不设置时表示不超时（注意：超时监测协程的轮询周期为1秒）
+    bool delete_in_done = 10005;       // 在done回调方法中释放request和controler对象，并交由接口实现者控制done的调用时机（该选项只在not_care_response为true时有意义）
 }
 
 message Void {}
