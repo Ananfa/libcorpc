@@ -23,15 +23,15 @@
 namespace corpc {
     class Controller : public google::protobuf::RpcController {
         std::string _error_str;
-        bool _is_failed;
+        int32_t _error_code;
     public:
         Controller() { Reset(); }
         void Reset() {
             _error_str = "";
-            _is_failed = false;
+            _error_code = 0;
         }
         bool Failed() const {
-            return _is_failed;
+            return _error_code != 0;
         }
         std::string ErrorText() const {
             return _error_str;
@@ -40,11 +40,19 @@ namespace corpc {
             return ;
         }
         void SetFailed(const std::string &reason) {
-            _is_failed = true;
             _error_str = reason;
+            if (_error_code == 0) {
+                _error_code = -1;
+            }
         }
         bool IsCanceled() const { // NOT IMPL
             return false;
+        }
+        void SetErrorCode(int32_t error_code) {
+            _error_code = error_code;
+        }
+        int32_t GetErrorCode() {
+            return _error_code;
         }
         
         void NotifyOnCancel(google::protobuf::Closure* callback) { // NOT IMPL

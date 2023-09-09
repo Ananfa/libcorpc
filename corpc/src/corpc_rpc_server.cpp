@@ -37,6 +37,12 @@
 
 using namespace corpc;
 
+//void callDoneHandle2(::google::protobuf::Message *request) {
+//    ERROR_LOG("RpcServer -- callDoneHandle2\n");
+//    //delete controller;
+//    delete request;
+//}
+
 RpcServer::Connection::Connection(int fd, RpcServer* server): corpc::Connection(fd, server->_io, false), _server(server) {
 }
 
@@ -202,38 +208,59 @@ void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
 }
 
 bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum) {
-    std::shared_ptr<RpcServerTask> rpcTask = std::static_pointer_cast<RpcServerTask>(data);
-    uint32_t msgSize = rpcTask->response->GetCachedSize();
-    if (msgSize == 0) {
-        msgSize = rpcTask->response->ByteSizeLong();
-    }
-    
     // 若空间不足容纳消息头部则等待下次
     if (CORPC_RESPONSE_HEAD_SIZE > space) {
         return true;
+    }
+
+    std::shared_ptr<RpcServerTask> rpcTask = std::static_pointer_cast<RpcServerTask>(data);
+
+    uint32_t msgSize;
+    if (rpcTask->controller->Failed()) {
+        msgSize = rpcTask->controller->ErrorText().size();
+    } else {
+        msgSize = rpcTask->response->GetCachedSize();
+        if (msgSize == 0) {
+            msgSize = rpcTask->response->ByteSizeLong();
+        }
     }
     
     *(uint32_t *)buf = htobe32(msgSize);
     *(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
     *(uint64_t *)(buf + 12) = htobe64(rpcTask->expireTime);
+
+    if (rpcTask->controller->Failed()) {
+        *(uint32_t *)(buf + 20) = htobe32(((Controller *)rpcTask->controller)->GetErrorCode());
+    } else {
+        *(uint32_t *)(buf + 20) = 0;
+    }
     
     int spaceleft = space - CORPC_RESPONSE_HEAD_SIZE;
     if (spaceleft >= msgSize) {
         if (msgSize > 0) {
-            rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
+            if (rpcTask->controller->Failed()) {
+                memcpy(buf + CORPC_RESPONSE_HEAD_SIZE, rpcTask->controller->ErrorText().c_str(), msgSize);
+            } else {
+                rpcTask->response->SerializeWithCachedSizesToArray(buf + CORPC_RESPONSE_HEAD_SIZE);
+            }
         }
         
         size = CORPC_RESPONSE_HEAD_SIZE + msgSize;
     } else {
         downflowBuf.assign(msgSize, 0);
         uint8_t *dbuf = (uint8_t*)downflowBuf.data();
-        rpcTask->response->SerializeWithCachedSizesToArray(dbuf);
+
+        if (rpcTask->controller->Failed()) {
+            memcpy(dbuf, rpcTask->controller->ErrorText().c_str(), msgSize);
+        } else {
+            rpcTask->response->SerializeWithCachedSizesToArray(dbuf);
+        }
         
         if (spaceleft > 0) {
             memcpy(buf + CORPC_RESPONSE_HEAD_SIZE, dbuf, spaceleft);
             downflowBufSentNum = spaceleft;
         }
-        
+
         size = space;
     }
     

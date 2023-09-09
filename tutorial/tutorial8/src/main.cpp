@@ -36,7 +36,8 @@ public:
         std::string msg1 = request->msg1();
         std::string msg2 = request->msg2();
         
-        response->set_msg(msg1 + " " + msg2);
+        controller->SetFailed(msg1 + " " + msg2);
+        ((Controller *)controller)->SetErrorCode(100);
     }
 };
 
@@ -56,7 +57,7 @@ static void *rpc_routine( void *arg )
     helloworld_clt->foo(controller, request, response, NULL);
     
     if (controller->Failed()) {
-        ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+        ERROR_LOG("Rpc Call Failed : error code:%d, error msg:%s\n", ((Controller *)controller)->GetErrorCode(), controller->ErrorText().c_str());
     } else {
         LOG("========= %s =========\n", response->msg().c_str());
     }

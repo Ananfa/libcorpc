@@ -38,9 +38,12 @@
 #define CORPC_MAX_REQUEST_SIZE 0x10000
 #define CORPC_MAX_RESPONSE_SIZE 0x100000
 
+// rpc request head format
+// |body size(4 bytes)|service id(4 bytes)|method id(4 bytes)|coroutine ptr(8 bytes)|expire time(8 bytes)|
 #define CORPC_REQUEST_HEAD_SIZE 28
-#define CORPC_RESPONSE_HEAD_SIZE 20
-
+// rpc response head format
+// |body size(4 bytes)|coroutine ptr(8 bytes)|expire time(8 bytes)|error code(4 bytes)|
+#define CORPC_RESPONSE_HEAD_SIZE 24
 // message head format
 // |body size(4 bytes)|message type(2 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
 #define CORPC_MESSAGE_HEAD_SIZE 20

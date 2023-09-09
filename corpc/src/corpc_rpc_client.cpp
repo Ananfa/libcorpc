@@ -42,6 +42,8 @@ void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
     callId = be64toh(callId);
     uint64_t expireTime = *(uint64_t *)(head + 12);
     expireTime = be64toh(expireTime);
+    uint32_t error_code = *(uint32_t *)(head + 20);
+    error_code = be32toh(error_code);
     assert(respSize == size);
     std::shared_ptr<ClientTask> task;
     // 注意: _waitResultCoMap需进行线程同步
@@ -65,20 +67,34 @@ void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
         conn->_waitResultCoMap.erase(itor);
     }
     
-    // 注意：这里操作的是response_1对象而不是response对象（因为有多线程同步问题），在调用线程中再通过Swap方法将结果交换到response中
-    // 解析包体（RpcResponseData）
-    if (!task->rpcTask->response_1->ParseFromArray(body, respSize)) {
-        ERROR_LOG("RpcClient::decode -- parse response body fail\n");
-        assert(false);
-        // 什么情况会导致proto消息解析失败？
-        RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, expireTime, EBADMSG);
+    // 注意：这里操作的是response_1（或controller_1）对象而不是response（或controller）对象是因为有多线程同步问题（有超时时会有多线程同步问题），在调用线程中再通过Swap方法将结果交换到response中
+    if (error_code != 0) {
+        std::string error_str((char *)body, respSize);
+        assert(task->rpcTask->controller_1 == nullptr);
 
-        return nullptr;
+        if (expireTime == 0) {
+            task->rpcTask->controller->SetFailed(error_str);
+            ((Controller *)task->rpcTask->controller)->SetErrorCode(error_code);
+        } else {
+            Controller *controller = new Controller();
+            controller->SetFailed(error_str);
+            controller->SetErrorCode(error_code);
+            task->rpcTask->controller_1 = controller;
+        }
+    } else {
+        // 解析包体（RpcResponseData）
+        if (!task->rpcTask->response_1->ParseFromArray(body, respSize)) {
+            ERROR_LOG("RpcClient::decode -- parse response body fail\n");
+            assert(false);
+            // 什么情况会导致proto消息解析失败？
+            RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, expireTime, EBADMSG);
+            return nullptr;
+        }
     }
-    
+
     // 注意：在这直接进行跨线程协程唤醒，而不是返回后再处理
     RoutineEnvironment::resumeCoroutine(task->rpcTask->pid, task->rpcTask->co, expireTime);
-    
+
     return nullptr;
 }
 

@@ -1,14 +1,16 @@
+syntax = "proto3";
+
 import "corpc_option.proto";
 
 option cc_generic_services = true;
 
 message FooRequest {
-    required string msg1 = 1;
-    required string msg2 = 2;
+    string msg1 = 1;
+    string msg2 = 2;
 }
 
 message FooResponse {
-    required string msg = 1;
+    string msg = 1;
 }
 
 service HelloWorldService {

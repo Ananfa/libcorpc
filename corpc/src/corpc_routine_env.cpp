@@ -295,8 +295,10 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
                 if (node && node->expireTime == wr->expireTime) { // 因为使用协程对象指针地址作为标识，协程对象销毁后地址会被复用，因此通过过期时间来确定是协程本身
                     if (wr->err) {
                         node->data->controller->SetFailed(strerror(wr->err));
+                        ((Controller *)node->data->controller)->SetErrorCode(-1);
                     } else if (node->data->controller_1 != NULL && node->data->controller_1->Failed()) {
                         node->data->controller->SetFailed(node->data->controller_1->ErrorText());
+                        ((Controller *)node->data->controller)->SetErrorCode(((Controller *)node->data->controller_1)->GetErrorCode());
                     } else {
                         node->data->response->MergeFrom(*(node->data->response_1));
                     }
