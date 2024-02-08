@@ -90,6 +90,12 @@ void _print_time(FILE* fd, struct tm& tm_now, uint32_t mseconds) {
     fputs(buffer, fd);
 }
 
+void _print_head(FILE* fd, const char *filename, int line, const char *function) {
+    char buffer[256];
+    snprintf(buffer, 256, "[%s:%d(%s)]: ", strrchr(filename, '/')+1, line, function);
+    fputs(buffer, fd);
+}
+
 namespace corpc {
     
     int setKeepAlive(int fd, int interval)
@@ -164,7 +170,7 @@ namespace corpc {
         }
     }
     
-    void debuglog(const char *format, ...)
+    void debuglog(const char *filename, int line, const char *function, const char *format, ...)
     {
         va_list arg;
         va_start(arg, format);
@@ -182,7 +188,9 @@ namespace corpc {
         FILE *fd = _getLogFile(today);
         
         _print_time(fd, tm_now, mseconds);
-        fputs(" [DEBUG] : ", fd);
+        fputs(" [DEBUG] ", fd);
+
+        _print_head(fd, filename, line, function);
         
         vfprintf(fd, format, arg);
         
@@ -209,7 +217,7 @@ namespace corpc {
         FILE *fd = _getLogFile(today);
         
         _print_time(fd, tm_now, mseconds);
-        fputs(" [INFO]  : ", fd);
+        fputs(" [INFO] ", fd);
         
         vfprintf(fd, format, arg);
         
@@ -218,7 +226,7 @@ namespace corpc {
         va_end(arg);
     }
     
-    void warnlog(const char *format, ...)
+    void warnlog(const char *filename, int line, const char *function, const char *format, ...)
     {
         va_list arg;
         va_start(arg, format);
@@ -236,7 +244,9 @@ namespace corpc {
         FILE *fd = _getLogFile(today);
         
         _print_time(fd, tm_now, mseconds);
-        fputs(" [WARN]  : ", fd);
+        fputs(" [WARN] ", fd);
+        
+        _print_head(fd, filename, line, function);
         
         vfprintf(fd, format, arg);
         
@@ -245,7 +255,7 @@ namespace corpc {
         va_end(arg);
     }
     
-    void errlog(const char *format, ...)
+    void errlog(const char *filename, int line, const char *function, const char *format, ...)
     {
         va_list arg;
         va_start(arg, format);
@@ -263,7 +273,9 @@ namespace corpc {
         FILE *fd = _getLogFile(today);
         
         _print_time(fd, tm_now, mseconds);
-        fputs(" [ERROR] : ", fd);
+        fputs(" [ERROR] ", fd);
+        
+        _print_head(fd, filename, line, function);
         
         vfprintf(fd, format, arg);
         
@@ -272,7 +284,7 @@ namespace corpc {
         va_end(arg);
     }
 
-    void fatallog(const char *format, ...)
+    void fatallog(const char *filename, int line, const char *function, const char *format, ...)
     {
         va_list arg;
         va_start(arg, format);
@@ -290,7 +302,9 @@ namespace corpc {
         FILE *fd = _getLogFile(today);
         
         _print_time(fd, tm_now, mseconds);
-        fputs(" [FATAL] : ", fd);
+        fputs(" [FATAL] ", fd);
+        
+        _print_head(fd, filename, line, function);
         
         vfprintf(fd, format, arg);
         

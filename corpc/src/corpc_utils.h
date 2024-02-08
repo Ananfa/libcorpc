@@ -51,11 +51,11 @@ namespace corpc {
     void callDoneHandle(std::shared_ptr<::google::protobuf::Closure> done);
 
     void setLogPath(const char *path);
-    void debuglog(const char *format, ...);
+    void debuglog(const char *filename, int line, const char *function, const char *format, ...);
     void infolog(const char *format, ...);
-    void warnlog(const char *format, ...);
-    void errlog(const char *format, ...);
-    void fatallog(const char *format, ...);
+    void warnlog(const char *filename, int line, const char *function, const char *format, ...);
+    void errlog(const char *filename, int line, const char *function, const char *format, ...);
+    void fatallog(const char *filename, int line, const char *function, const char *format, ...);
 }
 
 #define LOG_LEVEL_DEBUG 0
@@ -63,23 +63,23 @@ namespace corpc {
 #define LOG_LEVEL_WARN 2
 
 #if LOG_LEVEL == LOG_LEVEL_DEBUG
-#  define DEBUG_LOG(format, ...) corpc::debuglog(format, ## __VA_ARGS__)
+#  define DEBUG_LOG(format, ...) corpc::debuglog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
 #  define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
-#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
+#  define WARN_LOG(format, ...) corpc::warnlog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
 #elif LOG_LEVEL == LOG_LEVEL_INFO
 #  define DEBUG_LOG(...)
 #  define LOG(format, ...) corpc::infolog(format, ## __VA_ARGS__)
-#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
+#  define WARN_LOG(format, ...) corpc::warnlog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
 #elif LOG_LEVEL == LOG_LEVEL_WARN
 #  define DEBUG_LOG(...)
 #  define LOG(...)
-#  define WARN_LOG(format, ...) corpc::warnlog(format, ## __VA_ARGS__)
+#  define WARN_LOG(format, ...) corpc::warnlog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
 #else
 #  define DEBUG_LOG(...)
 #  define LOG(...)
 #  define WARN_LOG(...)
 #endif
-#define ERROR_LOG(format, ...) corpc::errlog(format, ## __VA_ARGS__)
-#define FATAL_LOG(format, ...) corpc::fatallog(format, ## __VA_ARGS__)
+#define ERROR_LOG(format, ...) corpc::errlog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
+#define FATAL_LOG(format, ...) corpc::fatallog(__FILE__, __LINE__, __func__, format, ## __VA_ARGS__)
 
 #endif /* corpc_utils_h */
