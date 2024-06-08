@@ -40,14 +40,14 @@ namespace corpc {
     
     class InnerRpcChannel : public google::protobuf::RpcChannel {
     public:
-        InnerRpcChannel(InnerRpcServer *server): _server(server) {}
+        InnerRpcChannel(InnerRpcServer *server): server_(server) {}
         virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done);
         
     private:
         virtual ~InnerRpcChannel() {}
         
     private:
-        InnerRpcServer *_server;
+        InnerRpcServer *server_;
     };
     
     class InnerRpcServer {
@@ -73,11 +73,11 @@ namespace corpc {
         
         static void *requestRoutine( void * arg );
     private:
-        std::map<uint32_t, ServiceData> _services;
+        std::map<uint32_t, ServiceData> services_;
         
-        InnerRpcRequestQueue _queue;
+        InnerRpcRequestQueue queue_;
         
-        std::vector<std::thread> _ts;
+        std::vector<std::thread> ts_;
     public:
         friend class InnerRpcChannel;
     };

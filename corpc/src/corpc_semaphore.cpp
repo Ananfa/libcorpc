@@ -27,17 +27,17 @@ void Semaphore::wait() {
     stCoRoutine_t *coSelf = co_self();
     int retryTimes = 0;
     while (true) {
-        int v = _res.load();
+        int v = res_.load();
         if (v == 0) {
             // 尝试把_res值从0改成-1（防止此时锁被其他线程解锁，导致本协程进入不会被唤醒的等待）
-            if (_res.compare_exchange_weak(v, -1)) {
+            if (res_.compare_exchange_weak(v, -1)) {
                 //assert(v == 0);
                 // 若改成功，将本协程插入等待唤醒队列（由于只会有一个协程成功将_res改为-1，因此这里不需要用锁或者CAS机制），然后将_res从-1改为0（这里必然一次成功），yeld协程等待唤醒，退出
-                _waitRoutines.push_back({pid, coSelf});
+                waitRoutines_.push_back({pid, coSelf});
 
-                //assert(_res.load() == -1);
+                //assert(res_.load() == -1);
 
-                _res.store(0);
+                res_.store(0);
 
                 co_yield_ct(); // 等待锁让出给当前协程时唤醒
                 return;
@@ -48,7 +48,7 @@ void Semaphore::wait() {
                 corpc_cpu_pause();
             }
         } else if (v > 0) {
-            if (_res.compare_exchange_weak(v, v-1)) {
+            if (res_.compare_exchange_weak(v, v-1)) {
                 // 若改成功则获得信号量，退出
                 return;
             }
@@ -65,20 +65,20 @@ void Semaphore::wait() {
 void Semaphore::post() {
     int retryTimes = 0;
     while (true) {
-        int v = _res.load();
+        int v = res_.load();
         if (v == 0) {
             // 尝试把_lock值从0改为-1
-            if (_res.compare_exchange_weak(v, -1)) {
+            if (res_.compare_exchange_weak(v, -1)) {
                 // 若改成功，判断待唤醒队列是否有元素
-                if (_waitRoutines.empty()) {
+                if (waitRoutines_.empty()) {
                     // 若没有元素，将_lock值从-2改为1，退出
-                    _res.store(1);
+                    res_.store(1);
                 } else {
                     // 若有元素，从待唤醒队列pop出头部元素，将_lock值从-2改为0，唤醒头部元素协程，退出
-                    RoutineInfo info = _waitRoutines.front();
-                    _waitRoutines.pop_front();
+                    RoutineInfo info = waitRoutines_.front();
+                    waitRoutines_.pop_front();
 
-                    _res.store(0);
+                    res_.store(0);
 
                     RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
                 }
@@ -90,7 +90,7 @@ void Semaphore::post() {
                 corpc_cpu_pause();
             }
         } else if (v > 0) {
-            if (_res.compare_exchange_weak(v, v+1)) {
+            if (res_.compare_exchange_weak(v, v+1)) {
                 // 若改成功则返还信号量，退出
                 return;
             }

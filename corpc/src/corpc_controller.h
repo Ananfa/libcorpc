@@ -22,37 +22,37 @@
 
 namespace corpc {
     class Controller : public google::protobuf::RpcController {
-        std::string _error_str;
-        int32_t _error_code;
+        std::string error_str_;
+        int32_t error_code_;
     public:
         Controller() { Reset(); }
         void Reset() {
-            _error_str = "";
-            _error_code = 0;
+            error_str_ = "";
+            error_code_ = 0;
         }
         bool Failed() const {
-            return _error_code != 0;
+            return error_code_ != 0;
         }
         std::string ErrorText() const {
-            return _error_str;
+            return error_str_;
         }
         void StartCancel() { // NOT IMPL
             return ;
         }
         void SetFailed(const std::string &reason) {
-            _error_str = reason;
-            if (_error_code == 0) {
-                _error_code = -1;
+            error_str_ = reason;
+            if (error_code_ == 0) {
+                error_code_ = -1;
             }
         }
         bool IsCanceled() const { // NOT IMPL
             return false;
         }
         void SetErrorCode(int32_t error_code) {
-            _error_code = error_code;
+            error_code_ = error_code;
         }
         int32_t GetErrorCode() {
-            return _error_code;
+            return error_code_;
         }
         
         void NotifyOnCancel(google::protobuf::Closure* callback) { // NOT IMPL

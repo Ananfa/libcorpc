@@ -43,13 +43,13 @@ namespace corpc {
             void put(MYSQL* mysql, bool error);
             
         private:
-            Proxy(): _stub(nullptr) {}
+            Proxy(): stub_(nullptr) {}
             ~Proxy();
             
             void init(InnerRpcServer *server);
             
         private:
-            thirdparty::ThirdPartyService::Stub *_stub;
+            thirdparty::ThirdPartyService::Stub *stub_;
             
         public:
             friend class MysqlConnectPool;
@@ -68,6 +68,7 @@ namespace corpc {
     public:
         static MysqlConnectPool* create(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum);
         
+        
     private:
         MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum);
         ~MysqlConnectPool() {}
@@ -80,21 +81,21 @@ namespace corpc {
         Proxy proxy;
         
     private:
-        std::string _host;
-        std::string _user;
-        std::string _passwd;
-        std::string _db;
-        unsigned int _port;
-        std::string _unix_socket;
-        unsigned long _clientflag;
+        std::string host_;
+        std::string user_;
+        std::string passwd_;
+        std::string db_;
+        unsigned int port_;
+        std::string unix_socket_;
+        unsigned long clientflag_;
         
-        uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
-        uint32_t _realConnectCount; // 当前实际建立连接的数量
+        uint32_t maxConnectNum_;    // 与mysql数据库最多建立的连接数
+        uint32_t realConnectCount_; // 当前实际建立连接的数量
         
-        std::list<IdleHandle> _idleList; // 空闲连接表
-        std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
+        std::list<IdleHandle> idleList_; // 空闲连接表
+        std::list<stCoRoutine_t*> waitingList_; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
-        InnerRpcServer *_server;
+        InnerRpcServer *server_;
     };
 
 }

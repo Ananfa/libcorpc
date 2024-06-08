@@ -47,8 +47,8 @@ namespace corpc {
             static int rawOut(const char *buf, int len, ikcpcb *kcp, void *obj);
 
         private:
-            ikcpcb* _pkcp;
-            Mutex _kcpMtx; // _pkcp同步访问锁
+            ikcpcb* pkcp_;
+            Mutex kcpMtx_; // pkcp_同步访问锁
 
         public:
             friend class KcpPipeline;
@@ -70,26 +70,26 @@ namespace corpc {
         virtual bool upflow(uint8_t *buf, int size);
 
     private:
-        std::string _data;
-        uint8_t *_dataBuf;
+        std::string data_;
+        uint8_t *dataBuf_;
 
-        uint _headNum;
-        uint _bodyNum;
+        uint headNum_;
+        uint bodyNum_;
         
-        uint _bodySizeOffset;
-        SIZE_TYPE _bodySizeType;
+        uint bodySizeOffset_;
+        SIZE_TYPE bodySizeType_;
     };
     
     class KcpPipelineFactory: public MessagePipelineFactory {
     public:
-        KcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
+        KcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType) {}
         ~KcpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
         
     public:
-        uint _bodySizeOffset;
-        MessagePipeline::SIZE_TYPE _bodySizeType;
+        uint bodySizeOffset_;
+        MessagePipeline::SIZE_TYPE bodySizeType_;
     };
     
 }

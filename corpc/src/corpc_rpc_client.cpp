@@ -48,10 +48,10 @@ void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
     std::shared_ptr<ClientTask> task;
     // 注意: _waitResultCoMap需进行线程同步
     {
-        LockGuard lock( conn->_waitResultCoMapMutex );
-        Connection::WaitTaskMap::iterator itor = conn->_waitResultCoMap.find(callId);
+        LockGuard lock( conn->waitResultCoMapMutex_ );
+        Connection::WaitTaskMap::iterator itor = conn->waitResultCoMap_.find(callId);
         
-        if (itor == conn->_waitResultCoMap.end()) {
+        if (itor == conn->waitResultCoMap_.end()) {
             // 注意：RPC超时机制会出现找不到等待结果任务的情况
             return nullptr;
         }
@@ -64,7 +64,7 @@ void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
         task = std::move(itor->second);
         
         // 唤醒结果对应的等待结果协程进行处理
-        conn->_waitResultCoMap.erase(itor);
+        conn->waitResultCoMap_.erase(itor);
     }
     
     // 注意：这里操作的是response_1（或controller_1）对象而不是response（或controller）对象是因为有多线程同步问题（有超时时会有多线程同步问题），在调用线程中再通过Swap方法将结果交换到response中
@@ -140,6 +140,7 @@ bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shar
     }
     
     if (!rpcTask->response) {
+//ERROR_LOG("RpcClient::encode call done\n");
         // 对于not_care_response类型的rpc调用，这里需要触发回调来清理request对象
         assert(rpcTask->done);
         rpcTask->done->Run();
@@ -148,7 +149,7 @@ bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shar
     return true;
 }
 
-RpcClient::Connection::Connection(std::shared_ptr<ChannelCore> channel): corpc::Connection(-1, channel->_client->_io, false), _channel(channel), _st(CLOSED) {
+RpcClient::Connection::Connection(std::shared_ptr<ChannelCore> channel): corpc::Connection(-1, channel->client_->io_, false), channel_(channel), st_(CLOSED) {
 }
 
 void RpcClient::Connection::onClose() {
@@ -156,7 +157,7 @@ void RpcClient::Connection::onClose() {
     connectionTask->type = ConnectionTask::CLOSE;
     connectionTask->connection = std::static_pointer_cast<Connection>(corpc::Connection::shared_from_this());
     
-    _channel->_client->_connectionTaskQueue.push(connectionTask);
+    channel_->client_->connectionTaskQueue_.push(connectionTask);
 }
 
 void RpcClient::Connection::cleanDataOnClosing(std::shared_ptr<void>& data) {
@@ -168,54 +169,58 @@ void RpcClient::Connection::cleanDataOnClosing(std::shared_ptr<void>& data) {
             rpcTask->controller->SetFailed(strerror(ENETDOWN));
         }
         
+//ERROR_LOG("RpcClient::Connection::cleanDataOnClosing call done\n");
         rpcTask->done->Run();
     }
 }
 
 RpcClient::ChannelCore::ChannelCore(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum)
-: _client(client), _host(host), _port(port), _conIndex(0), _connectDelay(false) {
+: client_(client), host_(host), port_(port), conIndex_(0), connectDelay_(false) {
     if (connectNum == 0) {
         connectNum = 1;
     }
     
     for (int i = 0; i < connectNum; i++) {
-        _connections.push_back(nullptr);
+        connections_.push_back(nullptr);
     }
 }
 
 RpcClient::ChannelCore::~ChannelCore() {
-    // TODO: 如何优雅的关闭channel？涉及其中connection关闭，而connection中有协程正在执行
-    // 一般情况channel是不会被关闭的
+    // 如何优雅的关闭channel？涉及其中connection关闭，而connection中有协程正在执行
+    // 通过引入ChannelGuard来实现channel资源回收，ChannelGuard持有ChannelCore的share_ptr，Channel又持有ChannelGuard的shared_ptr
+    // 当所有持有ChannelGuard的Channel都销毁后ChannelGuard就会被销毁，而它的析构函数会将其持有的ChannelCore插入到RpcClient的clearChannelQueue中
+    // RpcClient的清理Channel协程会对ChannelCore进行清理————关闭其中的connections（connection与ChannelCore的互相引用会在此处断开，后成功销毁）
+    // 这些connection都由RpcClient线程管理，这样清理是安全的
 }
 
 std::shared_ptr<RpcClient::Connection> RpcClient::ChannelCore::getNextConnection() {
     // 若Channel正在清理，连接会被清空，此时返回空
-    if (!_connections.size()) {
+    if (!connections_.size()) {
         return nullptr;
     }
     
-    _conIndex = (_conIndex + 1) % _connections.size();
+    conIndex_ = (conIndex_ + 1) % connections_.size();
     
-    if (_connections[_conIndex] == nullptr || _connections[_conIndex]->_st == Connection::CLOSED) {
-        _connections[_conIndex] = std::make_shared<Connection>(shared_from_this());
+    if (connections_[conIndex_] == nullptr || connections_[conIndex_]->st_ == Connection::CLOSED) {
+        connections_[conIndex_] = std::make_shared<Connection>(shared_from_this());
         
-        std::shared_ptr<corpc::Connection> connection = _connections[_conIndex];
+        std::shared_ptr<corpc::Connection> connection = connections_[conIndex_];
         
-        std::shared_ptr<corpc::Pipeline> pipeline = _client->_pipelineFactory->buildPipeline(connection);
+        std::shared_ptr<corpc::Pipeline> pipeline = client_->pipelineFactory_->buildPipeline(connection);
         connection->setPipeline(pipeline);
     }
     
-    if (_connections[_conIndex]->_st == Connection::CLOSED) {
-        _connections[_conIndex]->_st = Connection::CONNECTING;
+    if (connections_[conIndex_]->st_ == Connection::CLOSED) {
+        connections_[conIndex_]->st_ = Connection::CONNECTING;
         
         ConnectionTask *connectionTask = new ConnectionTask;
         connectionTask->type = ConnectionTask::CONNECT;
-        connectionTask->connection = _connections[_conIndex];
+        connectionTask->connection = connections_[conIndex_];
         
-        _client->_connectionTaskQueue.push(connectionTask);
+        client_->connectionTaskQueue_.push(connectionTask);
     }
     
-    return _connections[_conIndex];
+    return connections_[conIndex_];
 }
 
 void RpcClient::ChannelCore::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
@@ -256,13 +261,14 @@ void RpcClient::ChannelCore::CallMethod(const google::protobuf::MethodDescriptor
         clientTask->rpcTask->expireTime = 0;
     }
 
-    _client->_taskQueue.push(std::move(clientTask));
+    client_->taskQueue_.push(std::move(clientTask));
 
     if (care_response) {
         co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
         
         // 正确返回
         if (done) {
+//ERROR_LOG("RpcClient::ChannelCore::CallMethod call done\n");
             done->Run();
         }
     }
@@ -272,11 +278,11 @@ void RpcClient::ChannelCore::CallMethod(const google::protobuf::MethodDescriptor
 RpcClient::Channel::Guard::~Guard() {
     // 发消息给RpcClient线程来清理Channel
     // 注意：不能在这里清理，因为会产生多线程问题
-    _channel->_client->_clearChannelQueue.push(_channel);
+    channel_->client_->clearChannelQueue_.push(channel_);
 }
 
-RpcClient::RpcClient(IO *io): _io(io) {
-    _pipelineFactory = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+RpcClient::RpcClient(IO *io): io_(io) {
+    pipelineFactory_ = new TcpPipelineFactory(NULL, decode, encode, CORPC_RESPONSE_HEAD_SIZE, CORPC_MAX_RESPONSE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
 }
 
 RpcClient* RpcClient::create(IO *io) {
@@ -288,7 +294,7 @@ RpcClient* RpcClient::create(IO *io) {
 }
 
 void RpcClient::start() {
-    _t = std::thread(threadEntry, this);
+    t_ = std::thread(threadEntry, this);
 }
 
 void RpcClient::threadEntry(RpcClient *self) {
@@ -304,11 +310,11 @@ void RpcClient::threadEntry(RpcClient *self) {
 void *RpcClient::connectionRoutine( void * arg ) {
     RpcClient *self = (RpcClient *)arg;
     
-    int readFd = self->_connectionTaskQueue.getReadFd();
+    int readFd = self->connectionTaskQueue_.getReadFd();
     co_register_fd(readFd);
     co_set_timeout(readFd, -1, 1000);
     
-    IO *io = self->_io;
+    IO *io = self->io_;
     Sender *sender = io->getSender();
     
     int ret;
@@ -331,24 +337,24 @@ void *RpcClient::connectionRoutine( void * arg ) {
             }
         }
         
-        ConnectionTask *task = self->_connectionTaskQueue.pop();
+        ConnectionTask *task = self->connectionTaskQueue_.pop();
         while (task) {
             std::shared_ptr<Connection> connection = task->connection;
             
             switch (task->type) {
                 case ConnectionTask::CLOSE: {
                     // 清理
-                    connection->_st = Connection::CLOSED;
-                    connection->_channel->_connectDelay = true;
+                    connection->st_ = Connection::CLOSED;
+                    connection->channel_->connectDelay_ = true;
                     
-                    assert(connection->_waitSendTaskCoList.empty());
+                    assert(connection->waitSendTaskCoList_.empty());
                     
                     {
-                        LockGuard lock( connection->_waitResultCoMapMutex );
-                        while (!connection->_waitResultCoMap.empty()) {
-                            Connection::WaitTaskMap::iterator itor = connection->_waitResultCoMap.begin();
+                        LockGuard lock( connection->waitResultCoMapMutex_ );
+                        while (!connection->waitResultCoMap_.empty()) {
+                            Connection::WaitTaskMap::iterator itor = connection->waitResultCoMap_.begin();
                             std::shared_ptr<ClientTask> task = std::move(itor->second);
-                            connection->_waitResultCoMap.erase(itor);
+                            connection->waitResultCoMap_.erase(itor);
                             
                             if (!task->rpcTask->expireTime) {
                                 task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
@@ -359,7 +365,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
                     }
                     
                     // 注意：连接断开时，需要调用回调
-                    std::list<std::shared_ptr<void>>& datas = connection->_datas;
+                    std::list<std::shared_ptr<void>>& datas = connection->datas_;
                     for (auto& data : datas) {
                         std::shared_ptr<RpcClientTask> rpcTask = std::static_pointer_cast<RpcClientTask>(data);
                         
@@ -369,6 +375,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
                                 rpcTask->controller->SetFailed(strerror(ENETDOWN));
                             }
                             
+//ERROR_LOG("RpcClient::connectionRoutine call done on connect close\n");
                             rpcTask->done->Run();
                         }
                     }
@@ -376,82 +383,82 @@ void *RpcClient::connectionRoutine( void * arg ) {
                     break;
                 }
                 case ConnectionTask::CONNECT: {
-                    assert(connection->_st == Connection::CONNECTING);
-                    if (connection->_channel->_connectDelay) {
+                    assert(connection->st_ == Connection::CONNECTING);
+                    if (connection->channel_->connectDelay_) {
                         // sleep 1 second
                         sleep(1);
                     }
                     
                     // 建立连接
-                    connection->_fd = socket(PF_INET, SOCK_STREAM, 0);
-                    co_set_timeout(connection->_fd, -1, 1000);
-                    LOG("co %d socket fd %d\n", co_self(), connection->_fd);
+                    connection->fd_ = socket(PF_INET, SOCK_STREAM, 0);
+                    co_set_timeout(connection->fd_, -1, 1000);
+                    LOG("co %d socket fd %d\n", co_self(), connection->fd_);
                     struct sockaddr_in addr;
                     
-                    std::shared_ptr<ChannelCore>& channel = connection->_channel;
+                    std::shared_ptr<ChannelCore>& channel = connection->channel_;
                     bzero(&addr,sizeof(addr));
                     addr.sin_family = AF_INET;
-                    addr.sin_port = htons(channel->_port);
+                    addr.sin_port = htons(channel->port_);
                     int nIP = 0;
-                    if (channel->_host.empty() ||
-                        channel->_host.compare("0") == 0 ||
-                        channel->_host.compare("0.0.0.0") == 0 ||
-                        channel->_host.compare("*") == 0) {
+                    if (channel->host_.empty() ||
+                        channel->host_.compare("0") == 0 ||
+                        channel->host_.compare("0.0.0.0") == 0 ||
+                        channel->host_.compare("*") == 0) {
                         nIP = htonl(INADDR_ANY);
                     } else {
-                        nIP = inet_addr(channel->_host.c_str());
+                        nIP = inet_addr(channel->host_.c_str());
                     }
                     
                     addr.sin_addr.s_addr = nIP;
                     
-                    int ret = connect(connection->_fd, (struct sockaddr*)&addr, sizeof(addr));
+                    int ret = connect(connection->fd_, (struct sockaddr*)&addr, sizeof(addr));
                     
                     if ( ret < 0 ) {
                         if ( errno == EALREADY || errno == EINPROGRESS ) {
                             struct pollfd pf = { 0 };
-                            pf.fd = connection->_fd;
+                            pf.fd = connection->fd_;
                             pf.events = (POLLOUT|POLLERR|POLLHUP);
                             co_poll( co_get_epoll_ct(),&pf,1,200);
                             //check connect
                             int error = 0;
                             uint32_t socklen = sizeof(error);
                             errno = 0;
-                            ret = getsockopt(connection->_fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
+                            ret = getsockopt(connection->fd_, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
                             if ( ret == -1 ) {
                                 // 出错处理
                                 ERROR_LOG("RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
-                                       co_self(), connection->_fd, ret, errno, strerror(errno));
+                                       co_self(), connection->fd_, ret, errno, strerror(errno));
                                 
-                                close(connection->_fd);
-                                connection->_fd = -1;
-                                connection->_st = Connection::CLOSED;
+                                close(connection->fd_);
+                                connection->fd_ = -1;
+                                connection->st_ = Connection::CLOSED;
                             } else if ( error ) {
                                 // 出错处理
                                 ERROR_LOG("RpcClient::connectRoutine getsockopt co %d fd %d ret %d errno %d (%s)\n",
-                                       co_self(), connection->_fd, ret, error, strerror(error));
+                                       co_self(), connection->fd_, ret, error, strerror(error));
                                 
-                                close(connection->_fd);
-                                connection->_fd = -1;
-                                connection->_st = Connection::CLOSED;
+                                close(connection->fd_);
+                                connection->fd_ = -1;
+                                connection->st_ = Connection::CLOSED;
                             }
                             
-                            assert(connection->_waitResultCoMap.empty());
+                            assert(connection->waitResultCoMap_.empty());
                         } else {
                             // 出错处理
                             ERROR_LOG("RpcClient::connectRoutine connect co %d fd %d ret %d errno %d (%s)\n",
-                                   co_self(), connection->_fd, ret, errno, strerror(errno));
+                                   co_self(), connection->fd_, ret, errno, strerror(errno));
                             
-                            close(connection->_fd);
-                            connection->_fd = -1;
-                            connection->_st = Connection::CLOSED;
+                            close(connection->fd_);
+                            connection->fd_ = -1;
+                            connection->st_ = Connection::CLOSED;
                         }
                     }
                     
-                    if (connection->_st == Connection::CLOSED) {
+                    if (connection->st_ == Connection::CLOSED) {
                         // 连接失败，唤醒所有等待连接建立的rpc调用协程进行错误处理
-                        while (!connection->_waitSendTaskCoList.empty()) {
-                            std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
-                            connection->_waitSendTaskCoList.pop_front();
+                        while (!connection->waitSendTaskCoList_.empty()) {
+                            std::shared_ptr<ClientTask> task = std::move(connection->waitSendTaskCoList_.front());
+                            connection->waitSendTaskCoList_.pop_front();
                             
                             if (task->rpcTask->response) {
                                 if (!task->rpcTask->expireTime) {
@@ -464,20 +471,22 @@ void *RpcClient::connectionRoutine( void * arg ) {
                                     task->rpcTask->controller->SetFailed(strerror(errno));
                                 }
 
+//ERROR_LOG("RpcClient::connectionRoutine call done on connect close 1\n");
+
                                 // not_care_response类型的rpc需要在这里触发回调清理request
                                 assert(task->rpcTask->done);
                                 task->rpcTask->done->Run();
                             }
                         }
                         
-                        assert(connection->_waitResultCoMap.empty());
+                        assert(connection->waitResultCoMap_.empty());
                         break;
                     }
                     
-                    connection->_st = Connection::CONNECTED;
-                    connection->_channel->_connectDelay = false;
+                    connection->st_ = Connection::CONNECTED;
+                    connection->channel_->connectDelay_ = false;
                     
-                    setKeepAlive(connection->_fd, 10);
+                    setKeepAlive(connection->fd_, 10);
                     // 加入到IO中
                     std::shared_ptr<corpc::Connection> ioConnection = std::static_pointer_cast<corpc::Connection>(connection);
                     io->addConnection(ioConnection);
@@ -486,9 +495,9 @@ void *RpcClient::connectionRoutine( void * arg ) {
                     gettimeofday(&t, NULL);
                     uint64_t now = t.tv_sec * 1000 + t.tv_usec / 1000; // 当前时间（毫秒精度）
                     // 发送等待发送队列中的任务
-                    while (!connection->_waitSendTaskCoList.empty()) {
-                        std::shared_ptr<ClientTask> task = std::move(connection->_waitSendTaskCoList.front());
-                        connection->_waitSendTaskCoList.pop_front();
+                    while (!connection->waitSendTaskCoList_.empty()) {
+                        std::shared_ptr<ClientTask> task = std::move(connection->waitSendTaskCoList_.front());
+                        connection->waitSendTaskCoList_.pop_front();
                         
                         //std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(connection);
 
@@ -496,11 +505,11 @@ void *RpcClient::connectionRoutine( void * arg ) {
                             // 若rpc任务已超时就不需发给服务器
                             if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
                                 {
-                                    LockGuard lock(connection->_waitResultCoMapMutex);
+                                    LockGuard lock(connection->waitResultCoMapMutex_);
 
                                     // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
-                                    //connection->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
-                                    connection->_waitResultCoMap[uint64_t(task->rpcTask->co)] = task;
+                                    //connection->waitResultCoMap_.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                                    connection->waitResultCoMap_[uint64_t(task->rpcTask->co)] = task;
                                 }
 
                                 sender->send(ioConnection, task->rpcTask);
@@ -516,7 +525,7 @@ void *RpcClient::connectionRoutine( void * arg ) {
             
             delete task;
             
-            task = self->_connectionTaskQueue.pop();
+            task = self->connectionTaskQueue_.pop();
         }
         
     }
@@ -527,8 +536,8 @@ void *RpcClient::connectionRoutine( void * arg ) {
 void *RpcClient::taskHandleRoutine(void *arg) {
     RpcClient *self = (RpcClient *)arg;
     
-    ClientTaskQueue& queue = self->_taskQueue;
-    Sender *sender = self->_io->getSender();
+    ClientTaskQueue& queue = self->taskQueue_;
+    Sender *sender = self->io_->getSender();
     
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -565,7 +574,7 @@ void *RpcClient::taskHandleRoutine(void *arg) {
         while (task) {
             // 先从channel中获得一connection
             std::shared_ptr<Connection> conn = task->channel->getNextConnection();
-            assert(conn->_st != Connection::CLOSED);
+            assert(conn->st_ != Connection::CLOSED);
             
             if (!conn) {
                 // 若连接为空，需要应直接唤醒rpc任务对应的协程进行出错处理。注意：not_care_response类型的请求不需要唤醒
@@ -580,6 +589,7 @@ void *RpcClient::taskHandleRoutine(void *arg) {
                         task->rpcTask->controller->SetFailed(strerror(ENETDOWN));
                     }
 
+//ERROR_LOG("RpcClient::taskHandleRoutine call done\n");
                     // not_care_response类型的rpc需要在这里触发回调清理request
                     assert(task->rpcTask->done);
                     task->rpcTask->done->Run();
@@ -587,8 +597,8 @@ void *RpcClient::taskHandleRoutine(void *arg) {
             } else {
                 // 当连接未建立时，放入等待发送队列，等连接建立好时再发送rpc请求，若连接不成功，需要将等待中的rpc请求都进行出错处理（唤醒其协程）
                 // 由于upRoutine和connectRoutine在同一线程中，因此放入等待发送队列不需要进行锁同步
-                if (conn->_st == Connection::CONNECTING) {
-                    conn->_waitSendTaskCoList.push_back(task);
+                if (conn->st_ == Connection::CONNECTING) {
+                    conn->waitSendTaskCoList_.push_back(task);
                 } else {
                     std::shared_ptr<corpc::Connection> ioConn = std::static_pointer_cast<corpc::Connection>(conn);
                     
@@ -596,11 +606,11 @@ void *RpcClient::taskHandleRoutine(void *arg) {
                         // 若rpc任务已超时就不需发给服务器
                         if (task->rpcTask->expireTime == 0 || now < task->rpcTask->expireTime) {
                             {
-                                LockGuard lock(conn->_waitResultCoMapMutex);
+                                LockGuard lock(conn->waitResultCoMapMutex_);
 
                                 // 注意：由于加入RPC超时机制后，rpc请求协程会在处理超时时结束请求，但_waitResultCoMap中还留有旧记录，新rpc请求会insert不了，改为赋值替换
-                                //conn->_waitResultCoMap.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
-                                conn->_waitResultCoMap[uint64_t(task->rpcTask->co)] = task;
+                                //conn->waitResultCoMap_.insert(std::make_pair(uint64_t(task->rpcTask->co), task));
+                                conn->waitResultCoMap_[uint64_t(task->rpcTask->co)] = task;
                             }
                         
                             sender->send(ioConn, task->rpcTask);
@@ -634,7 +644,7 @@ void *RpcClient::taskHandleRoutine(void *arg) {
 void *RpcClient::clearChannelRoutine(void *arg) {
     RpcClient *self = (RpcClient *)arg;
     
-    ClearChannelQueue& queue = self->_clearChannelQueue;
+    ClearChannelQueue& queue = self->clearChannelQueue_;
 
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -664,13 +674,13 @@ void *RpcClient::clearChannelRoutine(void *arg) {
         // 处理任务队列
         std::shared_ptr<ChannelCore> channel = queue.pop();
         while (channel) {
-            for (auto& connection : channel->_connections) {
+            for (auto& connection : channel->connections_) {
                 if (connection) {
                     connection->close();
                 }
             }
             
-            channel->_connections.clear();
+            channel->connections_.clear();
             
             channel = queue.pop();
         }

@@ -265,7 +265,7 @@ namespace corpc {
         };
 
     public:
-        NormalLink(): _head(nullptr), _tail(nullptr), _eIter(nullptr) {}
+        NormalLink(): head_(nullptr), tail_(nullptr), eIter_(nullptr) {}
         ~NormalLink() {
             clear();
         }
@@ -277,53 +277,53 @@ namespace corpc {
         void moveToTail(Node *node);
         void clear();
         
-        Node* getHead() { return _head; }
-        Node* getTail() { return _tail; }
+        Node* getHead() { return head_; }
+        Node* getTail() { return tail_; }
         
         Iterator begin() const {
-            Iterator iter(_head);
+            Iterator iter(head_);
             return iter;
         }
 
-        const Iterator& end() const { return _eIter; }
+        const Iterator& end() const { return eIter_; }
 
     private:
-        Node *_head;
-        Node *_tail;
+        Node *head_;
+        Node *tail_;
 
-        Iterator _eIter;
+        Iterator eIter_;
     };
 
     template <typename T>
     void NormalLink<T>::push_back(Node *node) {
-        if (_head) {
-            assert(_tail && !_tail->next);
+        if (head_) {
+            assert(tail_ && !tail_->next);
             node->next = nullptr;
-            node->prev = _tail;
-            _tail->next = node;
-            _tail = node;
+            node->prev = tail_;
+            tail_->next = node;
+            tail_ = node;
         } else {
-            assert(!_tail);
+            assert(!tail_);
             node->next = nullptr;
             node->prev = nullptr;
-            _head = node;
-            _tail = node;
+            head_ = node;
+            tail_ = node;
         }
     }
 
     template <typename T>
     typename NormalLink<T>::Node* NormalLink<T>::pop_front() {
-        if (!_head) {
+        if (!head_) {
             return nullptr;
         }
         
-        Node *node = _head;
-        _head = _head->next;
-        if (_head) {
-            _head->prev = nullptr;
+        Node *node = head_;
+        head_ = head_->next;
+        if (head_) {
+            head_->prev = nullptr;
         } else {
-            assert(_tail == node);
-            _tail = nullptr;
+            assert(tail_ == node);
+            tail_ = nullptr;
         }
         
         node->next = nullptr;
@@ -345,12 +345,12 @@ namespace corpc {
             next->prev = prev;
         }
         
-        if (_head == node) {
-            _head = next;
+        if (head_ == node) {
+            head_ = next;
         }
         
-        if (_tail == node) {
-            _tail = prev;
+        if (tail_ == node) {
+            tail_ = prev;
         }
         
         delete node;
@@ -359,7 +359,7 @@ namespace corpc {
     template <typename T>
     void NormalLink<T>::eraseTo(Node *node) {
         assert(node != nullptr);
-        Node *tmpNode = _head;
+        Node *tmpNode = head_;
 
         while (tmpNode != node) {
             assert(tmpNode != nullptr);
@@ -368,12 +368,12 @@ namespace corpc {
             tmpNode = next;
         }
 
-        _head = node->next;
-        if (_head) {
-            _head->prev = nullptr;
+        head_ = node->next;
+        if (head_) {
+            head_->prev = nullptr;
         } else {
-            assert(_tail == node);
-            _tail = nullptr;
+            assert(tail_ == node);
+            tail_ = nullptr;
         }
 
         delete node;
@@ -383,7 +383,7 @@ namespace corpc {
     void NormalLink<T>::moveToTail(Node *node) {
         Node *next = node->next;
         
-        assert(next || _tail == node);
+        assert(next || tail_ == node);
         
         if (next) {
             Node *prev = node->prev;
@@ -393,28 +393,28 @@ namespace corpc {
                 prev->next = next;
             }
             
-            if (_head == node) {
-                _head = next;
+            if (head_ == node) {
+                head_ = next;
             }
             
             node->next = nullptr;
-            node->prev = _tail;
-            _tail->next = node;
-            _tail = node;
+            node->prev = tail_;
+            tail_->next = node;
+            tail_ = node;
         }
     }
 
     template <typename T>
     void NormalLink<T>::clear() {
-        Node *node = _head;
+        Node *node = head_;
         while (node) {
             Node *next = node->next;
             delete node;
             node = next;
         }
         
-        _head = nullptr;
-        _tail = nullptr;
+        head_ = nullptr;
+        tail_ = nullptr;
     }
 
     struct DebugContext {

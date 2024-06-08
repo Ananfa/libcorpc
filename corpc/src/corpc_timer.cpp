@@ -20,10 +20,10 @@
 using namespace corpc;
 
 void Timer::stop() {
-    if (_running) {
-        _running = false;
+    if (running_) {
+        running_ = false;
 
-        _cond.broadcast();
+        cond_.broadcast();
     }
 }
 
@@ -46,15 +46,15 @@ void *Timer::timerRoutine(void *arg) {
     std::shared_ptr<Timer> timer = routineArg->timer;
     delete routineArg;
 
-    if (timer->_timeout_ms > 0) {
-        timer->_cond.wait(timer->_timeout_ms);
+    if (timer->timeout_ms_ > 0) {
+        timer->cond_.wait(timer->timeout_ms_);
     }
 
-    if (!timer->_running) {
+    if (!timer->running_) {
         return nullptr;
     }
 
-    timer->_cb();
-    timer->_running = false;
+    timer->cb_();
+    timer->running_ = false;
     return nullptr;
 }

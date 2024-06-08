@@ -100,27 +100,27 @@ namespace corpc {
 
     private:
         // 跳表
-        uint32_t m_maxCurLevel;
-        Node* m_pHeader;
-        Node* m_pTail;
+        uint32_t maxCurLevel_;
+        Node* pHeader_;
+        Node* pTail_;
 
         // 通过id查找节点
-        std::map<uint64_t, Node*> m_nodeMap;
+        std::map<uint64_t, Node*> nodeMap_;
     };
 
     template <typename T>
-    TimeoutList<T>::TimeoutList():m_pHeader(new Node(CORPC_MAX_UINT64, CORPC_SKIP_LIST_MAX_LEVEL)), m_pTail(new Node(CORPC_MIN_UINT64, CORPC_SKIP_LIST_MAX_LEVEL)), m_maxCurLevel(1) {
+    TimeoutList<T>::TimeoutList():pHeader_(new Node(CORPC_MAX_UINT64, CORPC_SKIP_LIST_MAX_LEVEL)), pTail_(new Node(CORPC_MIN_UINT64, CORPC_SKIP_LIST_MAX_LEVEL)), maxCurLevel_(1) {
         for (int i = 0; i < CORPC_SKIP_LIST_MAX_LEVEL; i++) {
-            m_pHeader->links[i].next = m_pTail;
-            m_pTail->links[i].prev = m_pHeader;
+            pHeader_->links[i].next = pTail_;
+            pTail_->links[i].prev = pHeader_;
         }
     }
 
     template <typename T>
     TimeoutList<T>::~TimeoutList() {
-        Node* n = m_pHeader->links[0].next;
+        Node* n = pHeader_->links[0].next;
 
-        while (n != m_pTail) {
+        while (n != pTail_) {
             Node* n1 = n;
             n = n->links[0].next;
 
@@ -134,16 +134,16 @@ namespace corpc {
             delete n1;
         }
         
-        delete m_pHeader;
-        delete m_pTail;
+        delete pHeader_;
+        delete pTail_;
     }
 
     template <typename T>
     typename TimeoutList<T>::Node* TimeoutList<T>::insert(uint64_t id, uint64_t expireTime, T& data) {
         Node* prevNodes[CORPC_SKIP_LIST_MAX_LEVEL];
-        Node* curNode = m_pHeader;
+        Node* curNode = pHeader_;
         
-        for (int i = m_maxCurLevel - 1; i >= 0; i--) {
+        for (int i = maxCurLevel_ - 1; i >= 0; i--) {
             Node* nextNode = curNode->links[i].next;
             while (nextNode->expireTime >= expireTime) {
                 assert(nextNode->id != id);
@@ -168,12 +168,12 @@ namespace corpc {
             prevNode->link.next = curNode;
         } else {
             int newlevel = randomLevel();
-            if (newlevel > m_maxCurLevel) {
-                for (int i = m_maxCurLevel; i < newlevel; i++) {
-                    prevNodes[i] = m_pHeader;
+            if (newlevel > maxCurLevel_) {
+                for (int i = maxCurLevel_; i < newlevel; i++) {
+                    prevNodes[i] = pHeader_;
                 }
                 
-                m_maxCurLevel = newlevel;
+                maxCurLevel_ = newlevel;
             }
             
             curNode = new Node(expireTime, id, newlevel, data);
@@ -189,7 +189,7 @@ namespace corpc {
             }
         }
 
-        m_nodeMap.insert(std::make_pair(id, curNode));
+        nodeMap_.insert(std::make_pair(id, curNode));
         
         return curNode;
     }
@@ -227,22 +227,22 @@ namespace corpc {
                     node->links[i].prev->links[i].next = node->links[i].next;
                     node->links[i].next->links[i].prev = node->links[i].prev;
 
-                    if (i > 0 && node->links[i].prev == m_pHeader && node->links[i].next == m_pTail) {
-                        m_maxCurLevel--;
+                    if (i > 0 && node->links[i].prev == pHeader_ && node->links[i].next == pTail_) {
+                        maxCurLevel_--;
                     }
                 }
             }
         }
 
-        m_nodeMap.erase(node->id);
+        nodeMap_.erase(node->id);
 
         delete node;
     }
 
     template <typename T>
     typename TimeoutList<T>::Node* TimeoutList<T>::getLast() {
-        Node* n = m_pTail->links[0].prev;
-        if (n == m_pHeader) {
+        Node* n = pTail_->links[0].prev;
+        if (n == pHeader_) {
             return nullptr;
         }
 
@@ -251,8 +251,8 @@ namespace corpc {
 
     template <typename T>
     typename TimeoutList<T>::Node* TimeoutList<T>::getNode(uint64_t id) {
-        auto it = m_nodeMap.find(id);
-        if (it != m_nodeMap.end()) {
+        auto it = nodeMap_.find(id);
+        if (it != nodeMap_.end()) {
             return it->second;
         }
 
@@ -261,7 +261,7 @@ namespace corpc {
 
     template <typename T>
     bool TimeoutList<T>::empty() {
-        return m_pHeader->links[0].next == m_pTail;
+        return pHeader_->links[0].next == pTail_;
     }
 }
 

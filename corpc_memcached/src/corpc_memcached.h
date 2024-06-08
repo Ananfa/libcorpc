@@ -40,13 +40,13 @@ namespace corpc {
             void put(memcached_st* memc, bool error);
             
         private:
-            Proxy(): _stub(nullptr) {}
+            Proxy(): stub_(nullptr) {}
             ~Proxy();
             
             void init(InnerRpcServer *server);
             
         private:
-            thirdparty::ThirdPartyService::Stub *_stub;
+            thirdparty::ThirdPartyService::Stub *stub_;
             
         public:
             friend class MemcachedConnectPool;
@@ -77,15 +77,15 @@ namespace corpc {
         Proxy proxy;
         
     private:
-        memcached_server_st *_memcServers; // memcached服务器列表
+        memcached_server_st *memcServers_; // memcached服务器列表
         
-        uint32_t _maxConnectNum;    // 与mysql数据库最多建立的连接数
-        uint32_t _realConnectCount; // 当前实际建立连接的数量
+        uint32_t maxConnectNum_;    // 与mysql数据库最多建立的连接数
+        uint32_t realConnectCount_; // 当前实际建立连接的数量
         
-        std::list<IdleHandle> _idleList; // 空闲连接表
-        std::list<stCoRoutine_t*> _waitingList; // 等待队列：当连接数量达到最大时，新的请求需要等待
+        std::list<IdleHandle> idleList_; // 空闲连接表
+        std::list<stCoRoutine_t*> waitingList_; // 等待队列：当连接数量达到最大时，新的请求需要等待
         
-        InnerRpcServer *_server;
+        InnerRpcServer *server_;
     };
 
 }

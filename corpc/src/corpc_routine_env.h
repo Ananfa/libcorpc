@@ -51,8 +51,8 @@ namespace corpc {
     public:
         class Guard {
         public:
-            Guard() { RoutineEnvironment::_keyRoutineNum++; }
-            ~Guard() { RoutineEnvironment::_keyRoutineNum--; }
+            Guard() { RoutineEnvironment::keyRoutineNum_++; }
+            ~Guard() { RoutineEnvironment::keyRoutineNum_--; }
             
         private:
             Guard(Guard const&) = delete;                  // copy ctor delete
@@ -72,7 +72,7 @@ namespace corpc {
         static void runEventLoop(); // 事件循环
         
         static RoutineEnvironment *getEnv();    // 获取线程相关的协程环境
-        stCoRoutineAttr_t *getAttr() { return _attr; }
+        stCoRoutineAttr_t *getAttr() { return attr_; }
         
         static void quit();
         
@@ -101,23 +101,23 @@ namespace corpc {
         void addEndedCoroutine( stCoRoutine_t *co ); // 协程结束
         
     private:
-        stCoRoutineAttr_t *_attr;
+        stCoRoutineAttr_t *attr_;
         
         PipeType _endPipe; // 用于通知cleanRoutine“有已结束协程”
-        std::list<stCoRoutine_t*> _endedCoroutines; // 已结束的协程（待清理的协程）
+        std::list<stCoRoutine_t*> endedCoroutines_; // 已结束的协程（待清理的协程）
         
-        WaitResumeQueue _waitResumeQueue; // 用于跨线程唤醒协程
+        WaitResumeQueue waitResumeQueue_; // 用于跨线程唤醒协程
 
-        TimeoutList<std::shared_ptr<RpcClientTask>> _timeoutList; // 管理本线程中的RPC请求协程超时
+        TimeoutList<std::shared_ptr<RpcClientTask>> timeoutList_; // 管理本线程中的RPC请求协程超时
         
-        static std::atomic<uint32_t> _keyRoutineNum;
+        static std::atomic<uint32_t> keyRoutineNum_;
         
 #ifdef MONITOR_ROUTINE
         // 监控状态
         static void *monitorRoutine( void *arg ); // 监控协程
         
-        int _routineNum; // 当前协程总数量（包括活着的和等待消耗的协程）
-        int _livingRoutineNum; // 活着的协程数量
+        int routineNum_; // 当前协程总数量（包括活着的和等待消耗的协程）
+        int livingRoutineNum_; // 活着的协程数量
 #endif
     };
     

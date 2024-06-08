@@ -27,26 +27,26 @@ using namespace corpc;
 //uint8_t MessageClient::_heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
 
 MessageClient::~MessageClient() {
-    MessageInfo *info = _sendQueue.pop();
+    MessageInfo *info = sendQueue_.pop();
     while (info) {
         WARN_LOG("MessageClient::~MessageClient() something in send queue need to delete\n");
         delete info;
-        info = _sendQueue.pop();
+        info = sendQueue_.pop();
     }
 
-    info = _recvQueue.pop();
+    info = recvQueue_.pop();
     while (info) {
         WARN_LOG("MessageClient::~MessageClient() something in recv queue need to delete\n");
         delete info;
-        info = _recvQueue.pop();
+        info = recvQueue_.pop();
     }
 }
 
 void MessageClient::close() {
-    //if (_running) {
-    //    _running = false;
-        LOG("MessageClient::close fd: %d\n", _s);
-        ::close(_s);
+    //if (running_) {
+    //    running_ = false;
+        LOG("MessageClient::close fd: %d\n", s_);
+        ::close(s_);
     //}
 }
 
@@ -57,11 +57,11 @@ void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shar
     info->proto = msg;
     info->needCrypter = needCrypter;
     
-    _sendQueue.push(info);
+    sendQueue_.push(info);
 }
 
 void MessageClient::recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg) {
-    MessageInfo *info = _recvQueue.pop();
+    MessageInfo *info = recvQueue_.pop();
     if (info) {
         type = info->type;
         tag = info->tag;
@@ -80,13 +80,13 @@ bool MessageClient::registerMessage(int16_t type, std::shared_ptr<google::protob
     info.type = type;
     info.proto = proto;
     
-    _registerMessageMap.insert(std::make_pair(type, info));
+    registerMessageMap_.insert(std::make_pair(type, info));
     
     return false;
 }
 
 bool TcpClient::start() {
-    if ((_s=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+    if ((s_=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         ERROR_LOG("can't create socket\n");
         return false;
     }
@@ -94,26 +94,26 @@ bool TcpClient::start() {
     struct sockaddr_in addr;
     bzero(&addr,sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(_port);
-    int nIP = inet_addr(_host.c_str());
+    addr.sin_port = htons(port_);
+    int nIP = inet_addr(host_.c_str());
     addr.sin_addr.s_addr = nIP;
     
-    if (connect(_s, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+    if (connect(s_, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         ERROR_LOG("can't connect\n");
         return false;
     }
     
-    if (_needHB) {
+    if (needHB_) {
         struct timeval now = { 0 };
         gettimeofday( &now,NULL );
-        _lastRecvHBTime = now.tv_sec;
-        _lastRecvHBTime *= 1000;
-        _lastRecvHBTime += now.tv_usec / 1000;
+        lastRecvHBTime_ = now.tv_sec;
+        lastRecvHBTime_ *= 1000;
+        lastRecvHBTime_ += now.tv_usec / 1000;
         
-        _lastSendHBTime = _lastRecvHBTime;
+        lastSendHBTime_ = lastRecvHBTime_;
     }
 
-    _running = true;
+    running_ = true;
     
     // 启动数据收发协程
     RoutineEnvironment::startCoroutine(workRoutine, this);
@@ -131,7 +131,7 @@ void *TcpClient::workRoutine( void * arg ) {
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
     
-    int s = self->_s;
+    int s = self->s_;
     struct pollfd fd_in, fd_out;
     fd_out.fd = fd_in.fd = s;
     fd_in.events = POLLIN;
@@ -162,10 +162,10 @@ void *TcpClient::workRoutine( void * arg ) {
     //   4.若到心跳时间，发心跳
     //   5.查看是否有数据需要发送，有则发送
     //   6.回第1步
-    while (self->_running) {
+    while (self->running_) {
         ret = poll(&fd_in, 1, 4);
 
-        if (self->_needHB) {
+        if (self->needHB_) {
             struct timeval now = { 0 };
             gettimeofday( &now,NULL );
             nowms = now.tv_sec;
@@ -252,30 +252,30 @@ void *TcpClient::workRoutine( void * arg ) {
                     // 根据消息类型解析和处理消息
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                         assert(bodySize == 0);
-                        self->_lastRecvHBTime = nowms;
+                        self->lastRecvHBTime_ = nowms;
                     } else if (msgType < 0) {
                         // 其他连接控制消息，不做处理
                     } else {
                         //assert(bodySize > 0);
                         // 校验序列号
-                        if (self->_enableSerial) {
+                        if (self->enableSerial_) {
                             uint32_t serial = *(uint32_t *)(headBuf + 14);
                             serial = be32toh(serial);
 
                             if (serial != 0) {
-                                if (serial != self->_lastRecvSerial + 1) {
-                                    ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial+1, serial);
+                                if (serial != self->lastRecvSerial_ + 1) {
+                                    ERROR_LOG("serial check failed, need:%d, get:%d\n", self->lastRecvSerial_+1, serial);
                                     self->close();
                                     return nullptr;
                                 }
 
-                                self->_lastRecvSerial++;
+                                self->lastRecvSerial_++;
                             }
                         }
 
                         if (bodySize > 0) {
                             // 校验CRC
-                            if (self->_enableRecvCRC) {
+                            if (self->enableRecvCRC_) {
                                 uint16_t crc = *(uint16_t *)(headBuf + 18);
                                 crc = be16toh(crc);
 
@@ -290,20 +290,20 @@ void *TcpClient::workRoutine( void * arg ) {
 
                             // 解密
                             if (flag & CORPC_MESSAGE_FLAG_CRYPT) {
-                                if (self->_crypter == nullptr) {
+                                if (self->crypter_ == nullptr) {
                                     ERROR_LOG("cant decrypt message for crypter not exist\n");
                                     self->close();
                                     return nullptr;
                                 }
 
-                                self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                                self->crypter_->decrypt(bodyBuf, bodyBuf, bodySize);
                             }
                         }
                         
                         
                         // 解码数据
-                        auto iter = self->_registerMessageMap.find(msgType);
-                        if (iter == self->_registerMessageMap.end()) {
+                        auto iter = self->registerMessageMap_.find(msgType);
+                        if (iter == self->registerMessageMap_.end()) {
                             ERROR_LOG("unknown message: %d\n", msgType);
                             self->close();
                             return nullptr;
@@ -325,7 +325,7 @@ void *TcpClient::workRoutine( void * arg ) {
                         info->tag = tag;
                         info->proto = msg;
                         
-                        self->_recvQueue.push(info);
+                        self->recvQueue_.push(info);
                     }
                     
                     // 处理完一个消息，需要清理变量
@@ -339,17 +339,17 @@ void *TcpClient::workRoutine( void * arg ) {
         }
         
         // 心跳判断
-        if (self->_needHB) {
-            if (nowms - self->_lastRecvHBTime > CORPC_MAX_NO_HEARTBEAT_TIME) {
+        if (self->needHB_) {
+            if (nowms - self->lastRecvHBTime_ > CORPC_MAX_NO_HEARTBEAT_TIME) {
                 // 无心跳，断线
                 ERROR_LOG("heartbeat timeout\n");
                 self->close();
                 return nullptr;
             }
             
-            if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
-                if (self->_enableSerial) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->_lastRecvSerial);
+            if (nowms - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
+                if (self->enableSerial_) {
+                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->lastRecvSerial_);
                 }
 
                 if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
@@ -358,14 +358,14 @@ void *TcpClient::workRoutine( void * arg ) {
                     return nullptr;
                 }
                 
-                self->_lastSendHBTime = nowms;
+                self->lastSendHBTime_ = nowms;
             }
         }
 
         // 将要发送的数据拼在一起发送，提高效率
         int sendNum = 0;
         // 发送数据
-        MessageInfo *info = self->_sendQueue.pop();
+        MessageInfo *info = self->sendQueue_.pop();
         while (info) {
             uint32_t msgSize = info->proto->GetCachedSize();
             if (msgSize == 0) {
@@ -382,8 +382,8 @@ void *TcpClient::workRoutine( void * arg ) {
                 info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
 
                 if (info->needCrypter) {
-                    assert(self->_crypter);
-                    self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+                    assert(self->crypter_);
+                    self->crypter_->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                     *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 } else {
                     *(uint16_t *)(buf + sendNum + 8) = 0;
@@ -394,12 +394,12 @@ void *TcpClient::workRoutine( void * arg ) {
 
                 *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
-                if (self->_enableSerial) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->_lastRecvSerial);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->_lastSendSerial);
+                if (self->enableSerial_) {
+                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->lastSendSerial_);
                 }
 
-                if (self->_enableSendCRC) {
+                if (self->enableSendCRC_) {
                     uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                     *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
@@ -409,7 +409,7 @@ void *TcpClient::workRoutine( void * arg ) {
                 
                 delete info;
                 
-                info = self->_sendQueue.pop();
+                info = self->sendQueue_.pop();
                 
                 if (info) {
                     continue;
@@ -452,7 +452,7 @@ bool UdpClient::start() {
     socklen_t slen = sizeof(si_other);
     char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     
-    if ((_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+    if ((s_=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         ERROR_LOG("can't create socket\n");
         return false;
     }
@@ -461,26 +461,26 @@ bool UdpClient::start() {
     memset((char *)&si_me, 0, sizeof(si_me));
     
     si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(_local_port);
+    si_me.sin_port = htons(local_port_);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     
     int reuse = 1;
-    setsockopt(_s, SOL_SOCKET, SO_REUSEADDR, &reuse,sizeof(reuse));
-    setsockopt(_s, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
+    setsockopt(s_, SOL_SOCKET, SO_REUSEADDR, &reuse,sizeof(reuse));
+    setsockopt(s_, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     
     //bind socket to port
-    if(bind(_s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1) {
+    if(bind(s_, (struct sockaddr*)&si_me, sizeof(si_me)) == -1) {
         ERROR_LOG("can't bind socket\n");
         return false;
     }
     
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
-    si_other.sin_port = htons(_port);
-    int nIP = inet_addr(_host.c_str());
+    si_other.sin_port = htons(port_);
+    int nIP = inet_addr(host_.c_str());
     si_other.sin_addr.s_addr = nIP;
     
-    if(connect(_s, (struct sockaddr *)&si_other, slen) == -1) {
+    if(connect(s_, (struct sockaddr *)&si_other, slen) == -1) {
         ERROR_LOG("can't connect\n");
         return false;
     }
@@ -488,7 +488,7 @@ bool UdpClient::start() {
     struct pollfd fd;
     int ret;
     
-    fd.fd = _s;
+    fd.fd = s_;
     fd.events = POLLIN;
     
     // 准备握手消息
@@ -504,9 +504,9 @@ bool UdpClient::start() {
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
         // 阶段一：发送handshake1消息
-        if (write(_s, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s_, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("can't send handshake1\n");
-            ::close(_s);
+            ::close(s_);
             return false;
         }
         DEBUG_LOG("send handshake1\n");
@@ -528,15 +528,15 @@ STEP1_POLLAGAIN:
                 }
 
                 ERROR_LOG("can't recv handshake2\n");
-                ::close(_s);
+                ::close(s_);
                 return false;
             case 0:
                 continue; // 回阶段一
             default: {
-                ret = (int)read(_s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
+                ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
                 if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                     ERROR_LOG("recv data size error\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 
@@ -545,7 +545,7 @@ STEP1_POLLAGAIN:
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     ERROR_LOG("recv data not handshake2\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 DEBUG_LOG("recv handshake2\n");
@@ -557,9 +557,9 @@ STEP1_POLLAGAIN:
 STEP2:
     while (true) {
         // 阶段三：发hankshake3消息
-        if (write(_s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s_, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("can't send handshake3\n");
-            ::close(_s);
+            ::close(s_);
             return false;
         }
         DEBUG_LOG("send handshake3\n");
@@ -581,15 +581,15 @@ STEP2_POLLAGAIN:
                 }
 
                 ERROR_LOG("can't recv handshake4\n");
-                ::close(_s);
+                ::close(s_);
                 return false;
             case 0:
                 continue; // 回阶段三
             default: {
-                ret = (int)read(_s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
+                ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
                 if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                     ERROR_LOG("recv data size error\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 
@@ -602,7 +602,7 @@ STEP2_POLLAGAIN:
 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_4) {
                     ERROR_LOG("recv data not handshake4\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 DEBUG_LOG("recv handshake4\n");
@@ -612,17 +612,17 @@ STEP2_POLLAGAIN:
     }
 
 STEP3:
-    if (_needHB) {
+    if (needHB_) {
         struct timeval now = { 0 };
         gettimeofday( &now,NULL );
-        _lastRecvHBTime = now.tv_sec;
-        _lastRecvHBTime *= 1000;
-        _lastRecvHBTime += now.tv_usec / 1000;
+        lastRecvHBTime_ = now.tv_sec;
+        lastRecvHBTime_ *= 1000;
+        lastRecvHBTime_ += now.tv_usec / 1000;
         
-        _lastSendHBTime = _lastRecvHBTime;
+        lastSendHBTime_ = lastRecvHBTime_;
     }
     
-    _running = true;
+    running_ = true;
     // 启动数据收发协程
     RoutineEnvironment::startCoroutine(workRoutine, this);
     
@@ -639,7 +639,7 @@ void *UdpClient::workRoutine( void * arg ) {
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
 
-    int s = self->_s;
+    int s = self->s_;
     struct pollfd fd;
     fd.fd = s;
     fd.events = POLLIN;
@@ -660,7 +660,7 @@ void *UdpClient::workRoutine( void * arg ) {
     //   4.若到心跳时间，发心跳
     //   5.查看是否有数据需要发送，有则发送
     //   6.回第1步
-    while (self->_running) {
+    while (self->running_) {
         ret = poll(&fd, 1, 4);
 
         struct timeval now = { 0 };
@@ -705,7 +705,7 @@ void *UdpClient::workRoutine( void * arg ) {
                 if (msgType < 0) {
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
                         //printf("recv heartbeat\n");
-                        self->_lastRecvHBTime = nowms;
+                        self->lastRecvHBTime_ = nowms;
                     } else if (msgType == CORPC_MSG_TYPE_BANNED) {
 
                     } else {
@@ -716,12 +716,12 @@ void *UdpClient::workRoutine( void * arg ) {
                 } else {
                     assert(bodySize > 0);
                     // 校验序列号
-                    if (self->_enableSerial) {
+                    if (self->enableSerial_) {
                         uint32_t serial = *(uint32_t *)(buf + 14);
                         serial = be32toh(serial);
 
-                        if (serial != ++self->_lastRecvSerial) {
-                            ERROR_LOG("serial check failed, fd:%d, need:%d, get:%d\n", s, self->_lastRecvSerial, serial);
+                        if (serial != ++self->lastRecvSerial_) {
+                            ERROR_LOG("serial check failed, fd:%d, need:%d, get:%d\n", s, self->lastRecvSerial_, serial);
                             self->close();
                             return nullptr;
                         }
@@ -729,7 +729,7 @@ void *UdpClient::workRoutine( void * arg ) {
                     }
 
                     // 校验CRC
-                    if (self->_enableRecvCRC) {
+                    if (self->enableRecvCRC_) {
                         uint16_t crc = *(uint16_t *)(buf + 18);
                         crc = be16toh(crc);
 
@@ -744,18 +744,18 @@ void *UdpClient::workRoutine( void * arg ) {
 
                     // 解密
                     if ((flag & CORPC_MESSAGE_FLAG_CRYPT) != 0) {
-                        if (self->_crypter == nullptr) {
+                        if (self->crypter_ == nullptr) {
                             ERROR_LOG("cant decrypt message for crypter not exist, fd:%d\n", s);
                             self->close();
                             return nullptr;
                         }
 
-                        self->_crypter->decrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, bodySize);
+                        self->crypter_->decrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, bodySize);
                     }
 
                     // 解码数据
-                    auto iter = self->_registerMessageMap.find(msgType);
-                    if (iter == self->_registerMessageMap.end()) {
+                    auto iter = self->registerMessageMap_.find(msgType);
+                    if (iter == self->registerMessageMap_.end()) {
                         ERROR_LOG("unknown message: %d, fd:%d\n", msgType, s);
                         self->close();
                         return nullptr;
@@ -774,20 +774,20 @@ void *UdpClient::workRoutine( void * arg ) {
                     info->tag = tag;
                     info->proto = msg;
                     
-                    self->_recvQueue.push(info);
+                    self->recvQueue_.push(info);
                 }
             }
         }
 
         // 心跳判断
-        if (nowms - self->_lastRecvHBTime > CORPC_MAX_NO_HEARTBEAT_TIME) {
+        if (nowms - self->lastRecvHBTime_ > CORPC_MAX_NO_HEARTBEAT_TIME) {
             // 无心跳，断线
             ERROR_LOG("heartbeat timeout, fd:%d\n", s);
             self->close();
             return nullptr;
         }
         
-        if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
+        if (nowms - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
             DEBUG_LOG("send heartbeat, fd:%d\n", s);
             if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
                 ERROR_LOG("can't send heartbeat, fd:%d\n", s);
@@ -795,11 +795,11 @@ void *UdpClient::workRoutine( void * arg ) {
                 return nullptr;
             }
             
-            self->_lastSendHBTime = nowms;
+            self->lastSendHBTime_ = nowms;
         }
         
         // 发送数据
-        MessageInfo *info = self->_sendQueue.pop();
+        MessageInfo *info = self->sendQueue_.pop();
         while (info) {
             uint32_t msgSize = info->proto->ByteSizeLong();
             
@@ -812,8 +812,8 @@ void *UdpClient::workRoutine( void * arg ) {
             info->proto->SerializeWithCachedSizesToArray(buf + CORPC_MESSAGE_HEAD_SIZE);
             
             if (info->needCrypter) {
-                assert(self->_crypter);
-                self->_crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+                assert(self->crypter_);
+                self->crypter_->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                 *(uint16_t *)(buf + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
             } else {
                 *(uint16_t *)(buf + 8) = 0;
@@ -824,12 +824,12 @@ void *UdpClient::workRoutine( void * arg ) {
 
             *(uint16_t *)(buf + 6) = htobe16(info->tag);
 
-            if (self->_enableSerial) {
-                *(uint32_t *)(buf + 10) = htobe32(self->_lastRecvSerial); // 由于UDP的包顺序会错乱，无法通过序号来删除缓存序号靠前的消息
-                *(uint32_t *)(buf + 14) = htobe32(++self->_lastSendSerial);
+            if (self->enableSerial_) {
+                *(uint32_t *)(buf + 10) = htobe32(self->lastRecvSerial_); // 由于UDP的包顺序会错乱，无法通过序号来删除缓存序号靠前的消息
+                *(uint32_t *)(buf + 14) = htobe32(++self->lastSendSerial_);
             }
 
-            if (self->_enableSendCRC) {
+            if (self->enableSendCRC_) {
                 uint16_t crc = corpc::CRC::CheckSum(buf, 0xFFFF, CORPC_MESSAGE_HEAD_SIZE - 2);
                 crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                 *(uint16_t *)(buf + 18) = htobe16(crc);
@@ -845,7 +845,7 @@ void *UdpClient::workRoutine( void * arg ) {
             
             delete info;
             
-            info = self->_sendQueue.pop();
+            info = self->sendQueue_.pop();
         }
     }
 
@@ -853,15 +853,15 @@ void *UdpClient::workRoutine( void * arg ) {
     return nullptr;
 }
 
-KcpClient::KcpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), _host(host), _port(port), _local_port(local_port) {
-    _pkcp = ikcp_create(0x1, (void *)this);
-    ikcp_nodelay(_pkcp, 1, 20, 2, 1);
-    _pkcp->output = rawOut;
+KcpClient::KcpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), host_(host), port_(port), local_port_(local_port) {
+    pkcp_ = ikcp_create(0x1, (void *)this);
+    ikcp_nodelay(pkcp_, 1, 20, 2, 1);
+    pkcp_->output = rawOut;
 }
 
 KcpClient::~KcpClient() {
     DEBUG_LOG("KcpClient::~KcpClient\n");
-    ikcp_release(_pkcp);
+    ikcp_release(pkcp_);
 }
 
 bool KcpClient::start() {
@@ -869,7 +869,7 @@ bool KcpClient::start() {
     socklen_t slen = sizeof(si_other);
     char buf[CORPC_MAX_UDP_MESSAGE_SIZE];
     
-    if ((_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+    if ((s_=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         ERROR_LOG("can't create socket\n");
         return false;
     }
@@ -878,26 +878,26 @@ bool KcpClient::start() {
     memset((char *)&si_me, 0, sizeof(si_me));
     
     si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(_local_port);
+    si_me.sin_port = htons(local_port_);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     
     int reuse = 1;
-    setsockopt(_s, SOL_SOCKET, SO_REUSEADDR, &reuse,sizeof(reuse));
-    setsockopt(_s, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
+    setsockopt(s_, SOL_SOCKET, SO_REUSEADDR, &reuse,sizeof(reuse));
+    setsockopt(s_, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     
     //bind socket to port
-    if(bind(_s, (struct sockaddr*)&si_me, sizeof(si_me)) == -1) {
+    if(bind(s_, (struct sockaddr*)&si_me, sizeof(si_me)) == -1) {
         ERROR_LOG("can't bind socket\n");
         return false;
     }
     
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
-    si_other.sin_port = htons(_port);
-    int nIP = inet_addr(_host.c_str());
+    si_other.sin_port = htons(port_);
+    int nIP = inet_addr(host_.c_str());
     si_other.sin_addr.s_addr = nIP;
     
-    if(connect(_s, (struct sockaddr *)&si_other, slen) == -1) {
+    if(connect(s_, (struct sockaddr *)&si_other, slen) == -1) {
         ERROR_LOG("can't connect\n");
         return false;
     }
@@ -905,7 +905,7 @@ bool KcpClient::start() {
     struct pollfd fd;
     int ret;
     
-    fd.fd = _s;
+    fd.fd = s_;
     fd.events = POLLIN;
     
     // 准备握手消息
@@ -921,9 +921,9 @@ bool KcpClient::start() {
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
         // 阶段一：发送handshake1消息
-        if (::write(_s, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (::write(s_, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("can't send handshake1\n");
-            ::close(_s);
+            ::close(s_);
             return false;
         }
         DEBUG_LOG("send handshake1\n");
@@ -945,15 +945,15 @@ STEP1_POLLAGAIN:
                 }
 
                 ERROR_LOG("can't recv handshake2\n");
-                ::close(_s);
+                ::close(s_);
                 return false;
             case 0:
                 continue; // 回阶段一
             default: {
-                ret = (int)read(_s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
+                ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
                 if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                     ERROR_LOG("recv data size error\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 
@@ -962,7 +962,7 @@ STEP1_POLLAGAIN:
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     ERROR_LOG("recv data not handshake2\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 DEBUG_LOG("recv handshake2\n");
@@ -974,9 +974,9 @@ STEP1_POLLAGAIN:
 STEP2:
     while (true) {
         // 阶段三：发hankshake3消息
-        if (::write(_s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (::write(s_, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("can't send handshake3\n");
-            ::close(_s);
+            ::close(s_);
             return false;
         }
         DEBUG_LOG("send handshake3\n");
@@ -998,15 +998,15 @@ STEP2_POLLAGAIN:
                 }
 
                 ERROR_LOG("can't recv handshake4\n");
-                ::close(_s);
+                ::close(s_);
                 return false;
             case 0:
                 continue; // 回阶段三
             default: {
-                ret = (int)read(_s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
+                ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
                 if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                     ERROR_LOG("recv data size error\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 
@@ -1019,7 +1019,7 @@ STEP2_POLLAGAIN:
 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_4) {
                     ERROR_LOG("recv data not handshake4\n");
-                    ::close(_s);
+                    ::close(s_);
                     return false;
                 }
                 DEBUG_LOG("recv handshake4\n");
@@ -1029,17 +1029,17 @@ STEP2_POLLAGAIN:
     }
 
 STEP3:
-    if (_needHB) {
+    if (needHB_) {
         struct timeval now = { 0 };
         gettimeofday( &now,NULL );
-        _lastRecvHBTime = now.tv_sec;
-        _lastRecvHBTime *= 1000;
-        _lastRecvHBTime += now.tv_usec / 1000;
+        lastRecvHBTime_ = now.tv_sec;
+        lastRecvHBTime_ *= 1000;
+        lastRecvHBTime_ += now.tv_usec / 1000;
         
-        _lastSendHBTime = _lastRecvHBTime;
+        lastSendHBTime_ = lastRecvHBTime_;
     }
     
-    _running = true;
+    running_ = true;
     // 启动数据收发协程
     RoutineEnvironment::startCoroutine(recvRoutine, this);
     RoutineEnvironment::startCoroutine(sendRoutine, this);
@@ -1058,7 +1058,7 @@ void *KcpClient::recvRoutine(void *arg) {
     std::string data(CORPC_MAX_KCP_PACKAGE_SIZE,0);
     uint8_t *dataBuf = (uint8_t *)data.data();
 
-    int s = self->_s;
+    int s = self->s_;
     
     int ret;
     
@@ -1076,7 +1076,7 @@ void *KcpClient::recvRoutine(void *arg) {
     uint16_t tag = 0;
     uint16_t flag = 0;
 
-    while (self->_running) {
+    while (self->running_) {
 //DEBUG_LOG("KcpClient::recvRoutine -- read\n");
         // 一次性读取尽可能多的数据
         ret = (int)read(s, buf, CORPC_MESSAGE_HEAD_SIZE + CORPC_MAX_MESSAGE_SIZE);
@@ -1101,7 +1101,7 @@ void *KcpClient::recvRoutine(void *arg) {
 //DEBUG_LOG("read data len:%d\n", ret);
 
         // 将收到的数据注入kcp中
-        ret = ikcp_input(self->_pkcp, (const char*)buf, ret);
+        ret = ikcp_input(self->pkcp_, (const char*)buf, ret);
         if (ret < 0) {
             ERROR_LOG("KcpClient::recvRoutine -- ikcp_input failed\n");
             goto END_LOOP;
@@ -1112,7 +1112,7 @@ void *KcpClient::recvRoutine(void *arg) {
         while (true)
         {
             //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-            ret = ikcp_recv(self->_pkcp, (char*)dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
+            ret = ikcp_recv(self->pkcp_, (char*)dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
             if (ret < 0) {
                 if (ret == -1) {
 //DEBUG_LOG("KcpClient::recvRoutine 2\n");
@@ -1191,7 +1191,7 @@ void *KcpClient::recvRoutine(void *arg) {
                     if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
 //DEBUG_LOG("KcpClient::recvRoutine 16\n");
                         assert(bodySize == 0);
-                        self->_lastRecvHBTime = mtime();
+                        self->lastRecvHBTime_ = mtime();
                     } else if (msgType < 0) {
 //DEBUG_LOG("KcpClient::recvRoutine 17\n");
                         // 其他连接控制消息，不做处理
@@ -1199,23 +1199,23 @@ void *KcpClient::recvRoutine(void *arg) {
 //DEBUG_LOG("KcpClient::recvRoutine 18\n");
                         //assert(bodySize > 0);
                         // 校验序列号
-                        if (self->_enableSerial) {
+                        if (self->enableSerial_) {
                             uint32_t serial = *(uint32_t *)(headBuf + 14);
                             serial = be32toh(serial);
 
                             if (serial != 0) {
-                                if (serial != self->_lastRecvSerial + 1) {
-                                    ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial+1, serial);
+                                if (serial != self->lastRecvSerial_ + 1) {
+                                    ERROR_LOG("serial check failed, need:%d, get:%d\n", self->lastRecvSerial_+1, serial);
                                     goto END_LOOP;
                                 }
 
-                                self->_lastRecvSerial++;
+                                self->lastRecvSerial_++;
                             }
                         }
 
                         if (bodySize > 0) {
                             // 校验CRC
-                            if (self->_enableRecvCRC) {
+                            if (self->enableRecvCRC_) {
                                 uint16_t crc = *(uint16_t *)(headBuf + 18);
                                 crc = be16toh(crc);
 
@@ -1229,19 +1229,19 @@ void *KcpClient::recvRoutine(void *arg) {
 
                             // 解密
                             if (flag & CORPC_MESSAGE_FLAG_CRYPT) {
-                                if (self->_crypter == nullptr) {
+                                if (self->crypter_ == nullptr) {
                                     ERROR_LOG("cant decrypt message for crypter not exist\n");
                                     goto END_LOOP;
                                 }
 
-                                self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                                self->crypter_->decrypt(bodyBuf, bodyBuf, bodySize);
                             }
                         }
                         
                         
                         // 解码数据
-                        auto iter = self->_registerMessageMap.find(msgType);
-                        if (iter == self->_registerMessageMap.end()) {
+                        auto iter = self->registerMessageMap_.find(msgType);
+                        if (iter == self->registerMessageMap_.end()) {
                             ERROR_LOG("unknown message: %d\n", msgType);
                             goto END_LOOP;
                         }
@@ -1261,7 +1261,7 @@ void *KcpClient::recvRoutine(void *arg) {
                         info->tag = tag;
                         info->proto = msg;
                         
-                        self->_recvQueue.push(info);
+                        self->recvQueue_.push(info);
                     }
                     
                     // 处理完一个消息，需要清理变量
@@ -1274,7 +1274,7 @@ void *KcpClient::recvRoutine(void *arg) {
             }
         }
 
-        ikcp_flush(self->_pkcp);
+        ikcp_flush(self->pkcp_);
     }
 
 END_LOOP:
@@ -1292,7 +1292,7 @@ void *KcpClient::sendRoutine(void *arg) {
     std::string buffs(CORPC_MESSAGE_HEAD_SIZE + CORPC_MAX_MESSAGE_SIZE,0);
     uint8_t *buf = (uint8_t *)buffs.data();
 
-    auto& queue = self->_sendQueue;
+    auto& queue = self->sendQueue_;
     
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -1300,7 +1300,7 @@ void *KcpClient::sendRoutine(void *arg) {
     co_set_timeout(readFd, -1, 1000);
     
     int ret;
-    while (self->_running) {
+    while (self->running_) {
 //DEBUG_LOG("KcpClient::sendRoutine 1\n");
         // 等待处理信号
         ret = (int)read(readFd, buf, 1024);
@@ -1322,7 +1322,7 @@ void *KcpClient::sendRoutine(void *arg) {
         // 将要发送的数据拼在一起发送，提高效率
         int sendNum = 0;
         // 发送数据
-        MessageInfo *info = self->_sendQueue.pop();
+        MessageInfo *info = self->sendQueue_.pop();
         while (info) {
 //DEBUG_LOG("KcpClient::sendRoutine 2\n");
             // TODO: 若是通知结束则退出
@@ -1341,8 +1341,8 @@ void *KcpClient::sendRoutine(void *arg) {
                 info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
 
                 if (info->needCrypter) {
-                    assert(self->_crypter);
-                    self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+                    assert(self->crypter_);
+                    self->crypter_->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                     *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 } else {
                     *(uint16_t *)(buf + sendNum + 8) = 0;
@@ -1353,12 +1353,12 @@ void *KcpClient::sendRoutine(void *arg) {
 
                 *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
-                if (self->_enableSerial) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->_lastRecvSerial);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->_lastSendSerial);
+                if (self->enableSerial_) {
+                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->lastSendSerial_);
                 }
 
-                if (self->_enableSendCRC) {
+                if (self->enableSendCRC_) {
                     uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                     *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
@@ -1378,15 +1378,15 @@ void *KcpClient::sendRoutine(void *arg) {
             
             sendNum = 0;
 
-            info = self->_sendQueue.pop();
+            info = self->sendQueue_.pop();
         }
 
 //DEBUG_LOG("KcpClient::sendRoutine 3\n");
 
         //uint64_t now = mtime();
         //uint32_t current = (uint32_t)(now & 0xfffffffful);
-        //ikcp_update(self->_pkcp, current);
-        ikcp_flush(self->_pkcp);
+        //ikcp_update(self->pkcp_, current);
+        ikcp_flush(self->pkcp_);
     }
 
 END_LOOP:
@@ -1406,20 +1406,20 @@ void *KcpClient::updateRoutine(void *arg) {
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
     *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
     
-    while (self->_running) {
+    while (self->running_) {
         uint64_t now = mtime();
         // 心跳判断
-        if (self->_needHB) {
-            if (now - self->_lastRecvHBTime > CORPC_MAX_NO_HEARTBEAT_TIME) {
+        if (self->needHB_) {
+            if (now - self->lastRecvHBTime_ > CORPC_MAX_NO_HEARTBEAT_TIME) {
                 // 无心跳，断线
                 ERROR_LOG("heartbeat timeout\n");
                 self->close();
                 return nullptr;
             }
             
-            if (now - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
-                if (self->_enableSerial) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->_lastRecvSerial);
+            if (now - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
+                if (self->enableSerial_) {
+                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->lastRecvSerial_);
                 }
 
                 if (self->write(heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) < 0) {
@@ -1428,15 +1428,15 @@ void *KcpClient::updateRoutine(void *arg) {
                     return nullptr;
                 }
                 
-                self->_lastSendHBTime = now;
+                self->lastSendHBTime_ = now;
             }
         }
 
 //DEBUG_LOG("KcpClient::updateRoutine -- ikcp_update\n");
         uint32_t current = (uint32_t)(now & 0xfffffffful);
-        ikcp_update(self->_pkcp, current);
+        ikcp_update(self->pkcp_, current);
 
-        uint32_t next = ikcp_check(self->_pkcp, current);
+        uint32_t next = ikcp_check(self->pkcp_, current);
         if (next > current) {
             // FixMe：这里会导致要发送的消息得不到立即发送
             //msleep(next-current);
@@ -1464,7 +1464,7 @@ void *KcpClient::workRoutine( void * arg ) {
     std::string data(CORPC_MAX_KCP_PACKAGE_SIZE,0);
     uint8_t *dataBuf = (uint8_t *)data.data();
 
-    int s = self->_s;
+    int s = self->s_;
     struct pollfd fd;
     fd.fd = s;
     fd.events = POLLIN;
@@ -1489,11 +1489,11 @@ void *KcpClient::workRoutine( void * arg ) {
     uint64_t nowms = 0;
 
     uint32_t waitMs = 4;
-    while (self->_running) {
+    while (self->running_) {
 DEBUG_LOG("KcpClient::workRoutine -- poll waitMs:%d\n", waitMs);
         ret = poll(&fd, 1, waitMs);
 
-        if (self->_needHB) {
+        if (self->needHB_) {
             gettimeofday( &now,NULL );
             nowms = now.tv_sec;
             nowms *= 1000;
@@ -1528,7 +1528,7 @@ DEBUG_LOG("KcpClient::workRoutine -- poll waitMs:%d\n", waitMs);
 DEBUG_LOG("read data len:%d\n", ret);
 
             // 将收到的数据注入kcp中
-            ret = ikcp_input(self->_pkcp, (const char*)buf, ret);
+            ret = ikcp_input(self->pkcp_, (const char*)buf, ret);
             if (ret < 0) {
                 ERROR_LOG("KcpClient::workRoutine -- ikcp_input failed\n");
                 self->close();
@@ -1540,7 +1540,7 @@ DEBUG_LOG("KcpClient::workRoutine 1\n");
             while (true)
             {
                 //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-                ret = ikcp_recv(self->_pkcp, (char*)dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
+                ret = ikcp_recv(self->pkcp_, (char*)dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
                 if (ret < 0) {
                     if (ret == -1) {
 DEBUG_LOG("KcpClient::workRoutine 2\n");
@@ -1621,7 +1621,7 @@ DEBUG_LOG("KcpClient::workRoutine 15\n");
                         if (msgType == CORPC_MSG_TYPE_HEARTBEAT) {
 DEBUG_LOG("KcpClient::workRoutine 16\n");
                             assert(bodySize == 0);
-                            self->_lastRecvHBTime = nowms;
+                            self->lastRecvHBTime_ = nowms;
                         } else if (msgType < 0) {
 DEBUG_LOG("KcpClient::workRoutine 17\n");
                             // 其他连接控制消息，不做处理
@@ -1629,24 +1629,24 @@ DEBUG_LOG("KcpClient::workRoutine 17\n");
 DEBUG_LOG("KcpClient::workRoutine 18\n");
                             //assert(bodySize > 0);
                             // 校验序列号
-                            if (self->_enableSerial) {
+                            if (self->enableSerial_) {
                                 uint32_t serial = *(uint32_t *)(headBuf + 14);
                                 serial = be32toh(serial);
 
                                 if (serial != 0) {
-                                    if (serial != self->_lastRecvSerial + 1) {
-                                        ERROR_LOG("serial check failed, need:%d, get:%d\n", self->_lastRecvSerial+1, serial);
+                                    if (serial != self->lastRecvSerial_ + 1) {
+                                        ERROR_LOG("serial check failed, need:%d, get:%d\n", self->lastRecvSerial_+1, serial);
                                         self->close();
                                         return nullptr;
                                     }
 
-                                    self->_lastRecvSerial++;
+                                    self->lastRecvSerial_++;
                                 }
                             }
 
                             if (bodySize > 0) {
                                 // 校验CRC
-                                if (self->_enableRecvCRC) {
+                                if (self->enableRecvCRC_) {
                                     uint16_t crc = *(uint16_t *)(headBuf + 18);
                                     crc = be16toh(crc);
 
@@ -1661,20 +1661,20 @@ DEBUG_LOG("KcpClient::workRoutine 18\n");
 
                                 // 解密
                                 if (flag & CORPC_MESSAGE_FLAG_CRYPT) {
-                                    if (self->_crypter == nullptr) {
+                                    if (self->crypter_ == nullptr) {
                                         ERROR_LOG("cant decrypt message for crypter not exist\n");
                                         self->close();
                                         return nullptr;
                                     }
 
-                                    self->_crypter->decrypt(bodyBuf, bodyBuf, bodySize);
+                                    self->crypter_->decrypt(bodyBuf, bodyBuf, bodySize);
                                 }
                             }
                             
                             
                             // 解码数据
-                            auto iter = self->_registerMessageMap.find(msgType);
-                            if (iter == self->_registerMessageMap.end()) {
+                            auto iter = self->registerMessageMap_.find(msgType);
+                            if (iter == self->registerMessageMap_.end()) {
                                 ERROR_LOG("unknown message: %d\n", msgType);
                                 self->close();
                                 return nullptr;
@@ -1696,7 +1696,7 @@ DEBUG_LOG("KcpClient::workRoutine 18\n");
                             info->tag = tag;
                             info->proto = msg;
                             
-                            self->_recvQueue.push(info);
+                            self->recvQueue_.push(info);
                         }
                         
                         // 处理完一个消息，需要清理变量
@@ -1712,17 +1712,17 @@ DEBUG_LOG("KcpClient::workRoutine 18\n");
 DEBUG_LOG("KcpClient::workRoutine 19\n");
 
         // 心跳判断
-        if (self->_needHB) {
-            if (nowms - self->_lastRecvHBTime > CORPC_MAX_NO_HEARTBEAT_TIME) {
+        if (self->needHB_) {
+            if (nowms - self->lastRecvHBTime_ > CORPC_MAX_NO_HEARTBEAT_TIME) {
                 // 无心跳，断线
                 ERROR_LOG("heartbeat timeout\n");
                 self->close();
                 return nullptr;
             }
             
-            if (nowms - self->_lastSendHBTime > CORPC_HEARTBEAT_PERIOD) {
-                if (self->_enableSerial) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->_lastRecvSerial);
+            if (nowms - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
+                if (self->enableSerial_) {
+                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->lastRecvSerial_);
                 }
 
                 if (self->write(heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) < 0) {
@@ -1731,7 +1731,7 @@ DEBUG_LOG("KcpClient::workRoutine 19\n");
                     return nullptr;
                 }
                 
-                self->_lastSendHBTime = nowms;
+                self->lastSendHBTime_ = nowms;
             }
         }
 DEBUG_LOG("KcpClient::workRoutine 20\n");
@@ -1739,7 +1739,7 @@ DEBUG_LOG("KcpClient::workRoutine 20\n");
         // 将要发送的数据拼在一起发送，提高效率
         int sendNum = 0;
         // 发送数据
-        MessageInfo *info = self->_sendQueue.pop();
+        MessageInfo *info = self->sendQueue_.pop();
         while (info) {
 DEBUG_LOG("KcpClient::workRoutine 21\n");
             uint32_t msgSize = info->proto->GetCachedSize();
@@ -1757,8 +1757,8 @@ DEBUG_LOG("KcpClient::workRoutine 21\n");
                 info->proto->SerializeWithCachedSizesToArray(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE);
 
                 if (info->needCrypter) {
-                    assert(self->_crypter);
-                    self->_crypter->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
+                    assert(self->crypter_);
+                    self->crypter_->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                     *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 } else {
                     *(uint16_t *)(buf + sendNum + 8) = 0;
@@ -1769,12 +1769,12 @@ DEBUG_LOG("KcpClient::workRoutine 21\n");
 
                 *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
                 
-                if (self->_enableSerial) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->_lastRecvSerial);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->_lastSendSerial);
+                if (self->enableSerial_) {
+                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->lastSendSerial_);
                 }
 
-                if (self->_enableSendCRC) {
+                if (self->enableSendCRC_) {
                     uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                     *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
@@ -1784,7 +1784,7 @@ DEBUG_LOG("KcpClient::workRoutine 21\n");
                 
                 delete info;
                 
-                info = self->_sendQueue.pop();
+                info = self->sendQueue_.pop();
                 
                 if (info) {
                     continue;
@@ -1804,9 +1804,9 @@ DEBUG_LOG("KcpClient::workRoutine 22\n");
         gettimeofday(&now, NULL);
         uint64_t nowms = now.tv_sec * 1000 + now.tv_usec / 1000;
         uint32_t current = (uint32_t)(nowms & 0xfffffffful);
-        ikcp_update(self->_pkcp, current);
+        ikcp_update(self->pkcp_, current);
 
-        uint32_t next = ikcp_check(self->_pkcp, current);
+        uint32_t next = ikcp_check(self->pkcp_, current);
         waitMs = (next > current) ? next-current:4;
     }
 
@@ -1823,7 +1823,7 @@ ssize_t KcpClient::write(const void *buf, size_t nbyte) {
     do {
         uint32_t pkgSize = (leftNum > CORPC_MAX_KCP_PACKAGE_SIZE)?CORPC_MAX_KCP_PACKAGE_SIZE:leftNum;
 
-        ret = ikcp_send(_pkcp, (const char *)(buf + sentNum), pkgSize);
+        ret = ikcp_send(pkcp_, (const char *)(buf + sentNum), pkgSize);
         if (ret < 0) {
             WARN_LOG("KcpClient::write -- ret %d\n", ret);
 
@@ -1844,7 +1844,7 @@ int KcpClient::rawOut(const char *buf, int len, ikcpcb *kcp, void *obj) {
     uint32_t sentNum = 0;
     uint32_t leftNum = len;
     do {
-        ret = (int)::write(client->_s, buf + sentNum, leftNum);
+        ret = (int)::write(client->s_, buf + sentNum, leftNum);
         if (ret > 0) {
             assert(ret <= leftNum);
             sentNum += ret;
@@ -1854,7 +1854,7 @@ int KcpClient::rawOut(const char *buf, int len, ikcpcb *kcp, void *obj) {
 
     if (leftNum > 0) {
         WARN_LOG("KcpClient::rawOut -- write fd %d ret %d errno %d (%s)\n",
-                   client->_s, ret, errno, strerror(errno));
+                   client->s_, ret, errno, strerror(errno));
         return -1;
     }
 //DEBUG_LOG("KcpClient::rawOut end\n");

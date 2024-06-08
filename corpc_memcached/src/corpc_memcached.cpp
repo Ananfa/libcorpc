@@ -19,15 +19,15 @@
 using namespace corpc;
 
 MemcachedConnectPool::Proxy::~Proxy() {
-    if (_stub) {
-        delete _stub;
+    if (stub_) {
+        delete stub_;
     }
 }
 
 void MemcachedConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
     InnerRpcChannel *channel = new InnerRpcChannel(server);
     
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+    stub_ = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
 
 memcached_st* MemcachedConnectPool::Proxy::take() {
@@ -35,7 +35,7 @@ memcached_st* MemcachedConnectPool::Proxy::take() {
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
     Controller *controller = new Controller();
     
-    _stub->take(controller, request, response, NULL);
+    stub_->take(controller, request, response, NULL);
     
     if (controller->Failed()) {
         ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
@@ -65,10 +65,10 @@ void MemcachedConnectPool::Proxy::put(memcached_st* memc, bool error) {
         request->set_error(error);
     }
     
-    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
+    stub_->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
 }
 
-MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum): _memcServers(memcServers), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
+MemcachedConnectPool::MemcachedConnectPool(memcached_server_st *memcServers, uint32_t maxConnectNum): memcServers_(memcServers), maxConnectNum_(maxConnectNum), realConnectCount_(0) {
     
 }
 
@@ -76,18 +76,18 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
                             const Void* request,
                             thirdparty::TakeResponse* response,
                             ::google::protobuf::Closure* done) {
-    if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.back().handle;
-        _idleList.pop_back();
+    if (idleList_.size() > 0) {
+        intptr_t handle = (intptr_t)idleList_.back().handle;
+        idleList_.pop_back();
         
         response->set_handle(handle);
-    } else if (_realConnectCount < _maxConnectNum) {
+    } else if (realConnectCount_ < maxConnectNum_) {
         // 建立新连接
-        _realConnectCount++;
+        realConnectCount_++;
         memcached_st *memc = memcached_create(NULL);
         
         if (memc) {
-            memcached_return rc = memcached_server_push(memc, _memcServers);
+            memcached_return rc = memcached_server_push(memc, memcServers_);
             
             if (rc == MEMCACHED_SUCCESS) {
                 response->set_handle((intptr_t)memc);
@@ -104,25 +104,25 @@ void MemcachedConnectPool::take(::google::protobuf::RpcController* controller,
         
         if (!memc) {
             // 唤醒所有等待协程
-            _realConnectCount--;
+            realConnectCount_--;
             
-            while (!_waitingList.empty()) {
-                stCoRoutine_t *co = _waitingList.front();
-                _waitingList.pop_front();
+            while (!waitingList_.empty()) {
+                stCoRoutine_t *co = waitingList_.front();
+                waitingList_.pop_front();
                 
                 co_resume(co);
             }
         }
     } else {
         // 等待空闲连接
-        _waitingList.push_back(co_self());
+        waitingList_.push_back(co_self());
         co_yield_ct();
         
-        if (_idleList.size() == 0) {
+        if (idleList_.size() == 0) {
             controller->SetFailed("can't connect to memcached server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.back().handle;
-            _idleList.pop_back();
+            intptr_t handle = (intptr_t)idleList_.back().handle;
+            idleList_.pop_back();
             
             response->set_handle(handle);
         }
@@ -135,28 +135,28 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                            ::google::protobuf::Closure* done) {
     memcached_st *memc = (memcached_st *)request->handle();
     
-    if (_idleList.size() < _maxConnectNum) {
+    if (idleList_.size() < maxConnectNum_) {
         if (request->error()) {
-            _realConnectCount--;
+            realConnectCount_--;
             memcached_free(memc);
             
             // 若有等待协程，尝试重连
-            if (_waitingList.size() > 0) {
-                assert(_idleList.size() == 0);
+            if (waitingList_.size() > 0) {
+                assert(idleList_.size() == 0);
                 
-                if (_realConnectCount < _maxConnectNum) {
+                if (realConnectCount_ < maxConnectNum_) {
                     // 注意: 重连后等待列表可能为空（由其他协程释放连接唤醒列表中的等待协程），此时会出bug，因此先从等待列表中取出一个等待协程
-                    stCoRoutine_t *co = _waitingList.front();
-                    _waitingList.pop_front();
+                    stCoRoutine_t *co = waitingList_.front();
+                    waitingList_.pop_front();
                     
-                    _realConnectCount++;
+                    realConnectCount_++;
                     memc = memcached_create(NULL);
                     
                     if (memc) {
-                        memcached_return rc = memcached_server_push(memc, _memcServers);
+                        memcached_return rc = memcached_server_push(memc, memcServers_);
                         
                         if (rc == MEMCACHED_SUCCESS) {
-                            _idleList.push_back({memc, time(nullptr)});
+                            idleList_.push_back({memc, time(nullptr)});
                         } else {
                             memcached_free(memc);
                             memc = NULL;
@@ -164,7 +164,7 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                     }
                     
                     if (!memc) {
-                        _realConnectCount--;
+                        realConnectCount_--;
                     }
                     
                     // 唤醒先前取出的等待协程
@@ -172,9 +172,9 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                     
                     if (!memc) {
                         // 唤醒当前所有等待协程
-                        while (!_waitingList.empty()) {
-                            stCoRoutine_t *co = _waitingList.front();
-                            _waitingList.pop_front();
+                        while (!waitingList_.empty()) {
+                            stCoRoutine_t *co = waitingList_.front();
+                            waitingList_.pop_front();
                             
                             co_resume(co);
                         }
@@ -182,19 +182,19 @@ void MemcachedConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back({memc, time(nullptr)});
+            idleList_.push_back({memc, time(nullptr)});
             
-            if (_waitingList.size() > 0) {
-                assert(_idleList.size() == 1);
-                stCoRoutine_t *co = _waitingList.front();
-                _waitingList.pop_front();
+            if (waitingList_.size() > 0) {
+                assert(idleList_.size() == 1);
+                stCoRoutine_t *co = waitingList_.front();
+                waitingList_.pop_front();
                 
                 co_resume(co);
             }
         }
     } else {
-        assert(_waitingList.size() == 0);
-        _realConnectCount--;
+        assert(waitingList_.size() == 0);
+        realConnectCount_--;
         memcached_free(memc);
     }
 }
@@ -207,10 +207,10 @@ MemcachedConnectPool* MemcachedConnectPool::create(memcached_server_st *memcServ
 }
 
 void MemcachedConnectPool::init() {
-    _server = new InnerRpcServer();
-    _server->registerService(this);
-    _server->start();
-    proxy.init(_server);
+    server_ = new InnerRpcServer();
+    server_->registerService(this);
+    server_->start();
+    proxy.init(server_);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
@@ -226,11 +226,11 @@ void *MemcachedConnectPool::clearIdleRoutine( void *arg ) {
         
         time(&now);
         
-        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+        while (self->idleList_.size() > 0 && self->idleList_.front().time < now - 60) {
             DEBUG_LOG("MemcachedConnectPool::clearIdleRoutine -- disconnect a memcached connection");
-            memcached_st *handle = self->_idleList.front().handle;
-            self->_idleList.pop_front();
-            self->_realConnectCount--;
+            memcached_st *handle = self->idleList_.front().handle;
+            self->idleList_.pop_front();
+            self->realConnectCount_--;
             memcached_free(handle);
         }
     }

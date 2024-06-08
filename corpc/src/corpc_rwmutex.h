@@ -27,7 +27,7 @@ namespace corpc {
     class RWMutex {
 
     public:
-        RWMutex():_readerSem(0), _writerSem(0), _readerCount(0), _readerWait(0) {}
+        RWMutex():readerSem_(0), writerSem_(0), readerCount_(0), readerWait_(0) {}
         ~RWMutex() {}
         
         void lock();
@@ -37,11 +37,11 @@ namespace corpc {
         void runlock();
 
     private:
-        Mutex _wlock;
-        Semaphore _readerSem;
-        Semaphore _writerSem;
-        std::atomic<int> _readerCount;
-        std::atomic<int> _readerWait;
+        Mutex wlock_;
+        Semaphore readerSem_;
+        Semaphore writerSem_;
+        std::atomic<int> readerCount_;
+        std::atomic<int> readerWait_;
     };
 
     class RLockGuard {
@@ -51,11 +51,11 @@ namespace corpc {
         void operator delete(void* ptr) {}
 
     public:
-        RLockGuard(RWMutex &lock): _lock(lock) { _lock.rlock(); }
-        ~RLockGuard() { _lock.runlock(); }
+        RLockGuard(RWMutex &lock): lock_(lock) { lock_.rlock(); }
+        ~RLockGuard() { lock_.runlock(); }
 
     private:
-        RWMutex &_lock;
+        RWMutex &lock_;
     };
 
     class WLockGuard {
@@ -65,11 +65,11 @@ namespace corpc {
         void operator delete(void* ptr) {}
 
     public:
-        WLockGuard(RWMutex &lock): _lock(lock) { _lock.lock(); }
-        ~WLockGuard() { _lock.unlock(); }
+        WLockGuard(RWMutex &lock): lock_(lock) { lock_.lock(); }
+        ~WLockGuard() { lock_.unlock(); }
 
     private:
-        RWMutex &_lock;
+        RWMutex &lock_;
     };
 }
 

@@ -31,7 +31,7 @@ using namespace corpc;
 
 void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
     InnerRpcRequest *req = new InnerRpcRequest;
-    req->server = _server;
+    req->server = server_;
     req->rpcTask = std::make_shared<RpcClientTask>();
     req->rpcTask->pid = GetPid();
     req->rpcTask->co = co_self();
@@ -74,7 +74,7 @@ void InnerRpcChannel::CallMethod(const google::protobuf::MethodDescriptor *metho
         req->rpcTask->expireTime = 0;
     }
 
-    _server->_queue.push(req);
+    server_->queue_.push(req);
     
     if (care_response) {
         co_yield_ct(); // 等待rpc结果到来被唤醒继续执行
@@ -92,12 +92,12 @@ bool InnerRpcServer::registerService(::google::protobuf::Service *rpcService) {
     
     uint32_t serviceId = (uint32_t)(serviceDescriptor->options().GetExtension(corpc::global_service_id));
     
-    std::map<uint32_t, ServiceData>::iterator it = _services.find(serviceId);
-    if (it != _services.end()) {
+    std::map<uint32_t, ServiceData>::iterator it = services_.find(serviceId);
+    if (it != services_.end()) {
         return false;
     }
     
-    ServiceData &serviceData = _services[serviceId];
+    ServiceData &serviceData = services_[serviceId];
     serviceData.rpcService = rpcService;
     
     MethodData methodData;
@@ -113,8 +113,8 @@ bool InnerRpcServer::registerService(::google::protobuf::Service *rpcService) {
 }
 
 google::protobuf::Service *InnerRpcServer::getService(uint32_t serviceId) const {
-    std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
-    if (it == _services.end()) {
+    std::map<uint32_t, ServiceData>::const_iterator it = services_.find(serviceId);
+    if (it == services_.end()) {
         return NULL;
     }
     
@@ -122,8 +122,8 @@ google::protobuf::Service *InnerRpcServer::getService(uint32_t serviceId) const 
 }
 
 const MethodData *InnerRpcServer::getMethod(uint32_t serviceId, uint32_t methodId) const {
-    std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
-    if (it == _services.end()) {
+    std::map<uint32_t, ServiceData>::const_iterator it = services_.find(serviceId);
+    if (it == services_.end()) {
         return NULL;
     }
     
@@ -136,9 +136,9 @@ const MethodData *InnerRpcServer::getMethod(uint32_t serviceId, uint32_t methodI
 
 void InnerRpcServer::start(uint32_t workerThreadNum) {
     if (workerThreadNum > 0) {
-        _ts.resize(workerThreadNum);
+        ts_.resize(workerThreadNum);
         for (int i=0; i<workerThreadNum; i++) {
-            _ts[i] = std::thread(threadEntry, this);
+            ts_[i] = std::thread(threadEntry, this);
         }
     } else {
         RoutineEnvironment::startCoroutine(requestQueueRoutine, this);
@@ -154,7 +154,7 @@ void InnerRpcServer::threadEntry( InnerRpcServer * self ) {
 
 void *InnerRpcServer::requestQueueRoutine( void * arg ) {
     InnerRpcServer *server = (InnerRpcServer*)arg;
-    InnerRpcRequestQueue& queue = server->_queue;
+    InnerRpcRequestQueue& queue = server->queue_;
 
     while (true) {
         // 处理任务队列

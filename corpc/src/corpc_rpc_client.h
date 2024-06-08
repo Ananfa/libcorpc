@@ -49,14 +49,14 @@ namespace corpc {
             std::shared_ptr<Connection> getNextConnection();
             
         private:
-            std::string _host;
-            uint32_t _port;
+            std::string host_;
+            uint32_t port_;
             
-            RpcClient *_client;
-            std::vector<std::shared_ptr<Connection>> _connections;
-            uint32_t _conIndex;
+            RpcClient *client_;
+            std::vector<std::shared_ptr<Connection>> connections_;
+            uint32_t conIndex_;
             
-            bool _connectDelay; // 是否需要延迟连接
+            bool connectDelay_; // 是否需要延迟连接
             
         public:
             friend class Channel;
@@ -82,13 +82,14 @@ namespace corpc {
             virtual void cleanDataOnClosing(std::shared_ptr<void>& data);
             
         private:
-            std::shared_ptr<ChannelCore> _channel;
+            std::shared_ptr<ChannelCore> channel_;
             
-            Status _st;
+            Status st_;
             
-            WaitTaskList _waitSendTaskCoList;// 等待发送RPC请求的任务
-            WaitTaskMap _waitResultCoMap; // 等待接受RPC结果的任务
-            Mutex _waitResultCoMapMutex; // _waitResultCoMap需要进行线程同步
+            WaitTaskList waitSendTaskCoList_;// 等待发送RPC请求的任务
+            WaitTaskMap waitResultCoMap_; // 等待接受RPC结果的任务
+            Mutex waitResultCoMapMutex_; // _waitResultCoMap需要进行线程同步
+            
             
         public:
             friend class Channel;
@@ -102,33 +103,33 @@ namespace corpc {
         private:
             class Guard {
             public:
-                Guard(std::shared_ptr<ChannelCore> &channel): _channel(channel) {}
+                Guard(std::shared_ptr<ChannelCore> &channel): channel_(channel) {}
                 ~Guard();
             private:
-                std::shared_ptr<ChannelCore> _channel;
+                std::shared_ptr<ChannelCore> channel_;
             };
 
         public:
-            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1): _channel(new ChannelCore(client, host, port, connectNum)) {
-                _guard = std::make_shared<Guard>(_channel);
+            Channel(RpcClient *client, const std::string& host, uint32_t port, uint32_t connectNum = 1): channel_(new ChannelCore(client, host, port, connectNum)) {
+                guard_ = std::make_shared<Guard>(channel_);
             }
             Channel(const Channel& channel) {
-                _channel = channel._channel;
-                _guard = channel._guard;
+                channel_ = channel.channel_;
+                guard_ = channel.guard_;
             }
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
-                _channel->CallMethod(method, controller, request, response, done);
+                channel_->CallMethod(method, controller, request, response, done);
             }
             
-            const std::string& getHost() const { return _channel->_host; }
-            uint32_t getPort() const { return _channel->_port; }
+            const std::string& getHost() const { return channel_->host_; }
+            uint32_t getPort() const { return channel_->port_; }
             
         private:
             virtual ~Channel() {}
             
         private:
-            std::shared_ptr<Guard> _guard;
-            std::shared_ptr<ChannelCore> _channel;
+            std::shared_ptr<Guard> guard_;
+            std::shared_ptr<ChannelCore> channel_;
         };
         
         struct ConnectionTask {
@@ -172,17 +173,17 @@ namespace corpc {
         virtual void start();
         
     private:
-        IO *_io;
+        IO *io_;
         
-        std::thread _t; // 任务处理线程
+        std::thread t_; // 任务处理线程
         
-        ConnectionTaskQueue _connectionTaskQueue; // connectionRoutine处理的连接任务队列
+        ConnectionTaskQueue connectionTaskQueue_; // connectionRoutine处理的连接任务队列
         
-        ClientTaskQueue _taskQueue; // taskHandleRoutine
+        ClientTaskQueue taskQueue_; // taskHandleRoutine
         
-        ClearChannelQueue _clearChannelQueue; // clearChannelRoutine
+        ClearChannelQueue clearChannelQueue_; // clearChannelRoutine
         
-        PipelineFactory *_pipelineFactory;
+        PipelineFactory *pipelineFactory_;
     };
 }
 

@@ -34,7 +34,7 @@ namespace corpc {
         typedef std::function<bool(std::shared_ptr<SendMessageInfo>&)> MessageHandle;
         
     public:
-        MessageBuffer(bool needBuf): _needBuf(needBuf), _lastSendSerial(0) {}
+        MessageBuffer(bool needBuf): needBuf_(needBuf), lastSendSerial_(0) {}
         ~MessageBuffer() {}
 
         // 插入新消息，并为新消息添加消息序号（注意：心跳消息以及网络控制消息不会加到消息缓存中，且不需要消息序号）
@@ -46,13 +46,13 @@ namespace corpc {
         // 删除某个消息序号之前的所有消息（包括消息序号消息）
         void scrapMessages(uint32_t serial);
 
-        bool needBuf() { return _needBuf; }
+        bool needBuf() { return needBuf_; }
     private:
-        BufMessageLink _bufMsglink; // 缓存消息链
-        std::map<uint64_t, BufMessageLink::Node*> _bufMsgMap; // 按消息序号索引链中消息节点
+        BufMessageLink bufMsglink_; // 缓存消息链
+        std::map<uint64_t, BufMessageLink::Node*> bufMsgMap_; // 按消息序号索引链中消息节点
 
-        bool _needBuf; // 是否缓存消息
-        uint64_t _lastSendSerial; // 最后发送消息序列号
+        bool needBuf_; // 是否缓存消息
+        uint64_t lastSendSerial_; // 最后发送消息序列号
     };
 
 }

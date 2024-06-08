@@ -31,7 +31,7 @@ namespace corpc {
         void wait(int timeout); // 参数单位毫秒
 
     private:
-        stCoCond_t* _cond;
+        stCoCond_t* cond_;
     };
 }
 

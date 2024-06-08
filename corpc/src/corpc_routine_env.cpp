@@ -30,26 +30,26 @@ using namespace corpc;
 
 // 由于需要线程间通信，这里没有使用__thread来实现线程相关变量，而是全局数组，风险点是pid超出204800导致数组越界（一般也不会在系统中启动那么多线程）
 static RoutineEnvironment* g_routineEnvPerThread[ 204800 ] = { 0 };
-std::atomic<uint32_t> RoutineEnvironment::_keyRoutineNum(0);
+std::atomic<uint32_t> RoutineEnvironment::keyRoutineNum_(0);
 
 RoutineEnvironment::RoutineEnvironment() {
-    _attr = new stCoRoutineAttr_t;
-    _attr->stack_size = SHARE_STACK_SIZE;
-    _attr->share_stack = co_alloc_sharestack(SHARE_STACK_COUNT, SHARE_STACK_SIZE);
+    attr_ = new stCoRoutineAttr_t;
+    attr_->stack_size = SHARE_STACK_SIZE;
+    attr_->share_stack = co_alloc_sharestack(SHARE_STACK_COUNT, SHARE_STACK_SIZE);
     
     pipe(_endPipe.pipefd);
     co_register_fd(_endPipe.pipefd[1]);
     co_set_nonblock(_endPipe.pipefd[1]);
     
 #ifdef MONITOR_ROUTINE
-    _routineNum = 0;
-    _livingRoutineNum = 0;
+    routineNum_ = 0;
+    livingRoutineNum_ = 0;
 #endif
 }
 
 RoutineEnvironment::~RoutineEnvironment() {
-    if (_attr) {
-        delete _attr;
+    if (attr_) {
+        delete attr_;
     }
 }
 
@@ -79,20 +79,20 @@ RoutineEnvironment *RoutineEnvironment::initialize() {
     
 #ifdef MONITOR_ROUTINE
     // 启动监控协程
-    co_create( &co, env->_attr, monitorRoutine, env);
+    co_create( &co, env->attr_, monitorRoutine, env);
     co_resume( co );
 #endif
     
     // 启动clean协程
-    co_create( &co, env->_attr, cleanRoutine, env);
+    co_create( &co, env->attr_, cleanRoutine, env);
     co_resume( co );
     
     // 启动resume协程
-    co_create( &co, env->_attr, resumeRoutine, env);
+    co_create( &co, env->attr_, resumeRoutine, env);
     co_resume( co );
 
     // 启动timeout协程
-    co_create( &co, env->_attr, timeoutRoutine, env);
+    co_create( &co, env->attr_, timeoutRoutine, env);
     co_resume( co );
     
     return env;
@@ -104,7 +104,7 @@ void RoutineEnvironment::quit() {
 
 void RoutineEnvironment::addTimeoutTask( std::shared_ptr<RpcClientTask>& rpcTask ) {
     RoutineEnvironment *curenv = getEnv();
-    curenv->_timeoutList.insert(uint64_t(rpcTask->co), rpcTask->expireTime, rpcTask);
+    curenv->timeoutList_.insert(uint64_t(rpcTask->co), rpcTask->expireTime, rpcTask);
 }
 
 void RoutineEnvironment::pause() {
@@ -140,7 +140,7 @@ stCoRoutine_t *RoutineEnvironment::startCoroutine(pfn_co_routine_t pfn,void *arg
     context->pfn = pfn;
     context->arg = arg;
     
-    co_create( &co, curenv->_attr, routineEntry, context);
+    co_create( &co, curenv->attr_, routineEntry, context);
     co_resume( co );
     
     return co;
@@ -155,22 +155,28 @@ stCoRoutine_t *RoutineEnvironment::startKeyCoroutine(pfn_co_routine_t pfn,void *
     context->pfn = pfn;
     context->arg = arg;
     
-    co_create( &co, curenv->_attr, keyRoutineEntry, context);
+    co_create( &co, curenv->attr_, keyRoutineEntry, context);
     co_resume( co );
     
     return co;
 }
 
 void RoutineEnvironment::resumeCoroutine( pid_t pid, stCoRoutine_t *co, uint64_t expireTime, int err ) {
-    RoutineEnvironment *env = g_routineEnvPerThread[pid];
-    assert(env);
-    
-    WaitResumeRPCRoutine *wr = new WaitResumeRPCRoutine;
-    wr->co = co;
-    wr->expireTime = expireTime;
-    wr->err = err;
+    //if (pid == GetPid()) {
+    //    // 为了提高性能，同线程的协程唤醒直接加到活跃队列中
+    //    // 这里会不会导致底层协程运行时得不到运行？如果同线程下的几个协程互相循环唤醒等待，会让本线程中其他协程得不到运行
+    //    co_activate(co);
+    //} else {
+        RoutineEnvironment *env = g_routineEnvPerThread[pid];
+        assert(env);
 
-    env->_waitResumeQueue.push(wr);
+        WaitResumeRPCRoutine *wr = new WaitResumeRPCRoutine;
+        wr->co = co;
+        wr->expireTime = expireTime;
+        wr->err = err;
+
+        env->waitResumeQueue_.push(wr);
+    //}
 }
 
 void RoutineEnvironment::runEventLoop() {
@@ -182,8 +188,8 @@ void *RoutineEnvironment::routineEntry( void *arg ) {
     
 #ifdef MONITOR_ROUTINE
     RoutineEnvironment *curenv = getEnv();
-    curenv->_routineNum++;
-    curenv->_livingRoutineNum++;
+    curenv->routineNum_++;
+    curenv->livingRoutineNum_++;
 #endif
     
     RoutineContext *context = (RoutineContext*)arg;
@@ -195,7 +201,7 @@ void *RoutineEnvironment::routineEntry( void *arg ) {
     pfn(ar);
     
 #ifdef MONITOR_ROUTINE
-    curenv->_livingRoutineNum--;
+    curenv->livingRoutineNum_--;
 #endif
     
     getEnv()->addEndedCoroutine(co_self());
@@ -243,14 +249,14 @@ void *RoutineEnvironment::cleanRoutine( void *arg ) {
         }
         
         // 处理结束协程的资源回收
-        while (!curenv->_endedCoroutines.empty()) {
-            stCoRoutine_t *co = curenv->_endedCoroutines.front();
-            curenv->_endedCoroutines.pop_front();
+        while (!curenv->endedCoroutines_.empty()) {
+            stCoRoutine_t *co = curenv->endedCoroutines_.front();
+            curenv->endedCoroutines_.pop_front();
             
             co_release(co);
             
 #ifdef MONITOR_ROUTINE
-            curenv->_routineNum--;
+            curenv->routineNum_--;
 #endif
         }
     }
@@ -263,7 +269,7 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
     
     RoutineEnvironment *curenv = (RoutineEnvironment *)arg;
     
-    int readFd = curenv->_waitResumeQueue.getReadFd();
+    int readFd = curenv->waitResumeQueue_.getReadFd();
     co_register_fd(readFd);
     co_set_timeout(readFd, -1, 1000);
     
@@ -287,11 +293,11 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
             }
         }
         
-        WaitResumeRPCRoutine *wr = curenv->_waitResumeQueue.pop();
+        WaitResumeRPCRoutine *wr = curenv->waitResumeQueue_.pop();
         while (wr) {
             // 校验协程的expireTime是否一致
             if (wr->expireTime) {
-                auto node = curenv->_timeoutList.getNode(uint64_t(wr->co));
+                auto node = curenv->timeoutList_.getNode(uint64_t(wr->co));
                 if (node && node->expireTime == wr->expireTime) { // 因为使用协程对象指针地址作为标识，协程对象销毁后地址会被复用，因此通过过期时间来确定是协程本身
                     if (wr->err) {
                         node->data->controller->SetFailed(strerror(wr->err));
@@ -303,7 +309,7 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
                         node->data->response->MergeFrom(*(node->data->response_1));
                     }
 
-                    curenv->_timeoutList.remove(node);
+                    curenv->timeoutList_.remove(node);
 
                     co_activate(wr->co); // 激活协程（这里没有协程切换）
                 }
@@ -313,7 +319,7 @@ void *RoutineEnvironment::resumeRoutine( void *arg ) {
             
             delete wr;
 
-            wr = curenv->_waitResumeQueue.pop();
+            wr = curenv->waitResumeQueue_.pop();
         }
     }
     
@@ -329,7 +335,7 @@ void *RoutineEnvironment::timeoutRoutine( void *arg ) {
     while (true) {
         sleep(1);
 
-        auto node = curenv->_timeoutList.getLast();
+        auto node = curenv->timeoutList_.getLast();
         if (node != nullptr) {
             struct timeval t;
             gettimeofday(&t, NULL);
@@ -340,9 +346,9 @@ void *RoutineEnvironment::timeoutRoutine( void *arg ) {
                 // 唤醒超时任务处理
                 node->data->controller->SetFailed(strerror(ETIMEDOUT));
                 stCoRoutine_t *co = node->data->co;
-                curenv->_timeoutList.remove(node);
+                curenv->timeoutList_.remove(node);
                 co_activate(co);
-                node = curenv->_timeoutList.getLast();
+                node = curenv->timeoutList_.getLast();
             }
         }
     }
@@ -357,7 +363,7 @@ void *RoutineEnvironment::monitorRoutine( void *arg ) {
     while( true ) {
         sleep(1);
         
-        LOG("monitorRoutine -- env: %ld, living: %d, dead: %d\n", curenv, curenv->_livingRoutineNum, curenv->_routineNum - curenv->_livingRoutineNum);
+        LOG("monitorRoutine -- env: %ld, living: %d, dead: %d\n", curenv, curenv->livingRoutineNum_, curenv->routineNum_ - curenv->livingRoutineNum_);
     }
     
     return NULL;
@@ -365,7 +371,7 @@ void *RoutineEnvironment::monitorRoutine( void *arg ) {
 #endif
 
 void RoutineEnvironment::addEndedCoroutine( stCoRoutine_t *co ) {
-    _endedCoroutines.push_back(co);
+    endedCoroutines_.push_back(co);
     
     char buf = 'L';
     write(_endPipe.pipefd[1], &buf, 1);
@@ -375,7 +381,7 @@ void *RoutineEnvironment::safeQuitRoutine( void *arg ) {
     co_enable_hook_sys();
     
     while ( true ) {
-        if (RoutineEnvironment::_keyRoutineNum == 0) {
+        if (RoutineEnvironment::keyRoutineNum_ == 0) {
             exit(EXIT_SUCCESS);
         }
         

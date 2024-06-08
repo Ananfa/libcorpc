@@ -20,15 +20,15 @@
 using namespace corpc;
 
 MysqlConnectPool::Proxy::~Proxy() {
-    if (_stub) {
-        delete _stub;
+    if (stub_) {
+        delete stub_;
     }
 }
 
 void MysqlConnectPool::Proxy::init(corpc::InnerRpcServer *server) {
     InnerRpcChannel *channel = new InnerRpcChannel(server);
     
-    _stub = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
+    stub_ = new thirdparty::ThirdPartyService::Stub(channel, thirdparty::ThirdPartyService::STUB_OWNS_CHANNEL);
 }
     
 MYSQL* MysqlConnectPool::Proxy::take() {
@@ -36,7 +36,7 @@ MYSQL* MysqlConnectPool::Proxy::take() {
     thirdparty::TakeResponse *response = new thirdparty::TakeResponse();
     Controller *controller = new Controller();
     
-    _stub->take(controller, request, response, NULL);
+    stub_->take(controller, request, response, NULL);
     
     if (controller->Failed()) {
         ERROR_LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
@@ -66,10 +66,10 @@ void MysqlConnectPool::Proxy::put(MYSQL* mysql, bool error) {
         request->set_error(error);
     }
     
-    _stub->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
+    stub_->put(controller, request, NULL, google::protobuf::NewCallback<::google::protobuf::Message *>(callDoneHandle, request, controller));
 }
 
-MysqlConnectPool::MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum): _host(host), _user(user), _passwd(passwd), _db(db), _port(port), _unix_socket(unix_socket), _clientflag(clientflag), _maxConnectNum(maxConnectNum), _realConnectCount(0) {
+MysqlConnectPool::MysqlConnectPool(const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long clientflag, uint32_t maxConnectNum): host_(host), user_(user), passwd_(passwd), db_(db), port_(port), unix_socket_(unix_socket), clientflag_(clientflag), maxConnectNum_(maxConnectNum), realConnectCount_(0) {
     
 }
 
@@ -77,18 +77,18 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
                             const Void* request,
                             thirdparty::TakeResponse* response,
                             ::google::protobuf::Closure* done) {
-    if (_idleList.size() > 0) {
-        intptr_t handle = (intptr_t)_idleList.back().handle;
-        _idleList.pop_back();
+    if (idleList_.size() > 0) {
+        intptr_t handle = (intptr_t)idleList_.back().handle;
+        idleList_.pop_back();
         
         response->set_handle(handle);
-    } else if (_realConnectCount < _maxConnectNum) {
+    } else if (realConnectCount_ < maxConnectNum_) {
         // 建立新连接
-        _realConnectCount++;
+        realConnectCount_++;
         MYSQL *con = mysql_init(NULL);
         
         if (con) {
-            if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
+            if (mysql_real_connect(con, host_.c_str(), user_.c_str(), passwd_.c_str(), db_.c_str(), port_, unix_socket_.c_str(), clientflag_)) {
                 response->set_handle((intptr_t)con);
             } else {
                 mysql_close(con);
@@ -102,11 +102,11 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         
         if (!con) {
             // 唤醒所有等待协程
-            _realConnectCount--;
+            realConnectCount_--;
             
-            while (!_waitingList.empty()) {
-                stCoRoutine_t *co = _waitingList.front();
-                _waitingList.pop_front();
+            while (!waitingList_.empty()) {
+                stCoRoutine_t *co = waitingList_.front();
+                waitingList_.pop_front();
                 
                 co_resume(co);
             }
@@ -114,14 +114,14 @@ void MysqlConnectPool::take(::google::protobuf::RpcController* controller,
         
     } else {
         // 等待空闲连接
-        _waitingList.push_back(co_self());
+        waitingList_.push_back(co_self());
         co_yield_ct();
         
-        if (_idleList.size() == 0) {
+        if (idleList_.size() == 0) {
             controller->SetFailed("can't connect to mysql server");
         } else {
-            intptr_t handle = (intptr_t)_idleList.back().handle;
-            _idleList.pop_back();
+            intptr_t handle = (intptr_t)idleList_.back().handle;
+            idleList_.pop_back();
             
             response->set_handle(handle);
         }
@@ -134,26 +134,26 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                            ::google::protobuf::Closure* done) {
     MYSQL *con = (MYSQL *)request->handle();
     
-    if (_idleList.size() < _maxConnectNum) {
+    if (idleList_.size() < maxConnectNum_) {
         if (request->error()) {
-            _realConnectCount--;
+            realConnectCount_--;
             mysql_close(con);
             
             // 若有等待协程，尝试重连
-            if (_waitingList.size() > 0) {
-                assert(_idleList.size() == 0);
+            if (waitingList_.size() > 0) {
+                assert(idleList_.size() == 0);
                 
-                if (_realConnectCount < _maxConnectNum) {
+                if (realConnectCount_ < maxConnectNum_) {
                     // 注意: 重连后等待列表可能为空（由其他协程释放连接唤醒列表中的等待协程），此时会出bug，因此先从等待列表中取出一个等待协程
-                    stCoRoutine_t *co = _waitingList.front();
-                    _waitingList.pop_front();
+                    stCoRoutine_t *co = waitingList_.front();
+                    waitingList_.pop_front();
                     
-                    _realConnectCount++;
+                    realConnectCount_++;
                     MYSQL *con = mysql_init(NULL);
                     
                     if (con) {
-                        if (mysql_real_connect(con, _host.c_str(), _user.c_str(), _passwd.c_str(), _db.c_str(), _port, _unix_socket.c_str(), _clientflag)) {
-                            _idleList.push_back({con, time(nullptr)});
+                        if (mysql_real_connect(con, host_.c_str(), user_.c_str(), passwd_.c_str(), db_.c_str(), port_, unix_socket_.c_str(), clientflag_)) {
+                            idleList_.push_back({con, time(nullptr)});
                         } else {
                             mysql_close(con);
                             con = NULL;
@@ -161,7 +161,7 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                     }
                     
                     if (!con) {
-                        _realConnectCount--;
+                        realConnectCount_--;
                     }
                     
                     // 唤醒先前取出的等待协程
@@ -169,9 +169,9 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                     
                     if (!con) {
                         // 唤醒当前所有等待协程
-                        while (!_waitingList.empty()) {
-                            stCoRoutine_t *co = _waitingList.front();
-                            _waitingList.pop_front();
+                        while (!waitingList_.empty()) {
+                            stCoRoutine_t *co = waitingList_.front();
+                            waitingList_.pop_front();
                             
                             co_resume(co);
                         }
@@ -179,19 +179,19 @@ void MysqlConnectPool::put(::google::protobuf::RpcController* controller,
                 }
             }
         } else {
-            _idleList.push_back({con, time(nullptr)});
+            idleList_.push_back({con, time(nullptr)});
             
-            if (_waitingList.size() > 0) {
-                assert(_idleList.size() == 1);
-                stCoRoutine_t *co = _waitingList.front();
-                _waitingList.pop_front();
+            if (waitingList_.size() > 0) {
+                assert(idleList_.size() == 1);
+                stCoRoutine_t *co = waitingList_.front();
+                waitingList_.pop_front();
                 
                 co_resume(co);
             }
         }
     } else {
-        assert(_waitingList.size() == 0);
-        _realConnectCount--;
+        assert(waitingList_.size() == 0);
+        realConnectCount_--;
         mysql_close(con);
     }
 }
@@ -204,10 +204,10 @@ MysqlConnectPool* MysqlConnectPool::create(const char *host, const char *user, c
 }
 
 void MysqlConnectPool::init() {
-    _server = new InnerRpcServer();
-    _server->registerService(this);
-    _server->start();
-    proxy.init(_server);
+    server_ = new InnerRpcServer();
+    server_->registerService(this);
+    server_->start();
+    proxy.init(server_);
     
     RoutineEnvironment::startCoroutine(clearIdleRoutine, this);
 }
@@ -223,11 +223,11 @@ void *MysqlConnectPool::clearIdleRoutine( void *arg ) {
         
         time(&now);
         
-        while (self->_idleList.size() > 0 && self->_idleList.front().time < now - 60) {
+        while (self->idleList_.size() > 0 && self->idleList_.front().time < now - 60) {
             DEBUG_LOG("MysqlConnectPool::clearIdleRoutine -- disconnect a mysql connection");
-            MYSQL *handle = self->_idleList.front().handle;
-            self->_idleList.pop_front();
-            self->_realConnectCount--;
+            MYSQL *handle = self->idleList_.front().handle;
+            self->idleList_.pop_front();
+            self->realConnectCount_--;
             mysql_close(handle);
         }
     }

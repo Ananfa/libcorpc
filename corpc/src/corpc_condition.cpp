@@ -22,14 +22,14 @@ using namespace corpc;
 
 void Condition::wait(Mutex &lock) {
     while (true) {
-        int v = _res.load();
+        int v = res_.load();
         if (v == 0) {
             // 尝试把_res值从0改成1（防止此时条件变量被其他线程操作）
-            if (_res.compare_exchange_weak(v, 1)) {
+            if (res_.compare_exchange_weak(v, 1)) {
                 // 在条件变量处挂起协程等待唤醒，挂起前需要先释放锁
-                _waitRoutines.push_back({GetPid(), co_self()});
+                waitRoutines_.push_back({GetPid(), co_self()});
 
-                _res.store(0);
+                res_.store(0);
 
                 lock.unlock(); // unlock中没有协程切换
 
@@ -50,19 +50,19 @@ void Condition::wait(Mutex &lock) {
 void Condition::signal() {
     // 唤醒一个等待协程
     while (true) {
-        int v = _res.load();
+        int v = res_.load();
         if (v == 0) {
             // 尝试把_res值从0改成1（防止此时条件变量被其他线程操作）
-            if (_res.compare_exchange_weak(v, 1)) {
-                if (_waitRoutines.empty()) {
+            if (res_.compare_exchange_weak(v, 1)) {
+                if (waitRoutines_.empty()) {
                     // 没有可以唤醒的协程
-                    _res.store(0);
+                    res_.store(0);
                 } else {
                     // 唤醒一个协程
-                    RoutineInfo info = _waitRoutines.front();
-                    _waitRoutines.pop_front();
+                    RoutineInfo info = waitRoutines_.front();
+                    waitRoutines_.pop_front();
 
-                    _res.store(0);
+                    res_.store(0);
 
                     RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
                 }
@@ -81,18 +81,18 @@ void Condition::signal() {
 void Condition::broadcast() {
     // 唤醒所有等待协程
     while (true) {
-        int v = _res.load();
+        int v = res_.load();
         if (v == 0) {
             // 尝试把_res值从0改成1（防止此时条件变量被其他线程操作）
-            if (_res.compare_exchange_weak(v, 1)) {
-                if (_waitRoutines.empty()) {
+            if (res_.compare_exchange_weak(v, 1)) {
+                if (waitRoutines_.empty()) {
                     // 没有可以唤醒的协程
-                    _res.store(0);
+                    res_.store(0);
                 } else {
                     // 唤醒所有协程
-                    std::list<RoutineInfo> waitRoutines = std::move(_waitRoutines);
+                    std::list<RoutineInfo> waitRoutines = std::move(waitRoutines_);
 
-                    _res.store(0);
+                    res_.store(0);
 
                     for (auto& info : waitRoutines) {
                         RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);

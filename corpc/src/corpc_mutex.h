@@ -37,7 +37,7 @@ namespace corpc {
         };
 
     public:
-        Mutex(): _state(0), _waitlock(false), _dontWait(false) {}
+        Mutex(): state_(0), waitlock_(false), dontWait_(false) {}
         ~Mutex() {}
         
         void lock();
@@ -51,14 +51,14 @@ namespace corpc {
         void post();
 
     private:
-        std::atomic<int32_t> _state;
-        std::atomic<bool> _waitlock;
-        bool _dontWait;
-        std::list<RoutineInfo> _waitRoutines;
+        std::atomic<int32_t> state_;
+        std::atomic<bool> waitlock_;
+        bool dontWait_;
+        std::list<RoutineInfo> waitRoutines_;
 
         // 以下成员用于当有其他协程长时间等待锁无法获得时不抢锁
-        stCoRoutine_t *_lastco = nullptr; // 最近一次获取锁的协程
-        int64_t _beginTm = 0; // MUTEXWOKEN被设置时上面协程连续获得该锁的最早时间
+        stCoRoutine_t *lastco_ = nullptr; // 最近一次获取锁的协程
+        int64_t beginTm_ = 0; // MUTEXWOKEN被设置时上面协程连续获得该锁的最早时间
     };
 
     class LockGuard {
@@ -68,11 +68,11 @@ namespace corpc {
         void operator delete(void* ptr) {}
 
     public:
-        LockGuard(Mutex &lock): _lock(lock) { _lock.lock(); }
-        ~LockGuard() { _lock.unlock(); }
+        LockGuard(Mutex &lock): lock_(lock) { lock_.lock(); }
+        ~LockGuard() { lock_.unlock(); }
 
     private:
-        Mutex &_lock;
+        Mutex &lock_;
     };
 }
 

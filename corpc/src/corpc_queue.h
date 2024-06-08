@@ -35,49 +35,49 @@ namespace corpc {
         };
         
     public:
-        MPSC_NoLockQueue():_head(NULL), _outqueue(NULL) {}
+        MPSC_NoLockQueue():head_(NULL), outqueue_(NULL) {}
         ~MPSC_NoLockQueue() {}
         
         void push(T& v) {
             Node *newNode = new Node;
             newNode->value = v;
             
-            newNode->next = _head;
-            while (!_head.compare_exchange_weak(newNode->next, newNode));
+            newNode->next = head_;
+            while (!head_.compare_exchange_weak(newNode->next, newNode));
         }
         
         void push(T&& v) {
             Node *newNode = new Node;
             newNode->value = std::move(v);
             
-            newNode->next = _head;
-            while (!_head.compare_exchange_weak(newNode->next, newNode));
+            newNode->next = head_;
+            while (!head_.compare_exchange_weak(newNode->next, newNode));
         }
         
         T pop() {
             T ret(nullptr);
             
-            if (!_outqueue) {
-                if (_head != NULL) {
-                    _outqueue = _head;
-                    while (!_head.compare_exchange_weak(_outqueue, NULL));
+            if (!outqueue_) {
+                if (head_ != NULL) {
+                    outqueue_ = head_;
+                    while (!head_.compare_exchange_weak(outqueue_, NULL));
                     
                     // 翻转
-                    Node *n1 = _outqueue;
-                    _outqueue = NULL;
+                    Node *n1 = outqueue_;
+                    outqueue_ = NULL;
                     while (n1) {
                         Node *n2 = n1->next;
-                        n1->next = _outqueue;
-                        _outqueue = n1;
+                        n1->next = outqueue_;
+                        outqueue_ = n1;
                         n1 = n2;
                     }
                 }
             }
             
-            if (_outqueue) {
-                ret = std::move(_outqueue->value);
-                Node *tnode = _outqueue;
-                _outqueue = _outqueue->next;
+            if (outqueue_) {
+                ret = std::move(outqueue_->value);
+                Node *tnode = outqueue_;
+                outqueue_ = outqueue_->next;
                 delete tnode;
             }
             
@@ -85,26 +85,26 @@ namespace corpc {
         }
             
     private:
-        std::atomic<Node*> _head;
-        Node *_outqueue;
+        std::atomic<Node*> head_;
+        Node *outqueue_;
     };
     
     template <typename T>
     class Co_MPSC_NoLockQueue: public MPSC_NoLockQueue<T> {
     public:
         Co_MPSC_NoLockQueue() {
-            pipe(_queuePipe.pipefd);
+            pipe(queuePipe_.pipefd);
             
-            co_register_fd(_queuePipe.pipefd[1]);
-            co_set_nonblock(_queuePipe.pipefd[1]);
+            co_register_fd(queuePipe_.pipefd[1]);
+            co_set_nonblock(queuePipe_.pipefd[1]);
         }
         ~Co_MPSC_NoLockQueue() {
-            close(_queuePipe.pipefd[0]);
-            close(_queuePipe.pipefd[1]);
+            close(queuePipe_.pipefd[0]);
+            close(queuePipe_.pipefd[1]);
         }
         
-        int getReadFd() { return _queuePipe.pipefd[0]; }
-        int getWriteFd() { return _queuePipe.pipefd[1]; }
+        int getReadFd() { return queuePipe_.pipefd[0]; }
+        int getWriteFd() { return queuePipe_.pipefd[1]; }
         
         void push(T & v) {
             MPSC_NoLockQueue<T>::push(v);
@@ -121,7 +121,7 @@ namespace corpc {
         }
         
     private:
-        PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
+        PipeType queuePipe_; // 管道（用于通知处理协程有新rpc任务入队）
     };
 
     // 另一种形式的非锁实现
@@ -133,32 +133,32 @@ namespace corpc {
         ~SyncQueue() {}
         
         void push(T & v) {
-            LockGuard lock( _queueMutex );
-            _inqueue.push_back(v);
+            LockGuard lock( queueMutex_ );
+            inqueue_.push_back(v);
         }
         
         void push(T && v) {
-            LockGuard lock( _queueMutex );
-            _inqueue.push_back(std::move(v));
+            LockGuard lock( queueMutex_ );
+            inqueue_.push_back(std::move(v));
         }
         
         T pop() {
             T ret(nullptr);
             
-            if (!_outqueue.empty()) {
-                ret = std::move(_outqueue.front());
+            if (!outqueue_.empty()) {
+                ret = std::move(outqueue_.front());
                 
-                _outqueue.pop_front();
+                outqueue_.pop_front();
             } else {
-                if (!_inqueue.empty()) {
+                if (!inqueue_.empty()) {
                     {
-                        LockGuard lock( _queueMutex );
-                        _inqueue.swap(_outqueue);
+                        LockGuard lock( queueMutex_ );
+                        inqueue_.swap(outqueue_);
                     }
                     
-                    ret = std::move(_outqueue.front());
+                    ret = std::move(outqueue_.front());
                     
-                    _outqueue.pop_front();
+                    outqueue_.pop_front();
                 }
             }
             
@@ -166,27 +166,27 @@ namespace corpc {
         }
         
     private:
-        Mutex _queueMutex;
-        std::list<T> _inqueue;
-        std::list<T> _outqueue;
+        Mutex queueMutex_;
+        std::list<T> inqueue_;
+        std::list<T> outqueue_;
     };
     
     template <typename T>
     class CoSyncQueue: public SyncQueue<T> {
     public:
         CoSyncQueue() {
-            pipe(_queuePipe.pipefd);
+            pipe(queuePipe_.pipefd);
             
-            co_register_fd(_queuePipe.pipefd[1]);
-            co_set_nonblock(_queuePipe.pipefd[1]);
+            co_register_fd(queuePipe_.pipefd[1]);
+            co_set_nonblock(queuePipe_.pipefd[1]);
         }
         ~CoSyncQueue() {
-            close(_queuePipe.pipefd[0]);
-            close(_queuePipe.pipefd[1]);
+            close(queuePipe_.pipefd[0]);
+            close(queuePipe_.pipefd[1]);
         }
         
-        int getReadFd() { return _queuePipe.pipefd[0]; }
-        int getWriteFd() { return _queuePipe.pipefd[1]; }
+        int getReadFd() { return queuePipe_.pipefd[0]; }
+        int getWriteFd() { return queuePipe_.pipefd[1]; }
         
         void push(T & v) {
             SyncQueue<T>::push(v);
@@ -203,7 +203,7 @@ namespace corpc {
         }
         
     private:
-        PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
+        PipeType queuePipe_; // 管道（用于通知处理协程有新rpc任务入队）
     };
     
      // 注意：该Queue实现只支持多生产者和单消费者情形
@@ -214,32 +214,32 @@ namespace corpc {
         ~LockQueue() {}
         
         void push(T & v) {
-            std::unique_lock<std::mutex> lock( _queueMutex );
-            _inqueue.push_back(v);
+            std::unique_lock<std::mutex> lock( queueMutex_ );
+            inqueue_.push_back(v);
         }
         
         void push(T && v) {
-            std::unique_lock<std::mutex> lock( _queueMutex );
-            _inqueue.push_back(std::move(v));
+            std::unique_lock<std::mutex> lock( queueMutex_ );
+            inqueue_.push_back(std::move(v));
         }
         
         T pop() {
             T ret(nullptr);
             
-            if (!_outqueue.empty()) {
-                ret = std::move(_outqueue.front());
+            if (!outqueue_.empty()) {
+                ret = std::move(outqueue_.front());
                 
-                _outqueue.pop_front();
+                outqueue_.pop_front();
             } else {
-                if (!_inqueue.empty()) {
+                if (!inqueue_.empty()) {
                     {
-                        std::unique_lock<std::mutex> lock( _queueMutex );
-                        _inqueue.swap(_outqueue);
+                        std::unique_lock<std::mutex> lock( queueMutex_ );
+                        inqueue_.swap(outqueue_);
                     }
                     
-                    ret = std::move(_outqueue.front());
+                    ret = std::move(outqueue_.front());
                     
-                    _outqueue.pop_front();
+                    outqueue_.pop_front();
                 }
             }
             
@@ -247,27 +247,27 @@ namespace corpc {
         }
         
     private:
-        std::mutex _queueMutex;
-        std::list<T> _inqueue;
-        std::list<T> _outqueue;
+        std::mutex queueMutex_;
+        std::list<T> inqueue_;
+        std::list<T> outqueue_;
     };
     
     template <typename T>
     class CoLockQueue: public LockQueue<T> {
     public:
         CoLockQueue() {
-            pipe(_queuePipe.pipefd);
+            pipe(queuePipe_.pipefd);
             
-            co_register_fd(_queuePipe.pipefd[1]);
-            co_set_nonblock(_queuePipe.pipefd[1]);
+            co_register_fd(queuePipe_.pipefd[1]);
+            co_set_nonblock(queuePipe_.pipefd[1]);
         }
         ~CoLockQueue() {
-            close(_queuePipe.pipefd[0]);
-            close(_queuePipe.pipefd[1]);
+            close(queuePipe_.pipefd[0]);
+            close(queuePipe_.pipefd[1]);
         }
         
-        int getReadFd() { return _queuePipe.pipefd[0]; }
-        int getWriteFd() { return _queuePipe.pipefd[1]; }
+        int getReadFd() { return queuePipe_.pipefd[0]; }
+        int getWriteFd() { return queuePipe_.pipefd[1]; }
         
         void push(T & v) {
             SyncQueue<T>::push(v);
@@ -284,50 +284,50 @@ namespace corpc {
         }
         
     private:
-        PipeType _queuePipe; // 管道（用于通知处理协程有新rpc任务入队）
+        PipeType queuePipe_; // 管道（用于通知处理协程有新rpc任务入队）
     };
 
     // 跨线程多协程阻塞等待消息队列
     template <typename T>
     class MPMC_NoLockBlockQueue {
     public:
-        MPMC_NoLockBlockQueue():_sem(0) {}
+        MPMC_NoLockBlockQueue():sem_(0) {}
         ~MPMC_NoLockBlockQueue() {}
 
         void push(T& v) {
             {
-                LockGuard lock(_queueMutex);
-                _queue.push_back(v);
+                LockGuard lock(queueMutex_);
+                queue_.push_back(v);
             }
 
-            _sem.post();
+            sem_.post();
         }
 
         void push(T&& v) {
             {
-                LockGuard lock( _queueMutex );
-                _queue.push_back(std::move(v));
+                LockGuard lock( queueMutex_ );
+                queue_.push_back(std::move(v));
             }
             
-            _sem.post();
+            sem_.post();
         }
 
         T pop() {
-            _sem.wait();
+            sem_.wait();
 
             {
-                LockGuard lock( _queueMutex );
-                T ret = std::move(_queue.front());
-                _queue.pop_front();
+                LockGuard lock( queueMutex_ );
+                T ret = std::move(queue_.front());
+                queue_.pop_front();
 
                 return ret;
             }
         }
 
     private:
-        Semaphore _sem;
-        Mutex _queueMutex;
-        std::list<T> _queue;
+        Semaphore sem_;
+        Mutex queueMutex_;
+        std::list<T> queue_;
     };
 
 }

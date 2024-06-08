@@ -43,16 +43,16 @@ using namespace corpc;
 //    delete request;
 //}
 
-RpcServer::Connection::Connection(int fd, RpcServer* server): corpc::Connection(fd, server->_io, false), _server(server) {
+RpcServer::Connection::Connection(int fd, RpcServer* server): corpc::Connection(fd, server->io_, false), server_(server) {
 }
 
 RpcServer::Connection::~Connection() {
-    LOG("INFO: RpcServer::Connection::~Connection -- fd:%d in thread:%d\n", _fd, GetPid());
+    LOG("INFO: RpcServer::Connection::~Connection -- fd:%d in thread:%d\n", fd_, GetPid());
 }
 
 void RpcServer::Connection::onClose() {
     std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
-    _server->onClose(self);
+    server_->onClose(self);
 }
 
 void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
@@ -128,16 +128,16 @@ void RpcServer::CoroutineWorker::handleMessage(void *msg) {
 }
 
 RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): corpc::Server(io) {
-    _acceptor = new TcpAcceptor(this, ip, port);
+    acceptor_ = new TcpAcceptor(this, ip, port);
 
     // 根据需要创建多线程worker或协程worker
     if (workThreadNum > 0) {
-        _worker = new MultiThreadWorker(this, workThreadNum);
+        worker_ = new MultiThreadWorker(this, workThreadNum);
     } else {
-        _worker = new CoroutineWorker(this);
+        worker_ = new CoroutineWorker(this);
     }
     
-    _pipelineFactory = new TcpPipelineFactory(_worker, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+    pipelineFactory_ = new TcpPipelineFactory(worker_, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
 }
 
 RpcServer::~RpcServer() {}
@@ -272,12 +272,12 @@ bool RpcServer::registerService(::google::protobuf::Service *rpcService) {
     
     uint32_t serviceId = (uint32_t)(serviceDescriptor->options().GetExtension(corpc::global_service_id));
     
-    std::map<uint32_t, ServiceData>::iterator it = _services.find(serviceId);
-    if (it != _services.end()) {
+    std::map<uint32_t, ServiceData>::iterator it = services_.find(serviceId);
+    if (it != services_.end()) {
         return false;
     }
     
-    ServiceData &serviceData = _services[serviceId];
+    ServiceData &serviceData = services_[serviceId];
     serviceData.rpcService = rpcService;
     
     MethodData methodData;
@@ -293,8 +293,8 @@ bool RpcServer::registerService(::google::protobuf::Service *rpcService) {
 }
 
 google::protobuf::Service *RpcServer::getService(uint32_t serviceId) const {
-    std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
-    if (it == _services.end()) {
+    std::map<uint32_t, ServiceData>::const_iterator it = services_.find(serviceId);
+    if (it == services_.end()) {
         return NULL;
     }
     
@@ -302,8 +302,8 @@ google::protobuf::Service *RpcServer::getService(uint32_t serviceId) const {
 }
 
 const MethodData *RpcServer::getMethod(uint32_t serviceId, uint32_t methodId) const {
-    std::map<uint32_t, ServiceData>::const_iterator it = _services.find(serviceId);
-    if (it == _services.end()) {
+    std::map<uint32_t, ServiceData>::const_iterator it = services_.find(serviceId);
+    if (it == services_.end()) {
         return NULL;
     }
     

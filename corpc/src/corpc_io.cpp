@@ -31,12 +31,12 @@ Worker::~Worker() {
 }
 
 void Worker::addMessage(void *msg) {
-    _queue.push(msg);
+    queue_.push(msg);
 }
 
 void *Worker::msgHandleRoutine( void * arg ) {
     Worker *self = (Worker *)arg;
-    WorkerMessageQueue& queue = self->_queue;
+    WorkerMessageQueue& queue = self->queue_;
 
     while (true) {
         // 处理任务队列
@@ -59,8 +59,8 @@ void MultiThreadWorker::threadEntry( Worker *self ) {
 
 void MultiThreadWorker::start() {
     // 启动线程
-    for (int i = 0; i < _threadNum; i++) {
-        _ts[i] = std::thread(threadEntry, this);
+    for (int i = 0; i < threadNum_; i++) {
+        ts_[i] = std::thread(threadEntry, this);
     }
 }
 
@@ -71,41 +71,41 @@ void CoroutineWorker::start() {
     RoutineEnvironment::startCoroutine(msgHandleRoutine, this);
 }
 
-Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker): _connection(connection), _worker(worker) {
+Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker): connection_(connection), worker_(worker) {
 }
 
 Pipeline::~Pipeline() {}
 
-MessagePipeline::MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize), _bodySize(0), _head(headSize,0), _body(maxBodySize,0), _downflowBufSentNum(0) {
-    _headBuf = (uint8_t *)_head.data();
-    _bodyBuf = (uint8_t *)_body.data();
+MessagePipeline::MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): corpc::Pipeline(connection, worker), decodeFun_(decodeFun), encodeFun_(encodeFun), headSize_(headSize), maxBodySize_(maxBodySize), bodySize_(0), head_(headSize,0), body_(maxBodySize,0), downflowBufSentNum_(0) {
+    headBuf_ = (uint8_t *)head_.data();
+    bodyBuf_ = (uint8_t *)body_.data();
 }
 
 MessagePipeline::~MessagePipeline() {}
 
 bool MessagePipeline::downflow(uint8_t *buf, int space, int &size) {
-    std::shared_ptr<Connection> connection = _connection.lock();
+    std::shared_ptr<Connection> connection = connection_.lock();
     assert(connection);
     
     size = 0;
     
-    size_t dlen = _downflowBuf.length();
+    size_t dlen = downflowBuf_.length();
     if (dlen > 0) {
-        assert(dlen > _downflowBufSentNum);
-        uint8_t *_dbuf = (uint8_t *)_downflowBuf.data();
+        assert(dlen > downflowBufSentNum_);
+        uint8_t *_dbuf = (uint8_t *)downflowBuf_.data();
         
-        if (space >= dlen - _downflowBufSentNum) {
-            memcpy(buf, _dbuf + _downflowBufSentNum, dlen - _downflowBufSentNum);
+        if (space >= dlen - downflowBufSentNum_) {
+            memcpy(buf, _dbuf + downflowBufSentNum_, dlen - downflowBufSentNum_);
             
-            size = int(dlen - _downflowBufSentNum);
+            size = int(dlen - downflowBufSentNum_);
             
-            _downflowBuf.clear();
-            _downflowBufSentNum = 0;
+            downflowBuf_.clear();
+            downflowBufSentNum_ = 0;
         } else {
-            memcpy(buf, _dbuf + _downflowBufSentNum, space);
+            memcpy(buf, _dbuf + downflowBufSentNum_, space);
             
             size = space;
-            _downflowBufSentNum += space;
+            downflowBufSentNum_ += space;
         }
         
         if (space == size) {
@@ -115,7 +115,7 @@ bool MessagePipeline::downflow(uint8_t *buf, int space, int &size) {
     
     while (connection->getDataSize() > 0) {
         int tmp = 0;
-        if (!_encodeFun(connection, connection->getFrontData(), buf + size, space - size, tmp, _downflowBuf, _downflowBufSentNum)) {
+        if (!encodeFun_(connection, connection->getFrontData(), buf + size, space - size, tmp, downflowBuf_, downflowBufSentNum_)) {
             // 编码失败
             return false;
         }
@@ -132,80 +132,80 @@ bool MessagePipeline::downflow(uint8_t *buf, int space, int &size) {
     return true;
 }
 
-TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
+TcpPipeline::TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType), headNum_(0), bodyNum_(0) {
 }
 
 bool TcpPipeline::upflow(uint8_t *buf, int size) {
-    std::shared_ptr<Connection> connection = _connection.lock();
+    std::shared_ptr<Connection> connection = connection_.lock();
     assert(connection);
     
     // 解析数据
     int offset = 0;
     while (size > offset) {
         // 先解析头部
-        if (_headNum < _headSize) {
-            int needNum = _headSize - _headNum;
+        if (headNum_ < headSize_) {
+            int needNum = headSize_ - headNum_;
             if (size - offset >= needNum) {
-                memcpy(_headBuf + _headNum, buf + offset, needNum);
-                _headNum = _headSize;
+                memcpy(headBuf_ + headNum_, buf + offset, needNum);
+                headNum_ = headSize_;
                 
                 offset += needNum;
             } else {
-                memcpy(_headBuf + _headNum, buf + offset, size - offset);
-                _headNum += size - offset;
+                memcpy(headBuf_ + headNum_, buf + offset, size - offset);
+                headNum_ += size - offset;
                 
                 break;
             }
         }
         
-        if (!_bodySize) {
+        if (!bodySize_) {
             // 解析消息长度值
-            if (_bodySizeType == TWO_BYTES) {
-                uint16_t x = *(uint16_t*)(_headBuf + _bodySizeOffset);
-                _bodySize = be16toh(x);
+            if (bodySizeType_ == TWO_BYTES) {
+                uint16_t x = *(uint16_t*)(headBuf_ + bodySizeOffset_);
+                bodySize_ = be16toh(x);
             } else {
-                assert(_bodySizeType == FOUR_BYTES);
-                uint32_t x = *(uint32_t*)(_headBuf + _bodySizeOffset);
-                _bodySize = be32toh(x);
+                assert(bodySizeType_ == FOUR_BYTES);
+                uint32_t x = *(uint32_t*)(headBuf_ + bodySizeOffset_);
+                bodySize_ = be32toh(x);
             }
             
-            if (_bodySize > _maxBodySize) { // 数据超长
-                ERROR_LOG("TcpPipeline::upflow -- request too large in thread, %d > %d\n", _bodySize, _maxBodySize);
+            if (bodySize_ > maxBodySize_) { // 数据超长
+                ERROR_LOG("TcpPipeline::upflow -- request too large in thread, %d > %d\n", bodySize_, maxBodySize_);
                 
                 return false;
             }
         }
         
         // 从缓存中解析数据
-        if (_bodyNum < _bodySize) {
-            int needNum = _bodySize - _bodyNum;
+        if (bodyNum_ < bodySize_) {
+            int needNum = bodySize_ - bodyNum_;
             if (size - offset >= needNum) {
-                memcpy(_bodyBuf + _bodyNum, buf + offset, needNum);
-                _bodyNum = _bodySize;
+                memcpy(bodyBuf_ + bodyNum_, buf + offset, needNum);
+                bodyNum_ = bodySize_;
                 
                 offset += needNum;
             } else {
-                memcpy(_bodyBuf + _bodyNum, buf + offset, size - offset);
-                _bodyNum += size - offset;
+                memcpy(bodyBuf_ + bodyNum_, buf + offset, size - offset);
+                bodyNum_ += size - offset;
                 
                 break;
             }
         }
         
-        void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
+        void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
         
         if (connection->isDecodeError()) {
             return false;
         }
         
         if (msg) {
-            _worker->addMessage(msg);
+            worker_->addMessage(msg);
         }
         
         // 处理完一个请求消息，复位状态
-        _headNum = 0;
-        _bodyNum = 0;
-        _bodySize = 0;
+        headNum_ = 0;
+        bodyNum_ = 0;
+        bodySize_ = 0;
     }
     
     return true;
@@ -216,31 +216,31 @@ UdpPipeline::UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker
 }
 
 bool UdpPipeline::upflow(uint8_t *buf, int size) {
-    std::shared_ptr<Connection> connection = _connection.lock();
+    std::shared_ptr<Connection> connection = connection_.lock();
     assert(connection);
     
-    if (size < _headSize) {
+    if (size < headSize_) {
         ERROR_LOG("UdpPipeline::upflow -- package size too small\n");
         
         return false;
     }
     
-    memcpy(_headBuf, buf, _headSize);
+    memcpy(headBuf_, buf, headSize_);
     
-    _bodySize = size - _headSize;
+    bodySize_ = size - headSize_;
     
-    if (_bodySize) {
-        memcpy(_bodyBuf, buf + _headSize, _bodySize);
+    if (bodySize_) {
+        memcpy(bodyBuf_, buf + headSize_, bodySize_);
     }
     
-    void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
+    void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
     
     if (connection->isDecodeError()) {
         return false;
     }
     
     if (msg) {
-        _worker->addMessage(msg);
+        worker_->addMessage(msg);
     }
     
     return true;
@@ -251,14 +251,14 @@ PipelineFactory::~PipelineFactory() {}
 MessagePipelineFactory::~MessagePipelineFactory() {}
 
 std::shared_ptr<corpc::Pipeline> TcpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
-    return std::shared_ptr<corpc::Pipeline>( new corpc::TcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
+    return std::shared_ptr<corpc::Pipeline>( new corpc::TcpPipeline(connection, worker_, decodeFun_, encodeFun_, headSize_, maxBodySize_, bodySizeOffset_, bodySizeType_) );
 }
 
 std::shared_ptr<corpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
-    return std::shared_ptr<corpc::Pipeline>( new corpc::UdpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize) );
+    return std::shared_ptr<corpc::Pipeline>( new corpc::UdpPipeline(connection, worker_, decodeFun_, encodeFun_, headSize_, maxBodySize_) );
 }
 
-Connection::Connection(int fd, IO* io, bool needHB): _fd(fd), _io(io), _needHB(needHB), _routineHang(false), _routine(NULL), _sendThreadIndex(-1), _recvThreadIndex(-1), _decodeError(false), _closed(false), _isClosing(false), _canClose(false), _lastRecvHBTime(0) {
+Connection::Connection(int fd, IO* io, bool needHB): fd_(fd), io_(io), needHB_(needHB), routineHang_(false), routine_(NULL), sendThreadIndex_(-1), recvThreadIndex_(-1), decodeError_(false), closed_(false), isClosing_(false), canClose_(false), lastRecvHBTime_(0) {
 }
 
 Connection::~Connection() {
@@ -267,13 +267,13 @@ Connection::~Connection() {
 
 void Connection::send(std::shared_ptr<void> data) {
     std::shared_ptr<Connection> self = shared_from_this();
-    _io->_sender->send(self, data);
+    io_->sender_->send(self, data);
 }
 
 void Connection::close() {
     if (isOpen()) {
         std::shared_ptr<Connection> self = shared_from_this();
-        _io->removeConnection(self);
+        io_->removeConnection(self);
 
         if (self->needHB()) {
             Heartbeater::Instance().removeConnection(self);
@@ -286,7 +286,7 @@ ssize_t Connection::write(const void *buf, size_t nbyte) {
     uint32_t sentNum = 0;
     uint32_t leftNum = nbyte;
     do {
-        ret = (int)::write(_fd, buf + sentNum, leftNum);
+        ret = (int)::write(fd_, buf + sentNum, leftNum);
         if (ret > 0) {
             assert(ret <= leftNum);
             sentNum += ret;
@@ -296,7 +296,7 @@ ssize_t Connection::write(const void *buf, size_t nbyte) {
 
     if (leftNum > 0) {
         WARN_LOG("Connection::write -- write fd %d ret %d errno %d (%s)\n",
-                   _fd, ret, errno, strerror(errno));
+                   fd_, ret, errno, strerror(errno));
         return -1;
     }
 
@@ -308,7 +308,7 @@ Server::~Server() {}
 std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
     LOG("fd %d connected\n", fd);
     std::shared_ptr<corpc::Connection> connection(buildConnection(fd));
-    std::shared_ptr<corpc::Pipeline> pipeline = _pipelineFactory->buildPipeline(connection);
+    std::shared_ptr<corpc::Pipeline> pipeline = pipelineFactory_->buildPipeline(connection);
     connection->setPipeline(pipeline);
     
     // 注意：onConnect原先是放在最后处理，现在调整到这里。原因是发现放在最后会出现连接消息处理前就收到业务消息处理，经过
@@ -317,7 +317,7 @@ std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
     onConnect(connection);
     
     // 将接受的连接分别发给Receiver和Sender
-    _io->addConnection(connection);
+    io_->addConnection(connection);
     
     // 判断是否需要心跳
     if (connection->needHB()) {
@@ -328,45 +328,45 @@ std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
 }
 
 bool Server::start() {
-    if (!_acceptor) {
+    if (!acceptor_) {
         ERROR_LOG("Server::start() -- acceptor is NULL.\n");
         return false;
     }
     
-    if (!_worker) {
+    if (!worker_) {
         ERROR_LOG("Server::start() -- worker is NULL.\n");
         return false;
     }
     
     // 启动acceptor
-    if (!_acceptor->start()) {
+    if (!acceptor_->start()) {
         ERROR_LOG("Server::start() -- start acceptor failed.\n");
         return false;
     }
     
-    _worker->start();
+    worker_->start();
     
     return true;
 }
 
-Acceptor::Acceptor(Server *server, const std::string& ip, uint16_t port): _server(server), _ip(ip), _port(port), _listen_fd(-1) {
-    socklen_t addrlen = sizeof(_local_addr);
-    bzero(&_local_addr, addrlen);
-    _local_addr.sin_family = AF_INET;
-    _local_addr.sin_port = htons(_port);
+Acceptor::Acceptor(Server *server, const std::string& ip, uint16_t port): server_(server), ip_(ip), port_(port), listen_fd_(-1) {
+    socklen_t addrlen = sizeof(local_addr_);
+    bzero(&local_addr_, addrlen);
+    local_addr_.sin_family = AF_INET;
+    local_addr_.sin_port = htons(port_);
     int nIP = 0;
     
-    if (_ip.empty() ||
-        _ip.compare("0") == 0 ||
-        _ip.compare("0.0.0.0") == 0 ||
-        _ip.compare("*") == 0) {
+    if (ip_.empty() ||
+        ip_.compare("0") == 0 ||
+        ip_.compare("0.0.0.0") == 0 ||
+        ip_.compare("*") == 0) {
         nIP = htonl(INADDR_ANY);
     }
     else
     {
-        nIP = inet_addr(_ip.c_str());
+        nIP = inet_addr(ip_.c_str());
     }
-    _local_addr.sin_addr.s_addr = nIP;
+    local_addr_.sin_addr.s_addr = nIP;
 }
 
 Acceptor::~Acceptor() {
@@ -375,10 +375,10 @@ Acceptor::~Acceptor() {
 
 void *TcpAcceptor::acceptRoutine( void * arg ) {
     TcpAcceptor *self = (TcpAcceptor *)arg;
-    Server *server = self->_server;
-    int listen_fd = self->_listen_fd;
+    Server *server = self->server_;
+    int listen_fd = self->listen_fd_;
     
-    LOG("start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+    LOG("start listen %d %s:%d\n", listen_fd, self->ip_.c_str(), self->port_);
     listen( listen_fd, 1024 );
     
     // 注意：由于accept方法没有进行hook，只好将它设置为NONBLOCK并且自己对它进行poll
@@ -417,26 +417,26 @@ void *TcpAcceptor::acceptRoutine( void * arg ) {
 }
 
 bool TcpAcceptor::start() {
-    if (_port == 0) {
+    if (port_ == 0) {
         ERROR_LOG("TcpAcceptor::start() -- port can't be 0\n");
         return false;
     }
     
-    _listen_fd = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
-    if( _listen_fd >= 0 )
+    listen_fd_ = socket(AF_INET,SOCK_STREAM, IPPROTO_TCP);
+    if( listen_fd_ >= 0 )
     {
         int nReuseAddr = 1;
-        setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
+        setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
         
-        if( bind(_listen_fd, (struct sockaddr*)&_local_addr, sizeof(_local_addr)) == -1 )
+        if( bind(listen_fd_, (struct sockaddr*)&local_addr_, sizeof(local_addr_)) == -1 )
         {
-            close(_listen_fd);
-            _listen_fd = -1;
+            close(listen_fd_);
+            listen_fd_ = -1;
         }
     }
     
-    if(_listen_fd==-1){
-        ERROR_LOG("TcpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+    if(listen_fd_==-1){
+        ERROR_LOG("TcpAcceptor::start() -- Can't create socket on %s:%d\n", ip_.c_str(), port_);
         return false;
     }
     
@@ -446,16 +446,16 @@ bool TcpAcceptor::start() {
     return true;
 }
 
-UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), _shakemsg2(CORPC_MESSAGE_HEAD_SIZE, 0), _shakemsg4(CORPC_MESSAGE_HEAD_SIZE, 0), _unshakemsg(CORPC_MESSAGE_HEAD_SIZE, 0) {
-    _shakemsg2buf = (uint8_t *)_shakemsg2.data();
-    memset(_shakemsg2buf, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(_shakemsg2buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
-    _shakemsg4buf = (uint8_t *)_shakemsg4.data();
-    memset(_shakemsg4buf, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(_shakemsg4buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
-    _unshakemsg2buf = (uint8_t *)_unshakemsg.data();
-    memset(_unshakemsg2buf, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(_unshakemsg2buf + 4) = htobe16(CORPC_MSG_TYPE_UDP_UNSHAKE);
+UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), shakemsg2_(CORPC_MESSAGE_HEAD_SIZE, 0), shakemsg4_(CORPC_MESSAGE_HEAD_SIZE, 0), unshakemsg_(CORPC_MESSAGE_HEAD_SIZE, 0) {
+    shakemsg2buf_ = (uint8_t *)shakemsg2_.data();
+    memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(shakemsg2buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+    shakemsg4buf_ = (uint8_t *)shakemsg4_.data();
+    memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(shakemsg4buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
+    unshakemsg2buf_ = (uint8_t *)unshakemsg_.data();
+    memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    *(int16_t *)(unshakemsg2buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_UNSHAKE);
 }
 
 void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -466,7 +466,7 @@ void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
 
 void *UdpAcceptor::acceptRoutine( void * arg ) {
     UdpAcceptor *self = (UdpAcceptor *)arg;
-    int listen_fd = self->_listen_fd;
+    int listen_fd = self->listen_fd_;
     
     std::string bufstring(CORPC_MAX_UDP_MESSAGE_SIZE, 0);
     uint8_t *buf = (uint8_t *)bufstring.data();
@@ -477,7 +477,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
     sockaddr_in client_addr;
     socklen_t slen = sizeof(client_addr);
     
-    LOG("start listen %d %s:%d\n", listen_fd, self->_ip.c_str(), self->_port);
+    LOG("start listen %d %s:%d\n", listen_fd, self->ip_.c_str(), self->port_);
     
     while (true) {
         bzero(&client_addr, slen);
@@ -486,7 +486,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
         if (ret != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("UdpAcceptor::acceptRoutine() -- wrong msg.\n");
             
-            sendto(listen_fd, self->_unshakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+            sendto(listen_fd, self->unshakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
             
             continue;
         }
@@ -502,7 +502,7 @@ DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
                 // 要求客户端重发握手3消息（应该由绑定四元组的new_fd接收握手3消息，但有时会被listen_fd接收）
                 DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake3.\n");
             
-                sendto(listen_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+                sendto(listen_fd, self->shakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
             } else {
                 ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
             }
@@ -512,26 +512,26 @@ DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake 1 msg.\n");
 
         // 过滤多余的HANDSHAKE_1消息
-        auto it = self->_shakingClient.find(client_addr);
-        if (it != self->_shakingClient.end()) {
+        auto it = self->shakingClient_.find(client_addr);
+        if (it != self->shakingClient_.end()) {
             ERROR_LOG("UdpAcceptor::acceptRoutine() -- duplicate handshake 1 msg.\n");
             continue;
         }
         
-        int new_fd = self->_shake_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        int new_fd = self->shake_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         
         int nReuseAddr = 1;
         setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
         setsockopt(new_fd, SOL_SOCKET, SO_REUSEPORT, &nReuseAddr, sizeof(nReuseAddr));
         
-        if (bind(new_fd , (struct sockaddr *)&self->_local_addr, sizeof(struct sockaddr)) == -1 ||
+        if (bind(new_fd , (struct sockaddr *)&self->local_addr_, sizeof(struct sockaddr)) == -1 ||
             connect(new_fd , (struct sockaddr * )&client_addr, sizeof(struct sockaddr)) == -1) {
             ERROR_LOG("UdpAcceptor::acceptRoutine() -- bind and connect new fd\n");
             close(new_fd);
             continue;
         }
         
-        self->_shakingClient.insert(std::make_pair(client_addr, true));
+        self->shakingClient_.insert(std::make_pair(client_addr, true));
 
         // 为new_fd启动握手协程
         HandshakeInfo *info = new HandshakeInfo();
@@ -549,8 +549,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
     sockaddr_in client_addr = info->addr;
     delete info;
 
-    Server *server = self->_server;
-    int shake_fd = self->_shake_fd; // 注意：这里必须立即记录shake_fd，UdpAcceptor::_shake_fd会被后续新连接修改
+    Server *server = self->server_;
+    int shake_fd = self->shake_fd_; // 注意：这里必须立即记录shake_fd，UdpAcceptor::_shake_fd会被后续新连接修改
     
     std::string bufstring(CORPC_MAX_UDP_MESSAGE_SIZE, 0);
     uint8_t *buf = (uint8_t *)bufstring.data();
@@ -566,7 +566,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
     while (trytimes > 0 && !shakeOK) {
         // 发送“连接确认”给客户的
         DEBUG_LOG("Send shake 2 msg, fd %d\n", shake_fd);
-        int ret = (int)write(shake_fd, self->_shakemsg2buf, CORPC_MESSAGE_HEAD_SIZE);
+        int ret = (int)write(shake_fd, self->shakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE);
         if (ret != CORPC_MESSAGE_HEAD_SIZE) {
             ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 2 fail for fd %d ret %d errno %d (%s)\n",
                    shake_fd, ret, errno, strerror(errno));
@@ -605,7 +605,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
 
             // 注意：由于发现绑定四元组socket后开始时handshake3消息有较大概率发到listen_fd，因此需要让客户端确认四元组socket确实收到消息
             // 这里需要发个shake4消息给客户端，客户端收到之后才能开始发数据消息（由于客户端能收到shake2消息因此shake4消息也能收到，若收不到就通过心跳机制关闭连接）
-            int ret = (int)write(shake_fd, self->_shakemsg4buf, CORPC_MESSAGE_HEAD_SIZE);
+            int ret = (int)write(shake_fd, self->shakemsg4buf_, CORPC_MESSAGE_HEAD_SIZE);
             if (ret != CORPC_MESSAGE_HEAD_SIZE) {
                 ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 4 fail for fd %d ret %d errno %d (%s)\n",
                        shake_fd, ret, errno, strerror(errno));
@@ -622,38 +622,38 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
         }
     }
 
-    self->_shakingClient.erase(client_addr);
+    self->shakingClient_.erase(client_addr);
     
     return NULL;
 }
 
 bool UdpAcceptor::start() {
-    if (_port == 0) {
+    if (port_ == 0) {
         ERROR_LOG("UdpAcceptor::start() -- port can't be 0\n");
         return false;
     }
     
-    _listen_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if( _listen_fd >= 0 )
+    listen_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if( listen_fd_ >= 0 )
     {
         int nReuseAddr = 1;
-        setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
-        setsockopt(_listen_fd, SOL_SOCKET, SO_REUSEPORT, &nReuseAddr, sizeof(nReuseAddr));
+        setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &nReuseAddr, sizeof(nReuseAddr));
+        setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEPORT, &nReuseAddr, sizeof(nReuseAddr));
         
         //bind socket to port
-        if( bind(_listen_fd , (struct sockaddr*)&_local_addr, sizeof(_local_addr) ) == -1 )
+        if( bind(listen_fd_ , (struct sockaddr*)&local_addr_, sizeof(local_addr_) ) == -1 )
         {
-            close(_listen_fd);
-            _listen_fd = -1;
+            close(listen_fd_);
+            listen_fd_ = -1;
         }
     }
     
-    if(_listen_fd==-1){
-        ERROR_LOG("UdpAcceptor::start() -- Can't create socket on %s:%d\n", _ip.c_str(), _port);
+    if(listen_fd_==-1){
+        ERROR_LOG("UdpAcceptor::start() -- Can't create socket on %s:%d\n", ip_.c_str(), port_);
         return false;
     }
     
-    _t = std::thread(threadEntry, this);
+    t_ = std::thread(threadEntry, this);
     
     return true;
 }
@@ -663,7 +663,7 @@ Receiver::~Receiver() {}
 void *Receiver::connectionDispatchRoutine( void * arg ) {
     QueueContext *context = (QueueContext*)arg;
     
-    ReceiverTaskQueue& queue = context->_queue;
+    ReceiverTaskQueue& queue = context->queue_;
     
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -707,7 +707,7 @@ void *Receiver::connectionRoutine( void * arg ) {
     std::shared_ptr<Connection> connection = recvTask->connection;
     delete recvTask;
     
-    IO *io = connection->_io;
+    IO *io = connection->io_;
     
     int fd = connection->getfd();
     DEBUG_LOG("start Receiver::connectionRoutine for fd:%d in thread:%d\n", fd, GetPid());
@@ -742,12 +742,12 @@ void *Receiver::connectionRoutine( void * arg ) {
         }
     }
 DEBUG_LOG("Receiver::connectionRoutine -- 1\n");
-    io->_sender->removeConnection(connection); // 通知sender关闭connection
+    io->sender_->removeConnection(connection); // 通知sender关闭connection
     shutdown(fd, SHUT_WR);  // 让sender中的fd相关协程退出
     
 DEBUG_LOG("Receiver::connectionRoutine -- 2\n");
     // 等待写关闭
-    while (!connection->_canClose) {
+    while (!connection->canClose_) {
         // sleep 100 milisecond
         msleep(100);
     }
@@ -755,7 +755,7 @@ DEBUG_LOG("Receiver::connectionRoutine -- 2\n");
 DEBUG_LOG("Receiver::connectionRoutine -- 3\n");
     close(fd);
     
-    connection->_closed = true;
+    connection->closed_ = true;
     
 DEBUG_LOG("Receiver::connectionRoutine -- 4\n");
     connection->onClose();
@@ -765,34 +765,34 @@ DEBUG_LOG("Receiver::connectionRoutine -- 4\n");
 
 void MultiThreadReceiver::threadEntry(ThreadData *tdata) {
     // 启动处理待处理连接协程
-    RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &tdata->_queueContext);
+    RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &tdata->queueContext_);
     
     RoutineEnvironment::runEventLoop();
 }
 
 bool MultiThreadReceiver::start() {
     // 启动线程
-    for (auto& td : _threadDatas) {
-        td._queueContext._receiver = this;
-        td._t = std::thread(threadEntry, &td);
+    for (auto& td : threadDatas_) {
+        td.queueContext_.receiver_ = this;
+        td.t_ = std::thread(threadEntry, &td);
     }
     
     return true;
 }
 
 void MultiThreadReceiver::addConnection(std::shared_ptr<Connection>& connection) {
-    uint16_t index = (_lastThreadIndex++) % _threadNum;
+    uint16_t index = (lastThreadIndex_++) % threadNum_;
     
     connection->setRecvThreadIndex(index);
     
     ReceiverTask *recvTask = new ReceiverTask;
     recvTask->connection = connection;
     
-    _threadDatas[index]._queueContext._queue.push(recvTask);
+    threadDatas_[index].queueContext_.queue_.push(recvTask);
 }
 
 bool CoroutineReceiver::start() {
-    RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &_queueContext);
+    RoutineEnvironment::startCoroutine(connectionDispatchRoutine, &queueContext_);
     
     return true;
 }
@@ -803,7 +803,7 @@ void CoroutineReceiver::addConnection(std::shared_ptr<Connection>& connection) {
     ReceiverTask *recvTask = new ReceiverTask;
     recvTask->connection = connection;
     
-    _queueContext._queue.push(recvTask);
+    queueContext_.queue_.push(recvTask);
 }
 
 Sender::~Sender() {
@@ -813,7 +813,7 @@ Sender::~Sender() {
 void *Sender::taskQueueRoutine( void * arg ) {
     QueueContext *context = (QueueContext*)arg;
     
-    SenderTaskQueue& queue = context->_queue;
+    SenderTaskQueue& queue = context->queue_;
     
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -850,11 +850,11 @@ void *Sender::taskQueueRoutine( void * arg ) {
                     break;
                     
                 case SenderTask::CLOSE:
-                    if (!task->connection->_isClosing) {
-                        task->connection->_isClosing = true;
+                    if (!task->connection->isClosing_) {
+                        task->connection->isClosing_ = true;
                         
-                        if (task->connection->_routineHang) {
-                            co_resume(task->connection->_routine);
+                        if (task->connection->routineHang_) {
+                            co_resume(task->connection->routine_);
                         }
                     }
                     
@@ -863,12 +863,12 @@ void *Sender::taskQueueRoutine( void * arg ) {
                     
                 case SenderTask::DATA:
                     // 若连接未关闭，放入connection的等待发送队列，若connection协程挂起则唤醒执行
-                    if (!task->connection->_isClosing) {
-                        task->connection->_datas.push_back(task->data);
+                    if (!task->connection->isClosing_) {
+                        task->connection->datas_.push_back(task->data);
                         
                         // 唤醒挂起的connection协程
-                        if (task->connection->_routineHang) {
-                            co_resume(task->connection->_routine);
+                        if (task->connection->routineHang_) {
+                            co_resume(task->connection->routine_);
                         }
                     } else {
                         task->connection->cleanDataOnClosing(task->data);
@@ -894,8 +894,8 @@ void *Sender::connectionRoutine( void * arg ) {
     
     DEBUG_LOG("start Sender::connectionRoutine for fd:%d in thread:%d\n", connection->getfd(), GetPid());
     
-    connection->_routine = co_self();
-    connection->_routineHang = false;
+    connection->routine_ = co_self();
+    connection->routineHang_ = false;
     
     std::string buffs(CORPC_MAX_BUFFER_SIZE, 0);
     uint8_t *buf = (uint8_t *)buffs.data();
@@ -915,14 +915,14 @@ void *Sender::connectionRoutine( void * arg ) {
         if (dataSize == 0) {
             //assert(startIndex == 0);
             // 等数据发完再关
-            if (connection->_isClosing) {
+            if (connection->isClosing_) {
                 break;
             }
             
             // 挂起
-            connection->_routineHang = true;
+            connection->routineHang_ = true;
             co_yield_ct();
-            connection->_routineHang = false;
+            connection->routineHang_ = false;
             
             continue;
         }
@@ -939,7 +939,7 @@ void *Sender::connectionRoutine( void * arg ) {
 
 //        int ret;
 //        do {
-//            ret = (int)write(connection->_fd, buf + startIndex, dataSize);
+//            ret = (int)write(connection->fd_, buf + startIndex, dataSize);
 //            if (ret > 0) {
 //                assert(ret <= dataSize);
 //                startIndex += ret;
@@ -949,7 +949,7 @@ void *Sender::connectionRoutine( void * arg ) {
 //        
 //        if (dataSize > 0) {
 //            WARN_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
-//                   connection->_fd, ret, errno, strerror(errno));
+//                   connection->fd_, ret, errno, strerror(errno));
 //            
 //            break;
 //        }
@@ -960,27 +960,27 @@ void *Sender::connectionRoutine( void * arg ) {
 //        }
     }
     
-    connection->_isClosing = true;
-    shutdown(connection->_fd, SHUT_RD);
-    connection->_canClose = true;
+    connection->isClosing_ = true;
+    shutdown(connection->fd_, SHUT_RD);
+    connection->canClose_ = true;
     
-    DEBUG_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->_fd);
+    DEBUG_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->fd_);
     
     return NULL;
 }
 
 bool MultiThreadSender::start() {
     // 启动线程
-    for (auto& td : _threadDatas) {
-        td._queueContext._sender = this;
-        td._t = std::thread(threadEntry, &td);
+    for (auto& td : threadDatas_) {
+        td.queueContext_.sender_ = this;
+        td.t_ = std::thread(threadEntry, &td);
     }
     
     return true;
 }
 
 void MultiThreadSender::addConnection(std::shared_ptr<Connection>& connection) {
-    uint16_t index = (_lastThreadIndex++) % _threadNum;
+    uint16_t index = (lastThreadIndex_++) % threadNum_;
     
     connection->setSendThreadIndex(index);
     
@@ -988,7 +988,7 @@ void MultiThreadSender::addConnection(std::shared_ptr<Connection>& connection) {
     senderTask->type = SenderTask::INIT;
     senderTask->connection = connection;
     
-    _threadDatas[index]._queueContext._queue.push(senderTask);
+    threadDatas_[index].queueContext_.queue_.push(senderTask);
 }
 
 void MultiThreadSender::removeConnection(std::shared_ptr<Connection>& connection) {
@@ -996,7 +996,7 @@ void MultiThreadSender::removeConnection(std::shared_ptr<Connection>& connection
     senderTask->type = SenderTask::CLOSE;
     senderTask->connection = connection;
     
-    _threadDatas[connection->getSendThreadIndex()]._queueContext._queue.push(senderTask);
+    threadDatas_[connection->getSendThreadIndex()].queueContext_.queue_.push(senderTask);
 }
 
 void MultiThreadSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
@@ -1005,18 +1005,18 @@ void MultiThreadSender::send(std::shared_ptr<Connection>& connection, std::share
     senderTask->connection = connection;
     senderTask->data = data;
     
-    _threadDatas[connection->getSendThreadIndex()]._queueContext._queue.push(senderTask);
+    threadDatas_[connection->getSendThreadIndex()].queueContext_.queue_.push(senderTask);
 }
 
 void MultiThreadSender::threadEntry( ThreadData *tdata ) {
     // 启动send协程
-    RoutineEnvironment::startCoroutine(taskQueueRoutine, &tdata->_queueContext);
+    RoutineEnvironment::startCoroutine(taskQueueRoutine, &tdata->queueContext_);
     
     RoutineEnvironment::runEventLoop();
 }
 
 bool CoroutineSender::start() {
-    RoutineEnvironment::startCoroutine(taskQueueRoutine, &_queueContext);
+    RoutineEnvironment::startCoroutine(taskQueueRoutine, &queueContext_);
     
     return true;
 }
@@ -1028,7 +1028,7 @@ void CoroutineSender::addConnection(std::shared_ptr<Connection>& connection) {
     senderTask->type = SenderTask::INIT;
     senderTask->connection = connection;
     
-    _queueContext._queue.push(senderTask);
+    queueContext_.queue_.push(senderTask);
 }
 
 void CoroutineSender::removeConnection(std::shared_ptr<Connection>& connection) {
@@ -1036,7 +1036,7 @@ void CoroutineSender::removeConnection(std::shared_ptr<Connection>& connection) 
     senderTask->type = SenderTask::CLOSE;
     senderTask->connection = connection;
     
-    _queueContext._queue.push(senderTask);
+    queueContext_.queue_.push(senderTask);
 }
 
 void CoroutineSender::send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) {
@@ -1045,17 +1045,17 @@ void CoroutineSender::send(std::shared_ptr<Connection>& connection, std::shared_
     senderTask->connection = connection;
     senderTask->data = data;
     
-    _queueContext._queue.push(senderTask);
+    queueContext_.queue_.push(senderTask);
 }
 
-Heartbeater::Heartbeater(): _heartbeatmsg(new SendMessageInfo) {
-    _heartbeatmsg->type = CORPC_MSG_TYPE_HEARTBEAT;
-    _heartbeatmsg->isRaw = true;
-    _heartbeatmsg->needCrypt = false;
-    _heartbeatmsg->tag = 0;
-    _heartbeatmsg->serial = 0;
+Heartbeater::Heartbeater(): heartbeatmsg_(new SendMessageInfo) {
+    heartbeatmsg_->type = CORPC_MSG_TYPE_HEARTBEAT;
+    heartbeatmsg_->isRaw = true;
+    heartbeatmsg_->needCrypt = false;
+    heartbeatmsg_->tag = 0;
+    heartbeatmsg_->serial = 0;
     
-    _t = std::thread(threadEntry, this);
+    t_ = std::thread(threadEntry, this);
 }
 
 void Heartbeater::threadEntry( Heartbeater *self ) {
@@ -1068,7 +1068,7 @@ void Heartbeater::threadEntry( Heartbeater *self ) {
 void *Heartbeater::dispatchRoutine( void * arg ) {
     Heartbeater *self = (Heartbeater *)arg;
     
-    HeartbeatQueue& queue = self->_queue;
+    HeartbeatQueue& queue = self->queue_;
     
     // 初始化pipe readfd
     int readFd = queue.getReadFd();
@@ -1100,16 +1100,16 @@ void *Heartbeater::dispatchRoutine( void * arg ) {
         while (task) {
             if (task->type == HeartbeatTask::START) {
                 uint64_t nowms = mtime();
-                self->_heartbeatList.insert((uint64_t)task->connection.get(), nowms + CORPC_HEARTBEAT_PERIOD, task->connection);
+                self->heartbeatList_.insert((uint64_t)task->connection.get(), nowms + CORPC_HEARTBEAT_PERIOD, task->connection);
 
-                if (self->_heartbeatRoutineHang) {
-                    co_resume(self->_heartbeatRoutine);
+                if (self->heartbeatRoutineHang_) {
+                    co_resume(self->heartbeatRoutine_);
                 }
             } else { // task->type == HeartbeatTask::STOP
-                auto node = self->_heartbeatList.getNode((uint64_t)task->connection.get());
+                auto node = self->heartbeatList_.getNode((uint64_t)task->connection.get());
                 if (node) {
                     DEBUG_LOG("Heartbeater::dispatchRoutine() -- remove conn: %lu fd %d\n", (uint64_t)task->connection.get(), task->connection->getfd());
-                    self->_heartbeatList.remove(node);
+                    self->heartbeatList_.remove(node);
                 }
             }
 
@@ -1122,28 +1122,28 @@ void *Heartbeater::dispatchRoutine( void * arg ) {
 void *Heartbeater::heartbeatRoutine( void * arg ) {
     Heartbeater *self = (Heartbeater *)arg;
     
-    self->_heartbeatRoutine = co_self();
-    self->_heartbeatRoutineHang = false;
+    self->heartbeatRoutine_ = co_self();
+    self->heartbeatRoutineHang_ = false;
 
     while (true) {
-        if (self->_heartbeatList.empty()) {
+        if (self->heartbeatList_.empty()) {
             // 挂起
-            self->_heartbeatRoutineHang = true;
+            self->heartbeatRoutineHang_ = true;
             co_yield_ct();
-            self->_heartbeatRoutineHang = false;
+            self->heartbeatRoutineHang_ = false;
             
             continue;
         }
         
         uint64_t nowms = mtime();
         
-        auto node = self->_heartbeatList.getLast();
+        auto node = self->heartbeatList_.getLast();
         uint64_t expireTime = node->expireTime;
         std::shared_ptr<Connection> conn = node->data;
 
-        if (conn->_closed) {
+        if (conn->closed_) {
             DEBUG_LOG("Heartbeater::heartbeatRoutine() -- remove conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
-            self->_heartbeatList.remove(node);
+            self->heartbeatList_.remove(node);
             continue;
         }
 
@@ -1155,7 +1155,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         if (nowms - conn->getLastRecvHBTime() > CORPC_MAX_NO_HEARTBEAT_TIME) {
             // 心跳超时，断线处理
             ERROR_LOG("Heartbeater::heartbeatRoutine() -- heartbeat timeout for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
-            self->_heartbeatList.remove(node);
+            self->heartbeatList_.remove(node);
             conn->close();
             continue;
         }
@@ -1171,14 +1171,14 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
             continue;
         }
 
-        self->_heartbeatList.remove(node);
+        self->heartbeatList_.remove(node);
 DEBUG_LOG("Heartbeater::heartbeatRoutine() -- send heartbeat for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
         // 发心跳包
-        conn->send(self->_heartbeatmsg);
+        conn->send(self->heartbeatmsg_);
 
         // 重新加入队列
         // TODO: 不同连接允许不一样的心跳周期
-        self->_heartbeatList.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
+        self->heartbeatList_.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
     }
 }
 
@@ -1186,17 +1186,17 @@ void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {
     HeartbeatTask *task = new HeartbeatTask;
     task->type = HeartbeatTask::START;
     task->connection = connection;
-    _queue.push(task);
+    queue_.push(task);
 }
 
 void Heartbeater::removeConnection(std::shared_ptr<Connection>& connection) {
     HeartbeatTask *task = new HeartbeatTask;
     task->type = HeartbeatTask::STOP;
     task->connection = connection;
-    _queue.push(task);
+    queue_.push(task);
 }
 
-IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): _receiveThreadNum(receiveThreadNum), _sendThreadNum(sendThreadNum) {
+IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): receiveThreadNum_(receiveThreadNum), sendThreadNum_(sendThreadNum) {
 }
 
 IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
@@ -1212,31 +1212,31 @@ IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
 }
 
 bool IO::start() {
-    if (_sendThreadNum == 0 && _receiveThreadNum == 0) {
+    if (sendThreadNum_ == 0 && receiveThreadNum_ == 0) {
         ERROR_LOG("IO::start() -- sender and receiver can't run at same thread.\n");
         return false;
     }
     
     // 根据需要启动receiver线程或协程
-    if (_receiveThreadNum > 0) {
-        _receiver = new MultiThreadReceiver(this, _receiveThreadNum);
+    if (receiveThreadNum_ > 0) {
+        receiver_ = new MultiThreadReceiver(this, receiveThreadNum_);
     } else {
-        _receiver = new CoroutineReceiver(this);
+        receiver_ = new CoroutineReceiver(this);
     }
     
     // 根据需要启动sender线程或协程
-    if (_sendThreadNum > 0) {
-        _sender = new MultiThreadSender(this, _sendThreadNum);
+    if (sendThreadNum_ > 0) {
+        sender_ = new MultiThreadSender(this, sendThreadNum_);
     } else {
-        _sender = new CoroutineSender(this);
+        sender_ = new CoroutineSender(this);
     }
     
-    if (!_receiver->start()) {
+    if (!receiver_->start()) {
         ERROR_LOG("IO::start() -- start receiver failed.\n");
         return false;
     }
     
-    if (!_sender->start()) {
+    if (!sender_->start()) {
         ERROR_LOG("IO::start() -- start sender failed.\n");
         return false;
     }
@@ -1246,10 +1246,10 @@ bool IO::start() {
 
 void IO::addConnection(std::shared_ptr<Connection>& connection) {
     // 注意：以下两行顺序不能调换，不然会有多线程问题
-    _sender->addConnection(connection);
-    _receiver->addConnection(connection);
+    sender_->addConnection(connection);
+    receiver_->addConnection(connection);
 }
 
 void IO::removeConnection(std::shared_ptr<Connection>& connection) {
-    _sender->removeConnection(connection);
+    sender_->removeConnection(connection);
 }

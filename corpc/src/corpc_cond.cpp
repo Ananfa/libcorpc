@@ -19,21 +19,21 @@
 using namespace corpc;
 
 Cond::Cond() {
-	_cond = co_cond_alloc();
+	cond_ = co_cond_alloc();
 }
 
 Cond::~Cond() {
-	co_cond_free(_cond);
+	co_cond_free(cond_);
 }
 
 void Cond::signal() {
-	co_cond_signal(_cond);
+	co_cond_signal(cond_);
 }
 
 void Cond::broadcast() {
-	co_cond_broadcast(_cond);
+	co_cond_broadcast(cond_);
 }
 
 void Cond::wait(int timeout) {
-	co_cond_timedwait(_cond, timeout);
+	co_cond_timedwait(cond_, timeout);
 }

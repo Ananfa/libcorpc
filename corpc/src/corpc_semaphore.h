@@ -29,15 +29,15 @@ namespace corpc {
         };
 
     public:
-        Semaphore(int num): _res(num) {}
+        Semaphore(int num): res_(num) {}
         ~Semaphore() {}
         
         void wait();
         void post();
 
     private:
-        std::atomic<int> _res;
-        std::list<RoutineInfo> _waitRoutines;
+        std::atomic<int> res_;
+        std::list<RoutineInfo> waitRoutines_;
     };
 
 }

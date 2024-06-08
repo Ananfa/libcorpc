@@ -28,7 +28,7 @@ namespace corpc {
         };
 
     public:
-        Condition(): _res(0) {}
+        Condition(): res_(0) {}
         ~Condition() {}
         
         void wait(Mutex &lock);
@@ -36,8 +36,8 @@ namespace corpc {
         void broadcast();
 
     private:
-    	std::atomic<int> _res;
-        std::list<RoutineInfo> _waitRoutines;
+    	std::atomic<int> res_;
+        std::list<RoutineInfo> waitRoutines_;
     };
 }
 

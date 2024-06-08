@@ -37,9 +37,9 @@ namespace corpc {
         virtual void decrypt(uint8_t *src, uint8_t *dst, int size);
 
     private:
-        std::string _key;
-        uint8_t *_keyBuf;
-        size_t _keySize;
+        std::string key_;
+        uint8_t *keyBuf_;
+        size_t keySize_;
     };
 }
 

@@ -36,16 +36,16 @@ namespace corpc {
 
         void stop();
     private:
-        Timer(uint32_t timeout_ms, const std::function<void()> &cb): _timeout_ms(timeout_ms), _cb(cb) {}
+        Timer(uint32_t timeout_ms, const std::function<void()> &cb): timeout_ms_(timeout_ms), cb_(cb) {}
         virtual ~Timer() {}
 
     private:
-        Cond _cond;
+        Cond cond_;
 
-        uint32_t _timeout_ms;
-        std::function<void()> _cb;
+        uint32_t timeout_ms_;
+        std::function<void()> cb_;
 
-        bool _running = true;
+        bool running_ = true;
     };
 }
 

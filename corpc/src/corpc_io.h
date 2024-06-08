@@ -63,12 +63,12 @@ namespace corpc {
         virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
 
     protected:
-        WorkerMessageQueue _queue;
+        WorkerMessageQueue queue_;
     };
     
     class MultiThreadWorker: public Worker {
     public:
-        MultiThreadWorker(uint16_t threadNum): _threadNum(threadNum), _ts(threadNum) {}
+        MultiThreadWorker(uint16_t threadNum): threadNum_(threadNum), ts_(threadNum) {}
         virtual ~MultiThreadWorker() = 0;
         
         virtual void start();
@@ -79,8 +79,8 @@ namespace corpc {
         virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
         
     private:
-        uint16_t _threadNum;
-        std::vector<std::thread> _ts;
+        uint16_t threadNum_;
+        std::vector<std::thread> ts_;
     };
     
     class CoroutineWorker: public Worker {
@@ -103,9 +103,9 @@ namespace corpc {
         virtual bool downflow(uint8_t *buf, int space, int &size) = 0;
         
     protected:
-        Worker *_worker;
+        Worker *worker_;
         
-        std::weak_ptr<Connection> _connection;
+        std::weak_ptr<Connection> connection_;
     };
     
     class MessagePipeline: public Pipeline {
@@ -119,22 +119,22 @@ namespace corpc {
         virtual bool downflow(uint8_t *buf, int space, int &size) override final;
         
     protected:
-        DecodeFunction _decodeFun;
-        EncodeFunction _encodeFun;
+        DecodeFunction decodeFun_;
+        EncodeFunction encodeFun_;
         
-        uint _headSize;
-        uint _maxBodySize;
+        uint headSize_;
+        uint maxBodySize_;
         
-        std::string _head;
-        uint8_t *_headBuf;
+        std::string head_;
+        uint8_t *headBuf_;
         
-        std::string _body;
-        uint8_t *_bodyBuf;
-        uint _bodySize;
+        std::string body_;
+        uint8_t *bodyBuf_;
+        uint bodySize_;
         
     private:
-        std::string _downflowBuf; // 在downflow过程中写不进buf的数据将记录到_downflowBuf中
-        uint32_t _downflowBufSentNum; // 已发送的数据量
+        std::string downflowBuf_; // 在downflow过程中写不进buf的数据将记录到_downflowBuf中
+        uint32_t downflowBufSentNum_; // 已发送的数据量
     };
     
     class TcpPipeline: public MessagePipeline {
@@ -145,11 +145,11 @@ namespace corpc {
         virtual bool upflow(uint8_t *buf, int size);
         
     private:
-        uint _headNum;
-        uint _bodyNum;
+        uint headNum_;
+        uint bodyNum_;
         
-        uint _bodySizeOffset;
-        SIZE_TYPE _bodySizeType;
+        uint bodySizeOffset_;
+        SIZE_TYPE bodySizeType_;
     };
     
     class UdpPipeline: public MessagePipeline {
@@ -162,40 +162,40 @@ namespace corpc {
     
     class PipelineFactory {
     public:
-        PipelineFactory(corpc::Worker *worker): _worker(worker) {}
+        PipelineFactory(corpc::Worker *worker): worker_(worker) {}
         virtual ~PipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
-        Worker *_worker;
+        Worker *worker_;
     };
     
     class MessagePipelineFactory: public PipelineFactory {
     public:
-        MessagePipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker), _decodeFun(decodeFun), _encodeFun(encodeFun), _headSize(headSize), _maxBodySize(maxBodySize) {}
+        MessagePipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker), decodeFun_(decodeFun), encodeFun_(encodeFun), headSize_(headSize), maxBodySize_(maxBodySize) {}
         virtual ~MessagePipelineFactory() = 0;
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
-        DecodeFunction _decodeFun;
-        EncodeFunction _encodeFun;
+        DecodeFunction decodeFun_;
+        EncodeFunction encodeFun_;
         
-        uint _headSize;
-        uint _maxBodySize;
+        uint headSize_;
+        uint maxBodySize_;
     };
     
     class TcpPipelineFactory: public MessagePipelineFactory {
     public:
-        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType) {}
+        TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType) {}
         ~TcpPipelineFactory() {}
         
         virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
         
     public:
-        uint _bodySizeOffset;
-        MessagePipeline::SIZE_TYPE _bodySizeType;
+        uint bodySizeOffset_;
+        MessagePipeline::SIZE_TYPE bodySizeType_;
     };
     
     class UdpPipelineFactory: public MessagePipelineFactory {
@@ -217,59 +217,59 @@ namespace corpc {
         virtual void onSenderInit() {}
         virtual void onReceiverInit() {}
     public:
-        void setPipeline(std::shared_ptr<Pipeline> &pipeline) { _pipeline = pipeline; }
-        std::shared_ptr<Pipeline> &getPipeline() { return _pipeline; }
+        void setPipeline(std::shared_ptr<Pipeline> &pipeline) { pipeline_ = pipeline; }
+        std::shared_ptr<Pipeline> &getPipeline() { return pipeline_; }
         
-        int getfd() { return _fd; }
+        int getfd() { return fd_; }
         
         std::shared_ptr<Connection> getPtr() {
             return shared_from_this();
         }
 
-        int getSendThreadIndex() { return _sendThreadIndex; }
-        void setSendThreadIndex(int threadIndex) { _sendThreadIndex = threadIndex; }
-        int getRecvThreadIndex() { return _recvThreadIndex; }
-        void setRecvThreadIndex(int threadIndex) { _recvThreadIndex = threadIndex; }
+        int getSendThreadIndex() { return sendThreadIndex_; }
+        void setSendThreadIndex(int threadIndex) { sendThreadIndex_ = threadIndex; }
+        int getRecvThreadIndex() { return recvThreadIndex_; }
+        void setRecvThreadIndex(int threadIndex) { recvThreadIndex_ = threadIndex; }
         
-        bool needHB() { return _needHB; }
-        uint64_t getLastRecvHBTime() { return _lastRecvHBTime; }
-        void setLastRecvHBTime(uint64_t time) { _lastRecvHBTime = time; }
+        bool needHB() { return needHB_; }
+        uint64_t getLastRecvHBTime() { return lastRecvHBTime_; }
+        void setLastRecvHBTime(uint64_t time) { lastRecvHBTime_ = time; }
         
-        bool isDecodeError() { return _decodeError; }
-        void setDecodeError() { _decodeError = true; }
+        bool isDecodeError() { return decodeError_; }
+        void setDecodeError() { decodeError_ = true; }
         
         void send(std::shared_ptr<void> data);
         
         void close();
         
-        size_t getDataSize() { return _datas.size(); }
-        std::shared_ptr<void>& getFrontData() { return _datas.front(); }
-        void popFrontData() { _datas.pop_front(); }
+        size_t getDataSize() { return datas_.size(); }
+        std::shared_ptr<void>& getFrontData() { return datas_.front(); }
+        void popFrontData() { datas_.pop_front(); }
         
-        bool isOpen() const { return !(_isClosing || _closed); }
+        bool isOpen() const { return !(isClosing_ || closed_); }
 
     protected:
         virtual ssize_t write(const void *buf, size_t nbyte);
         
     protected:
-        IO *_io;
-        int _fd; // connect fd
-        bool _routineHang; // 协程是否挂起
-        stCoRoutine_t* _routine; // 协程
+        IO *io_;
+        int fd_; // connect fd
+        bool routineHang_; // 协程是否挂起
+        stCoRoutine_t* routine_; // 协程
         
-        int _sendThreadIndex; // 分配到sender的线程下标
-        int _recvThreadIndex; // 分配到receiver的线程下标
+        int sendThreadIndex_; // 分配到sender的线程下标
+        int recvThreadIndex_; // 分配到receiver的线程下标
         
-        bool _needHB; // 是否进行心跳
-        std::atomic<uint64_t> _lastRecvHBTime; // 最后一次收到数据的时间
+        bool needHB_; // 是否进行心跳
+        std::atomic<uint64_t> lastRecvHBTime_; // 最后一次收到数据的时间
         
-        std::shared_ptr<Pipeline> _pipeline;
-        std::list<std::shared_ptr<void>> _datas; // 等待发送的数据
+        std::shared_ptr<Pipeline> pipeline_;
+        std::list<std::shared_ptr<void>> datas_; // 等待发送的数据
         
-        bool _decodeError; // 是否数据解码出错
-        std::atomic<bool> _closed; // 是否已关闭
-        std::atomic<bool> _isClosing; // 是否正在关闭
-        std::atomic<bool> _canClose; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
+        bool decodeError_; // 是否数据解码出错
+        std::atomic<bool> closed_; // 是否已关闭
+        std::atomic<bool> isClosing_; // 是否正在关闭
+        std::atomic<bool> canClose_; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
         
     public:
         friend class Receiver;
@@ -282,7 +282,7 @@ namespace corpc {
     // 服务器基类
     class Server {
     public:
-        Server(IO *io): _io(io), _acceptor(nullptr), _worker(nullptr), _pipelineFactory(nullptr) {}
+        Server(IO *io): io_(io), acceptor_(nullptr), worker_(nullptr), pipelineFactory_(nullptr) {}
         virtual ~Server() = 0;
         
         std::shared_ptr<Connection> buildAndAddConnection(int fd);
@@ -294,12 +294,12 @@ namespace corpc {
         virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
         virtual void onClose(std::shared_ptr<Connection>& connection) = 0;
     protected:
-        IO *_io;
+        IO *io_;
         
-        Acceptor *_acceptor;
-        Worker *_worker;
+        Acceptor *acceptor_;
+        Worker *worker_;
         
-        PipelineFactory *_pipelineFactory;
+        PipelineFactory *pipelineFactory_;
     };
     
     class Acceptor {
@@ -310,14 +310,14 @@ namespace corpc {
         virtual bool start() = 0;
         
     protected:
-        Server *_server;
+        Server *server_;
         
-        std::string _ip;
-        uint16_t _port;
+        std::string ip_;
+        uint16_t port_;
         
-        sockaddr_in _local_addr;
+        sockaddr_in local_addr_;
         
-        int _listen_fd;
+        int listen_fd_;
     };
     
     class TcpAcceptor: public Acceptor {
@@ -368,17 +368,17 @@ namespace corpc {
         static void *handshakeRoutine( void * arg ); // 负责新连接握手
         
     private:
-        int _shake_fd;
-        std::thread _t;
+        int shake_fd_;
+        std::thread t_;
         
-        std::string _shakemsg2;
-        uint8_t *_shakemsg2buf;
-        std::string _shakemsg4;
-        uint8_t *_shakemsg4buf;
-        std::string _unshakemsg;
-        uint8_t *_unshakemsg2buf;
+        std::string shakemsg2_;
+        uint8_t *shakemsg2buf_;
+        std::string shakemsg4_;
+        uint8_t *shakemsg4buf_;
+        std::string unshakemsg_;
+        uint8_t *unshakemsg2buf_;
 
-        std::map<sockaddr_in, bool, SockAddrCmp> _shakingClient;
+        std::map<sockaddr_in, bool, SockAddrCmp> shakingClient_;
     };
     
     struct SenderTask {
@@ -412,14 +412,14 @@ namespace corpc {
     class Receiver {
     protected:
         struct QueueContext {
-            Receiver *_receiver;
+            Receiver *receiver_;
             
             // 消息队列
-            ReceiverTaskQueue _queue;
+            ReceiverTaskQueue queue_;
         };
         
     public:
-        Receiver(IO *io):_io(io) {}
+        Receiver(IO *io):io_(io) {}
         virtual ~Receiver() = 0;
         
         virtual bool start() = 0;
@@ -432,20 +432,20 @@ namespace corpc {
         static void *connectionRoutine( void * arg );
         
     protected:
-        IO *_io;
+        IO *io_;
     };
     
     class MultiThreadReceiver: public Receiver {
         // 线程相关数据
         struct ThreadData {
-            QueueContext _queueContext;
+            QueueContext queueContext_;
             
             // 保持thread对象
-            std::thread _t;
+            std::thread t_;
         };
         
     public:
-        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
+        MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), threadNum_(threadNum), lastThreadIndex_(0), threadDatas_(threadNum) {}
         virtual ~MultiThreadReceiver() {}
         
         virtual bool start();
@@ -456,14 +456,14 @@ namespace corpc {
         static void threadEntry( ThreadData *tdata );
         
     private:
-        uint16_t _threadNum;
-        std::atomic<uint16_t> _lastThreadIndex;
-        std::vector<ThreadData> _threadDatas;
+        uint16_t threadNum_;
+        std::atomic<uint16_t> lastThreadIndex_;
+        std::vector<ThreadData> threadDatas_;
     };
     
     class CoroutineReceiver: public Receiver {
     public:
-        CoroutineReceiver(IO *io): Receiver(io) { _queueContext._receiver = this; }
+        CoroutineReceiver(IO *io): Receiver(io) { queueContext_.receiver_ = this; }
         virtual ~CoroutineReceiver() {}
         
         virtual bool start();
@@ -471,21 +471,21 @@ namespace corpc {
         virtual void addConnection(std::shared_ptr<Connection>& connection);
         
     private:
-        QueueContext _queueContext;
+        QueueContext queueContext_;
     };
     
     // Sender负责rpc连接的数据发送
     class Sender {
     protected:
         struct QueueContext {
-            Sender *_sender;
+            Sender *sender_;
             
             // 消息队列
-            SenderTaskQueue _queue;
+            SenderTaskQueue queue_;
         };
         
     public:
-        Sender(IO *io):_io(io) {}
+        Sender(IO *io):io_(io) {}
         virtual ~Sender() = 0;
         
         virtual bool start() = 0;
@@ -498,20 +498,20 @@ namespace corpc {
         static void *connectionRoutine( void * arg );
         
     private:
-        IO *_io;
+        IO *io_;
     };
     
     class MultiThreadSender: public Sender {
         // 线程相关数据
         struct ThreadData {
-            QueueContext _queueContext;
+            QueueContext queueContext_;
             
             // 保持thread对象
-            std::thread _t;
+            std::thread t_;
         };
         
     public:
-        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), _threadNum(threadNum), _lastThreadIndex(0), _threadDatas(threadNum) {}
+        MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), threadNum_(threadNum), lastThreadIndex_(0), threadDatas_(threadNum) {}
         virtual ~MultiThreadSender() {}
         
         virtual bool start();
@@ -523,14 +523,14 @@ namespace corpc {
         static void threadEntry( ThreadData *tdata );
         
     private:
-        uint16_t _threadNum;
-        std::atomic<uint16_t> _lastThreadIndex;
-        std::vector<ThreadData> _threadDatas;
+        uint16_t threadNum_;
+        std::atomic<uint16_t> lastThreadIndex_;
+        std::vector<ThreadData> threadDatas_;
     };
     
     class CoroutineSender: public Sender {
     public:
-        CoroutineSender(IO *io): Sender(io) { _queueContext._sender = this; }
+        CoroutineSender(IO *io): Sender(io) { queueContext_.sender_ = this; }
         virtual ~CoroutineSender() {}
         
         virtual bool start();
@@ -539,7 +539,7 @@ namespace corpc {
         virtual void removeConnection(std::shared_ptr<Connection>& connection);
         virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
     private:
-        QueueContext _queueContext;
+        QueueContext queueContext_;
     };
     
     // singleton
@@ -558,7 +558,7 @@ namespace corpc {
         Heartbeater();
         Heartbeater(Heartbeater const&);
         Heartbeater& operator=(Heartbeater const&);
-        ~Heartbeater() { _t.detach(); }
+        ~Heartbeater() { t_.detach(); }
         
         static void threadEntry( Heartbeater *self );
         
@@ -566,15 +566,15 @@ namespace corpc {
         static void *heartbeatRoutine( void * arg ); // 负责对握过手的连接进行心跳
         
     private:
-        std::shared_ptr<SendMessageInfo> _heartbeatmsg;
+        std::shared_ptr<SendMessageInfo> heartbeatmsg_;
         
-        HeartbeatQueue _queue;
-        std::thread _t;
+        HeartbeatQueue queue_;
+        std::thread t_;
         
-        TimeoutList<std::shared_ptr<Connection>> _heartbeatList;
+        TimeoutList<std::shared_ptr<Connection>> heartbeatList_;
         
-        bool _heartbeatRoutineHang; // 心跳协程是否挂起
-        stCoRoutine_t* _heartbeatRoutine; // 心跳协程
+        bool heartbeatRoutineHang_; // 心跳协程是否挂起
+        stCoRoutine_t* heartbeatRoutine_; // 心跳协程
         
     };
     
@@ -586,8 +586,8 @@ namespace corpc {
         
         void destroy() { delete this; } // 销毁IO
         
-        Receiver *getReceiver() { return _receiver; }
-        Sender *getSender() { return _sender; }
+        Receiver *getReceiver() { return receiver_; }
+        Sender *getSender() { return sender_; }
         
         void addConnection(std::shared_ptr<Connection>& connection);
         void removeConnection(std::shared_ptr<Connection>& connection);
@@ -598,11 +598,11 @@ namespace corpc {
         ~IO() {}  // 不允许在栈上创建IO
         
     private:
-        uint16_t _receiveThreadNum;
-        uint16_t _sendThreadNum;
+        uint16_t receiveThreadNum_;
+        uint16_t sendThreadNum_;
         
-        Receiver *_receiver;
-        Sender *_sender;
+        Receiver *receiver_;
+        Sender *sender_;
         
     public:
         friend class Connection;

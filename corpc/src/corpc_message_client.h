@@ -26,25 +26,25 @@
 namespace corpc {
     class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
-        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial): _needHB(needHB), _enableSendCRC(enableSendCRC), _enableRecvCRC(enableRecvCRC), _enableSerial(enableSerial), _crypter(crypter), _lastRecvSerial(lastRecvSerial) {}
+        MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial): needHB_(needHB), enableSendCRC_(enableSendCRC), enableRecvCRC_(enableRecvCRC), enableSerial_(enableSerial), crypter_(crypter), lastRecvSerial_(lastRecvSerial) {}
         virtual ~MessageClient();
         
         virtual bool start() = 0;
-        void stop() { _running = false; } // TODO: 发个结束消息
+        void stop() { running_ = false; } // TODO: 发个结束消息
         
         std::shared_ptr<MessageClient> getPtr() {
             return shared_from_this();
         }
 
-        bool isRunning() { return _running; };
+        bool isRunning() { return running_; };
         
         void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
         void recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
         
         bool registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto);
         
-        uint32_t getLastRecvSerial() { return _lastRecvSerial; }
-        uint32_t getLastSendSerial() { return _lastSendSerial; }
+        uint32_t getLastRecvSerial() { return lastRecvSerial_; }
+        uint32_t getLastSendSerial() { return lastSendSerial_; }
 
     protected:
         void close();
@@ -57,34 +57,34 @@ namespace corpc {
             bool needCrypter;   // 发送消息时标记消息是否需要加密
         };
         
-        bool _needHB;        // 是否需要心跳
-        bool _enableSendCRC; // 是否需要发包时校验CRC码
-        bool _enableRecvCRC; // 是否需要收包时校验CRC码
-        bool _enableSerial;  // 是否需要消息序号
+        bool needHB_;        // 是否需要心跳
+        bool enableSendCRC_; // 是否需要发包时校验CRC码
+        bool enableRecvCRC_; // 是否需要收包时校验CRC码
+        bool enableSerial_;  // 是否需要消息序号
 
-        uint32_t _lastRecvSerial = 0;
-        uint32_t _lastSendSerial = 0;
+        uint32_t lastRecvSerial_ = 0;
+        uint32_t lastSendSerial_ = 0;
         
-        std::shared_ptr<Crypter> _crypter;
+        std::shared_ptr<Crypter> crypter_;
 
-        int _s;
+        int s_;
         
-        Co_MPSC_NoLockQueue<MessageInfo*> _sendQueue;
-        MPSC_NoLockQueue<MessageInfo*> _recvQueue;
+        Co_MPSC_NoLockQueue<MessageInfo*> sendQueue_;
+        MPSC_NoLockQueue<MessageInfo*> recvQueue_;
         
-        std::map<int16_t, MessageInfo> _registerMessageMap;
+        std::map<int16_t, MessageInfo> registerMessageMap_;
         
-        uint64_t _lastRecvHBTime = 0; // 最后一次收到心跳的时间
-        uint64_t _lastSendHBTime = 0; // 最后一次发送心跳的时间
+        uint64_t lastRecvHBTime_ = 0; // 最后一次收到心跳的时间
+        uint64_t lastSendHBTime_ = 0; // 最后一次发送心跳的时间
 
-        bool _running = false;
+        bool running_ = false;
 
         //static uint8_t _heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     };
 
     class TcpClient: public MessageClient {
     public:
-        TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), _host(host), _port(port) {}
+        TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), host_(host), port_(port) {}
         ~TcpClient() {}
         
         virtual bool start();
@@ -93,13 +93,13 @@ namespace corpc {
         static void *workRoutine( void * arg ); // 数据收发协程
 
     private:
-        std::string _host;
-        uint16_t _port;
+        std::string host_;
+        uint16_t port_;
     };
 
     class UdpClient: public MessageClient {
     public:
-        UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), _host(host), _port(port), _local_port(local_port) {}
+        UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), host_(host), port_(port), local_port_(local_port) {}
         ~UdpClient() {}
 
         virtual bool start();
@@ -108,9 +108,9 @@ namespace corpc {
         static void *workRoutine( void * arg ); // 数据收发协程
         
     private:
-        std::string _host;
-        uint16_t _port;
-        uint16_t _local_port;
+        std::string host_;
+        uint16_t port_;
+        uint16_t local_port_;
     };
 
     class KcpClient: public MessageClient {
@@ -130,11 +130,11 @@ namespace corpc {
         
         static int rawOut(const char *buf, int len, ikcpcb *kcp, void *obj);
     private:
-        std::string _host;
-        uint16_t _port;
-        uint16_t _local_port;
+        std::string host_;
+        uint16_t port_;
+        uint16_t local_port_;
 
-        ikcpcb* _pkcp;
+        ikcpcb* pkcp_;
     };
 }
 

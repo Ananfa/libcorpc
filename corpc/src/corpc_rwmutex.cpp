@@ -21,19 +21,19 @@ using namespace corpc;
 
 void RWMutex::lock() {
     // 与其他获取写锁之间同步
-    _wlock.lock();
+    wlock_.lock();
 
-    int r = _readerCount.fetch_sub(RWMUTEXMAXREADERS);
+    int r = readerCount_.fetch_sub(RWMUTEXMAXREADERS);
     if (r != 0) {
-        int r1 = _readerWait.fetch_add(r);
+        int r1 = readerWait_.fetch_add(r);
         if (r1 + r != 0) {
-            _writerSem.wait();
+            writerSem_.wait();
         }
     }
 }
 
 void RWMutex::unlock() {
-    int r = _readerCount.fetch_add(RWMUTEXMAXREADERS);
+    int r = readerCount_.fetch_add(RWMUTEXMAXREADERS);
 
     if (r >= 0) {
         ERROR_LOG("RWMutex::runlock -- RUnlock of unlocked RWMutex\n");
@@ -43,21 +43,21 @@ void RWMutex::unlock() {
     r += RWMUTEXMAXREADERS;
 
     for (int i = 0; i < r; i++) {
-        _readerSem.post();
+        readerSem_.post();
     }
 
-    _wlock.unlock();
+    wlock_.unlock();
 }
 
 void RWMutex::rlock() {
-    int r = _readerCount.fetch_add(1);
+    int r = readerCount_.fetch_add(1);
     if (r < 0) {
-        _readerSem.wait();
+        readerSem_.wait();
     }
 }
 
 void RWMutex::runlock() {
-    int r = _readerCount.fetch_sub(1);
+    int r = readerCount_.fetch_sub(1);
     if (r <= 0) {
         if (r == 0 || r == -RWMUTEXMAXREADERS) {
             ERROR_LOG("RWMutex::runlock -- RUnlock of unlocked RWMutex\n");
@@ -65,9 +65,9 @@ void RWMutex::runlock() {
         }
 
         // 有写锁在等待
-        int r1 = _readerWait.fetch_sub(1);
+        int r1 = readerWait_.fetch_sub(1);
         if (r1 == 1) {
-            _writerSem.post();
+            writerSem_.post();
         }
     }
 }

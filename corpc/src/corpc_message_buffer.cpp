@@ -22,20 +22,20 @@
 using namespace corpc;
 
 void MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
-    msg->serial = ++_lastSendSerial;
+    msg->serial = ++lastSendSerial_;
 
-    if (_needBuf) {
+    if (needBuf_) {
         BufMessageLink::Node *node = new BufMessageLink::Node();
         node->data = msg;
 
-        _bufMsglink.push_back(node);
-        _bufMsgMap.insert(std::make_pair(msg->serial, node));
+        bufMsglink_.push_back(node);
+        bufMsgMap_.insert(std::make_pair(msg->serial, node));
     }
 }
 
 void MessageBuffer::traverse(MessageBuffer::MessageHandle handle) {
-    if (_needBuf) {
-        for (auto it = _bufMsglink.begin(); it != _bufMsglink.end(); ++it) {
+    if (needBuf_) {
+        for (auto it = bufMsglink_.begin(); it != bufMsglink_.end(); ++it) {
             if (!handle(it->data)) {
                 return;
             }
@@ -44,20 +44,20 @@ void MessageBuffer::traverse(MessageBuffer::MessageHandle handle) {
 }
 
 void MessageBuffer::scrapMessages(uint32_t serial) {
-    if (_needBuf) {
-        auto it = _bufMsgMap.find(serial);
-        if (it != _bufMsgMap.end()) {
+    if (needBuf_) {
+        auto it = bufMsgMap_.find(serial);
+        if (it != bufMsgMap_.end()) {
             BufMessageLink::Node *node = it->second;
 
-            for (auto it1 = _bufMsglink.begin(); it1 != _bufMsglink.end(); ++it1) {
-                _bufMsgMap.erase(it1->data->serial);
+            for (auto it1 = bufMsglink_.begin(); it1 != bufMsglink_.end(); ++it1) {
+                bufMsgMap_.erase(it1->data->serial);
 
                 if (it1->data->serial == serial) {
                     break;
                 }
             }
             
-            _bufMsglink.eraseTo(node);
+            bufMsglink_.eraseTo(node);
         }
     }
 }

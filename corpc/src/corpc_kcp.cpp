@@ -20,14 +20,14 @@
 using namespace corpc;
 
 KcpMessageServer::Connection::Connection(int fd, MessageServer* server): MessageServer::Connection(fd, server) {
-    _pkcp = ikcp_create(0x1, (void *)this);
-    ikcp_nodelay(_pkcp, 1, 20, 2, 1);
-    _pkcp->output = rawOut;
+    pkcp_ = ikcp_create(0x1, (void *)this);
+    ikcp_nodelay(pkcp_, 1, 20, 2, 1);
+    pkcp_->output = rawOut;
 }
 
 KcpMessageServer::Connection::~Connection() {
-    DEBUG_LOG("KcpMessageServer::Connection::~Connection -- fd:%d\n", _fd);
-    ikcp_release(_pkcp);
+    DEBUG_LOG("KcpMessageServer::Connection::~Connection -- fd:%d\n", fd_);
+    ikcp_release(pkcp_);
 }
 
 ssize_t KcpMessageServer::Connection::write(const void *buf, size_t nbyte) {
@@ -60,40 +60,40 @@ void KcpMessageServer::Connection::onSenderInit() {
 }
 
 void KcpMessageServer::Connection::kcpUpdate(uint32_t current) {
-    LockGuard lock(_kcpMtx);
-    ikcp_update(_pkcp, current);
+    LockGuard lock(kcpMtx_);
+    ikcp_update(pkcp_, current);
 }
 
 uint32_t KcpMessageServer::Connection::kcpCheck(uint32_t current) {
-    LockGuard lock(_kcpMtx);
-    return ikcp_check(_pkcp, current);
+    LockGuard lock(kcpMtx_);
+    return ikcp_check(pkcp_, current);
 }
 
 int KcpMessageServer::Connection::kcpInput(const char *data, long size) {
-    LockGuard lock(_kcpMtx);
-    return ikcp_input(_pkcp, data, size);
+    LockGuard lock(kcpMtx_);
+    return ikcp_input(pkcp_, data, size);
 }
 
 int KcpMessageServer::Connection::kcpSend(const char *buffer, int len) {
-    LockGuard lock(_kcpMtx);
-    return ikcp_send(_pkcp, buffer, len);
+    LockGuard lock(kcpMtx_);
+    return ikcp_send(pkcp_, buffer, len);
 }
 
 int KcpMessageServer::Connection::kcpRecv(char *buffer, int len) {
-    LockGuard lock(_kcpMtx);
-    return ikcp_recv(_pkcp, buffer, len);
+    LockGuard lock(kcpMtx_);
+    return ikcp_recv(pkcp_, buffer, len);
 }
 
 void KcpMessageServer::Connection::kcpFlush() {
-    LockGuard lock(_kcpMtx);
-    ikcp_flush(_pkcp);
+    LockGuard lock(kcpMtx_);
+    ikcp_flush(pkcp_);
 }
 
 void * KcpMessageServer::Connection::updateRoutine( void * arg ) {
     std::shared_ptr<KcpMessageServer::Connection> connection = std::static_pointer_cast<KcpMessageServer::Connection>(((KcpMessageServer::Connection*)arg)->getPtr());
 
     while (true) {
-        if (connection->_isClosing) {
+        if (connection->isClosing_) {
             break;
         }
 //DEBUG_LOG("KcpMessageServer::Connection::updateRoutine -- ikcp_update\n");
@@ -109,7 +109,7 @@ void * KcpMessageServer::Connection::updateRoutine( void * arg ) {
         }
     }
 
-    DEBUG_LOG("KcpMessageServer::Connection::updateRoutine ended, fd:%d\n", connection->_fd);
+    DEBUG_LOG("KcpMessageServer::Connection::updateRoutine ended, fd:%d\n", connection->fd_);
     return NULL;
 }
 
@@ -120,7 +120,7 @@ int KcpMessageServer::Connection::rawOut(const char *buf, int len, ikcpcb *kcp, 
     uint32_t leftNum = len;
 //DEBUG_LOG("KcpMessageServer::Connection::rawOut, len:%d\n", len);
     do {
-        ret = (int)::write(conn->_fd, buf + sentNum, leftNum);
+        ret = (int)::write(conn->fd_, buf + sentNum, leftNum);
         if (ret > 0) {
             assert(ret <= leftNum);
             sentNum += ret;
@@ -130,7 +130,7 @@ int KcpMessageServer::Connection::rawOut(const char *buf, int len, ikcpcb *kcp, 
 
     if (leftNum > 0) {
         WARN_LOG("KcpMessageServer::Connection::rawOut -- write fd %d ret %d errno %d (%s)\n",
-                   conn->_fd, ret, errno, strerror(errno));
+                   conn->fd_, ret, errno, strerror(errno));
         return -1;
     }
 
@@ -138,9 +138,9 @@ int KcpMessageServer::Connection::rawOut(const char *buf, int len, ikcpcb *kcp, 
 }
 
 KcpMessageServer::KcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
-    _acceptor = new UdpAcceptor(this, ip, port);
+    acceptor_ = new UdpAcceptor(this, ip, port);
     
-    _pipelineFactory = new KcpPipelineFactory(_worker, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+    pipelineFactory_ = new KcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
 }
 
 corpc::Connection *KcpMessageServer::buildConnection(int fd) {
@@ -148,12 +148,12 @@ corpc::Connection *KcpMessageServer::buildConnection(int fd) {
 }
 
 
-KcpPipeline::KcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), _data(CORPC_MAX_KCP_PACKAGE_SIZE,0), _bodySizeOffset(bodySizeOffset), _bodySizeType(bodySizeType), _headNum(0), _bodyNum(0) {
-    _dataBuf = (uint8_t *)_data.data();
+KcpPipeline::KcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType): corpc::MessagePipeline(connection, worker, decodeFun, encodeFun, headSize, maxBodySize), data_(CORPC_MAX_KCP_PACKAGE_SIZE,0), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType), headNum_(0), bodyNum_(0) {
+    dataBuf_ = (uint8_t *)data_.data();
 }
 
 bool KcpPipeline::upflow(uint8_t *buf, int size) {
-    std::shared_ptr<corpc::Connection> connection = _connection.lock();
+    std::shared_ptr<corpc::Connection> connection = connection_.lock();
     std::shared_ptr<KcpMessageServer::Connection> kcpCon = std::static_pointer_cast<KcpMessageServer::Connection>(connection);
     assert(kcpCon);
     
@@ -167,7 +167,7 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
     while (true)
     {
         //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-        ret = kcpCon->kcpRecv((char*)_dataBuf, CORPC_MAX_KCP_PACKAGE_SIZE);
+        ret = kcpCon->kcpRecv((char*)dataBuf_, CORPC_MAX_KCP_PACKAGE_SIZE);
         if (ret < 0) {
             break;
         }
@@ -177,33 +177,33 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
         int offset = 0;
         while (dataSize > offset) {
             // 先解析头部
-            if (_headNum < _headSize) {
-                int needNum = _headSize - _headNum;
+            if (headNum_ < headSize_) {
+                int needNum = headSize_ - headNum_;
                 if (dataSize - offset >= needNum) {
-                    memcpy(_headBuf + _headNum, _dataBuf + offset, needNum);
-                    _headNum = _headSize;
+                    memcpy(headBuf_ + headNum_, dataBuf_ + offset, needNum);
+                    headNum_ = headSize_;
                     
                     offset += needNum;
                 } else {
-                    memcpy(_headBuf + _headNum, _dataBuf + offset, dataSize - offset);
-                    _headNum += dataSize - offset;
+                    memcpy(headBuf_ + headNum_, dataBuf_ + offset, dataSize - offset);
+                    headNum_ += dataSize - offset;
                     
                     break;
                 }
             }
             
-            if (!_bodySize) {
+            if (!bodySize_) {
                 // 解析消息长度值
-                if (_bodySizeType == TWO_BYTES) {
-                    uint16_t x = *(uint16_t*)(_headBuf + _bodySizeOffset);
-                    _bodySize = be16toh(x);
+                if (bodySizeType_ == TWO_BYTES) {
+                    uint16_t x = *(uint16_t*)(headBuf_ + bodySizeOffset_);
+                    bodySize_ = be16toh(x);
                 } else {
-                    assert(_bodySizeType == FOUR_BYTES);
-                    uint32_t x = *(uint32_t*)(_headBuf + _bodySizeOffset);
-                    _bodySize = be32toh(x);
+                    assert(bodySizeType_ == FOUR_BYTES);
+                    uint32_t x = *(uint32_t*)(headBuf_ + bodySizeOffset_);
+                    bodySize_ = be32toh(x);
                 }
                 
-                if (_bodySize > _maxBodySize) { // 数据超长
+                if (bodySize_ > maxBodySize_) { // 数据超长
                     ERROR_LOG("KcpPipeline::upflow -- request too large in thread\n");
                     
                     return false;
@@ -211,35 +211,35 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
             }
             
             // 从缓存中解析数据
-            if (_bodyNum < _bodySize) {
-                int needNum = _bodySize - _bodyNum;
+            if (bodyNum_ < bodySize_) {
+                int needNum = bodySize_ - bodyNum_;
                 if (dataSize - offset >= needNum) {
-                    memcpy(_bodyBuf + _bodyNum, _dataBuf + offset, needNum);
-                    _bodyNum = _bodySize;
+                    memcpy(bodyBuf_ + bodyNum_, dataBuf_ + offset, needNum);
+                    bodyNum_ = bodySize_;
                     
                     offset += needNum;
                 } else {
-                    memcpy(_bodyBuf + _bodyNum, _dataBuf + offset, dataSize - offset);
-                    _bodyNum += dataSize - offset;
+                    memcpy(bodyBuf_ + bodyNum_, dataBuf_ + offset, dataSize - offset);
+                    bodyNum_ += dataSize - offset;
                     
                     break;
                 }
             }
             
-            void *msg = _decodeFun(connection, _headBuf, _bodyBuf, _bodySize);
+            void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
             
             if (connection->isDecodeError()) {
                 return false;
             }
             
             if (msg) {
-                _worker->addMessage(msg);
+                worker_->addMessage(msg);
             }
             
             // 处理完一个请求消息，复位状态
-            _headNum = 0;
-            _bodyNum = 0;
-            _bodySize = 0;
+            headNum_ = 0;
+            bodyNum_ = 0;
+            bodySize_ = 0;
         }
     }
 
@@ -249,6 +249,6 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
 }
 
 std::shared_ptr<corpc::Pipeline> KcpPipelineFactory::buildPipeline(std::shared_ptr<corpc::Connection> &connection) {
-    return std::shared_ptr<corpc::Pipeline>( new corpc::KcpPipeline(connection, _worker, _decodeFun, _encodeFun, _headSize, _maxBodySize, _bodySizeOffset, _bodySizeType) );
+    return std::shared_ptr<corpc::Pipeline>( new corpc::KcpPipeline(connection, worker_, decodeFun_, encodeFun_, headSize_, maxBodySize_, bodySizeOffset_, bodySizeType_) );
 }
 

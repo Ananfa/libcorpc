@@ -33,7 +33,7 @@ namespace corpc {
         
         class MultiThreadWorker: public corpc::MultiThreadWorker {
         public:
-            MultiThreadWorker(RpcServer *server, uint16_t threadNum): corpc::MultiThreadWorker(threadNum), _server(server) {}
+            MultiThreadWorker(RpcServer *server, uint16_t threadNum): corpc::MultiThreadWorker(threadNum), server_(server) {}
             virtual ~MultiThreadWorker() {}
             
         protected:
@@ -42,12 +42,12 @@ namespace corpc {
             virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
             
         private:
-            RpcServer *_server;
+            RpcServer *server_;
         };
         
         class CoroutineWorker: public corpc::CoroutineWorker {
         public:
-            CoroutineWorker(RpcServer *server): _server(server) {}
+            CoroutineWorker(RpcServer *server): server_(server) {}
             virtual ~CoroutineWorker() {}
             
         protected:
@@ -56,7 +56,7 @@ namespace corpc {
             virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
             
         private:
-            RpcServer *_server;
+            RpcServer *server_;
         };
         
         class Connection: public corpc::Connection {
@@ -66,9 +66,9 @@ namespace corpc {
             
             virtual void onClose();
             
-            RpcServer *getServer() { return _server; }
+            RpcServer *getServer() { return server_; }
         private:
-            RpcServer *_server;
+            RpcServer *server_;
         };
 
         struct WorkerTask {
@@ -103,7 +103,7 @@ namespace corpc {
         static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum);
         
     private:
-        std::map<uint32_t, ServiceData> _services;
+        std::map<uint32_t, ServiceData> services_;
     };
     
 }

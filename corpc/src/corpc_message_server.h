@@ -35,23 +35,23 @@ namespace corpc {
             
             virtual void onClose();
             
-            MessageServer *getServer() { return _server; }
-            std::shared_ptr<Crypter> &getCrypter() { return _crypter; }
-            void setCrypter(std::shared_ptr<Crypter> &crypter) { _crypter = crypter; }
-            std::shared_ptr<MessageBuffer> &getMsgBuffer() { return _msgBuffer; }
-            void setMsgBuffer(std::shared_ptr<MessageBuffer> &msgBuffer) { _msgBuffer = msgBuffer; }
-            uint64_t getCreateTime() { return _createTime; }
+            MessageServer *getServer() { return server_; }
+            std::shared_ptr<Crypter> &getCrypter() { return crypter_; }
+            void setCrypter(std::shared_ptr<Crypter> &crypter) { crypter_ = crypter; }
+            std::shared_ptr<MessageBuffer> &getMsgBuffer() { return msgBuffer_; }
+            void setMsgBuffer(std::shared_ptr<MessageBuffer> &msgBuffer) { msgBuffer_ = msgBuffer; }
+            uint64_t getCreateTime() { return createTime_; }
             void scrapMessages(uint32_t serial); // 擦除已确认消息
             
             // 注意：此send方法使用了消息缓存，非线程安全
             void send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
             void resend(); // 重发消息缓存中所有消息
         private:
-            MessageServer *_server;
-            std::shared_ptr<Crypter> _crypter;
-            std::shared_ptr<MessageBuffer> _msgBuffer; // 已发送消息缓存（用于实现断线重连机制，在worker中处理才是安全的）
-            time_t _createTime;   // 连接创建时间
-            uint32_t _recvSerial; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
+            MessageServer *server_;
+            std::shared_ptr<Crypter> crypter_;
+            std::shared_ptr<MessageBuffer> msgBuffer_; // 已发送消息缓存（用于实现断线重连机制，在worker中处理才是安全的）
+            time_t createTime_;   // 连接创建时间
+            uint32_t recvSerial_; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
         public:
             friend class MessageServer;
             friend class MessageServer::Worker;
@@ -80,7 +80,7 @@ namespace corpc {
         
         class Worker: public corpc::CoroutineWorker {
         public:
-            Worker(MessageServer *server): _server(server) {}
+            Worker(MessageServer *server): server_(server) {}
             virtual ~Worker() {}
             
         protected:
@@ -89,7 +89,7 @@ namespace corpc {
             virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
             
         private:
-            MessageServer *_server;
+            MessageServer *server_;
         };
         
     public:
@@ -101,7 +101,7 @@ namespace corpc {
                              bool needCoroutine,
                              MessageHandle handle);
 
-        void setOtherMessageHandle(OtherMessageHandle handle) { _otherMessageHandle = handle; };
+        void setOtherMessageHandle(OtherMessageHandle handle) { otherMessageHandle_ = handle; };
 
         // TODO: 改造成接收完整的封禁列表
         bool setBanMessages(std::list<int> &msgTypes);
@@ -121,12 +121,12 @@ namespace corpc {
         virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
         
     protected:
-        bool _needHB; // 是否进行心跳
-        bool _enableSendCRC; // 是否需要发包时校验CRC码
-        bool _enableRecvCRC; // 是否需要收包时校验CRC码
-        bool _enableSerial;  // 是否需要消息序号
-        std::map<int, RegisterMessageInfo> _registerMessageMap;
-        OtherMessageHandle _otherMessageHandle;  // 其他未注册消息的处理
+        bool needHB_; // 是否进行心跳
+        bool enableSendCRC_; // 是否需要发包时校验CRC码
+        bool enableRecvCRC_; // 是否需要收包时校验CRC码
+        bool enableSerial_;  // 是否需要消息序号
+        std::map<int, RegisterMessageInfo> registerMessageMap_;
+        OtherMessageHandle otherMessageHandle_;  // 其他未注册消息的处理
 
     public:
         friend class MessageServer::Connection;

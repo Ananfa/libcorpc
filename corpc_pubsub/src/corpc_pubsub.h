@@ -87,20 +87,20 @@ namespace corpc {
         static void *subscribeRoutine(void *arg);  // 订阅协程
 
     private:
-        static PubsubService* _service;
+        static PubsubService* service_;
 
-        RedisConnectPool *_redisPool;
+        RedisConnectPool *redisPool_;
 
-        PipeType _pipe; // 用于通知有新主题需要订阅
-        std::thread _t; // 任务处理线程
+        PipeType pipe_; // 用于通知有新主题需要订阅
+        std::thread t_; // 任务处理线程
 
-        redisContext *_subCon; // 订阅连接
+        redisContext *subCon_; // 订阅连接
 
         // 订阅登记队列（registerRoutine处理此队列）
-        TopicRegisterMessageQueue _queue;
+        TopicRegisterMessageQueue queue_;
 
         // 订阅回调关系表（登记主题与订阅回调环境的关系）
-        std::map<std::string, std::list<SubscribeEnv*>> _topicToEnvsMap;
+        std::map<std::string, std::list<SubscribeEnv*>> topicToEnvsMap_;
 
     public:
         friend class SubscribeEnv;
@@ -123,9 +123,9 @@ namespace corpc {
         void addSubscribeCallback(const std::string& topic, bool needCoroutine, SubcribeCallback callback);
 
     private:
-        std::map<std::string, std::list<SubscribeCallbackInfo>> _topicCallbackMap; // 主题回调函数表
+        std::map<std::string, std::list<SubscribeCallbackInfo>> topicCallbackMap_; // 主题回调函数表
 
-        TopicMessageQueue _queue; // 主题消息接收队列
+        TopicMessageQueue queue_; // 主题消息接收队列
 
     public:
         friend class PubsubService;

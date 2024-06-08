@@ -21,7 +21,7 @@ using namespace corpc;
 
 void Mutex::lock() {
     int32_t v = 0;
-    if (_state.compare_exchange_weak(v, MUTEXLOCKED)) {
+    if (state_.compare_exchange_weak(v, MUTEXLOCKED)) {
         return;
     }
 
@@ -37,7 +37,7 @@ void Mutex::lockSlow() {
     bool awoke = false;
     int iter = 0;
 
-    int32_t oldV = _state.load();
+    int32_t oldV = state_.load();
     while (true) {
         // Don't spin in starvation mode, ownership is handed off to waiters
         // so we won't be able to acquire the mutex anyway.
@@ -46,7 +46,7 @@ void Mutex::lockSlow() {
             // Try to set mutexWoken flag to inform Unlock
             // to not wake other blocked goroutines.
             if (!awoke && (oldV & MUTEXWOKEN == 0) && (oldV >> MUTEXWAITERSHIFT != 0) &&
-                _state.compare_exchange_weak(oldV, oldV | MUTEXWOKEN)) {
+                state_.compare_exchange_weak(oldV, oldV | MUTEXWOKEN)) {
                 awoke = true;
             }
 
@@ -56,16 +56,16 @@ void Mutex::lockSlow() {
             }
 
             iter++;
-            oldV = _state.load();
+            oldV = state_.load();
             continue;
         }
 
         // 判断当前是否有长时间等待的MUTEXWOKEN协程，防止同线程的协程得不到运行
         if (!awoke && (oldV & MUTEXWOKEN) != 0) {
-            if (_lastco == coSelf) {
+            if (lastco_ == coSelf) {
                 gettimeofday(&t, NULL);
                 int64_t curTime = t.tv_sec * 1000000 + t.tv_usec;
-                if ((curTime - _beginTm) > 1000) {
+                if ((curTime - beginTm_) > 1000) {
                     RoutineEnvironment::pause();
                     continue;
                 }
@@ -96,17 +96,17 @@ void Mutex::lockSlow() {
             }
             newV &= ~MUTEXWOKEN;
         }
-        if (_state.compare_exchange_weak(oldV, newV)) {
+        if (state_.compare_exchange_weak(oldV, newV)) {
             if ((oldV & (MUTEXLOCKED | MUTEXSTARVING)) == 0) {
-                if (_lastco == nullptr) {
+                if (lastco_ == nullptr) {
                     if ((oldV & MUTEXWOKEN) != 0) {
-                        _lastco = coSelf;
+                        lastco_ = coSelf;
                         gettimeofday(&t, NULL);
-                        _beginTm = t.tv_sec * 1000000 + t.tv_usec;
+                        beginTm_ = t.tv_sec * 1000000 + t.tv_usec;
                     }
-                } else if (_lastco != coSelf) {
-                    _lastco = nullptr;
-                    _beginTm = 0;
+                } else if (lastco_ != coSelf) {
+                    lastco_ = nullptr;
+                    beginTm_ = 0;
                 }
 
                 break; // locked the mutex with CAS
@@ -126,7 +126,7 @@ void Mutex::lockSlow() {
                 starving = (curTime - waitStartTime) > 1000;
             }
             
-            oldV = _state.load();
+            oldV = state_.load();
 
             if ((oldV & MUTEXSTARVING) != 0) {
                 // If this goroutine was woken and mutex is in starvation mode,
@@ -148,11 +148,11 @@ void Mutex::lockSlow() {
                     delta -= MUTEXSTARVING;
                 }
 
-                _state.fetch_add(delta);
+                state_.fetch_add(delta);
                 
-                if (_lastco != nullptr) {
-                    _lastco = nullptr;
-                    _beginTm = 0;
+                if (lastco_ != nullptr) {
+                    lastco_ = nullptr;
+                    beginTm_ = 0;
                 }
 
                 break;
@@ -160,14 +160,14 @@ void Mutex::lockSlow() {
             awoke = true;
             iter = 0;
         } else {
-            oldV = _state.load();
+            oldV = state_.load();
         }
     }
 }
 
 void Mutex::unlock() {
     // Fast path: drop lock bit.
-    int32_t newV = _state.fetch_add(-MUTEXLOCKED) - MUTEXLOCKED;
+    int32_t newV = state_.fetch_add(-MUTEXLOCKED) - MUTEXLOCKED;
     if (newV != 0) {
         // Outlined slow path to allow inlining the fast path.
         // To hide unlockSlow during tracing we skip one extra frame when tracing GoUnblock.
@@ -196,12 +196,12 @@ void Mutex::unlockSlow(int32_t newV) {
             // Grab the right to wake someone.
             newV = (oldV - (1<<MUTEXWAITERSHIFT)) | MUTEXWOKEN;
 
-            if (_state.compare_exchange_weak(oldV, newV)) {
+            if (state_.compare_exchange_weak(oldV, newV)) {
                 post();
                 return;
             }
 
-            oldV = _state.load();
+            oldV = state_.load();
         }
     } else {
         // Starving mode: handoff mutex ownership to the next waiter, and yield
@@ -220,21 +220,21 @@ void Mutex::wait(bool queueLifo) {
     bool v = false;
     while (true) {
         v = false;
-        if (_waitlock.compare_exchange_weak(v, true)) {
-            if (_dontWait) {
+        if (waitlock_.compare_exchange_weak(v, true)) {
+            if (dontWait_) {
 //                ERROR_LOG("Mutex::wait -- dont wait pid:%d co:%d\n", pid, coSelf);
-                _dontWait = false;
-                _waitlock.store(false);
+                dontWait_ = false;
+                waitlock_.store(false);
                 return;
             }
 
             if (queueLifo) {
-                _waitRoutines.push_front({pid, coSelf});
+                waitRoutines_.push_front({pid, coSelf});
             } else {
-                _waitRoutines.push_back({pid, coSelf});
+                waitRoutines_.push_back({pid, coSelf});
             }
             
-            _waitlock.store(false);
+            waitlock_.store(false);
 
             co_yield_ct(); // 等待锁让出给当前协程时唤醒
             return;
@@ -250,17 +250,17 @@ void Mutex::wait(bool queueLifo) {
 void Mutex::post() {
     while (true) {
         bool v = false;
-        if (_waitlock.compare_exchange_weak(v, true)) {
-            if (_waitRoutines.empty()) {
-                _dontWait = true;
-                _waitlock.store(false);
+        if (waitlock_.compare_exchange_weak(v, true)) {
+            if (waitRoutines_.empty()) {
+                dontWait_ = true;
+                waitlock_.store(false);
                 return;
             }
 
-            RoutineInfo info = _waitRoutines.front();
-            _waitRoutines.pop_front();
+            RoutineInfo info = waitRoutines_.front();
+            waitRoutines_.pop_front();
 
-            _waitlock.store(false);
+            waitlock_.store(false);
 
             RoutineEnvironment::resumeCoroutine(info.pid, info.co, 0);
             return;
