@@ -100,6 +100,7 @@ bool TcpClient::start() {
     
     if (connect(s_, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         ERROR_LOG("can't connect\n");
+        ::close(s_);
         return false;
     }
     
