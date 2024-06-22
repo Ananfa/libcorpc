@@ -140,7 +140,7 @@ int KcpMessageServer::Connection::rawOut(const char *buf, int len, ikcpcb *kcp, 
 KcpMessageServer::KcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new UdpAcceptor(this, ip, port);
     
-    pipelineFactory_ = new KcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+    pipelineFactory_.reset(new KcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
 }
 
 corpc::Connection *KcpMessageServer::buildConnection(int fd) {

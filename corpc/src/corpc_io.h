@@ -269,7 +269,9 @@ namespace corpc {
         bool decodeError_; // 是否数据解码出错
         std::atomic<bool> closed_; // 是否已关闭
         std::atomic<bool> isClosing_; // 是否正在关闭
-        std::atomic<bool> canClose_; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
+
+        Semaphore closeSem_; // 关闭同步用信号量（注意：应该用条件变量更合适）
+        //std::atomic<bool> canClose_; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）
         
     public:
         friend class Receiver;
@@ -299,7 +301,8 @@ namespace corpc {
         Acceptor *acceptor_;
         Worker *worker_;
         
-        PipelineFactory *pipelineFactory_;
+        //PipelineFactory *pipelineFactory_;
+        std::unique_ptr<PipelineFactory> pipelineFactory_;
     };
     
     class Acceptor {

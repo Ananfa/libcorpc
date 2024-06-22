@@ -258,7 +258,7 @@ std::shared_ptr<corpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_p
     return std::shared_ptr<corpc::Pipeline>( new corpc::UdpPipeline(connection, worker_, decodeFun_, encodeFun_, headSize_, maxBodySize_) );
 }
 
-Connection::Connection(int fd, IO* io, bool needHB): fd_(fd), io_(io), needHB_(needHB), routineHang_(false), routine_(NULL), sendThreadIndex_(-1), recvThreadIndex_(-1), decodeError_(false), closed_(false), isClosing_(false), canClose_(false), lastRecvHBTime_(0) {
+Connection::Connection(int fd, IO* io, bool needHB): fd_(fd), io_(io), needHB_(needHB), routineHang_(false), routine_(NULL), sendThreadIndex_(-1), recvThreadIndex_(-1), decodeError_(false), closed_(false), isClosing_(false), closeSem_(0), lastRecvHBTime_(0) {
 }
 
 Connection::~Connection() {
@@ -747,10 +747,11 @@ DEBUG_LOG("Receiver::connectionRoutine -- 1\n");
     
 DEBUG_LOG("Receiver::connectionRoutine -- 2\n");
     // 等待写关闭
-    while (!connection->canClose_) {
-        // sleep 100 milisecond
-        msleep(100);
-    }
+    connection->closeSem_.wait();
+    //while (!connection->canClose_) {
+    //    // sleep 100 milisecond
+    //    msleep(100);
+    //}
     
 DEBUG_LOG("Receiver::connectionRoutine -- 3\n");
     close(fd);
@@ -962,7 +963,8 @@ void *Sender::connectionRoutine( void * arg ) {
     
     connection->isClosing_ = true;
     shutdown(connection->fd_, SHUT_RD);
-    connection->canClose_ = true;
+    connection->closeSem_.post();
+    //connection->canClose_ = true;
     
     DEBUG_LOG("Sender::connectionRoutine -- routine end for fd %d\n", connection->fd_);
     

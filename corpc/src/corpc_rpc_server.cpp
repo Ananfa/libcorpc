@@ -137,7 +137,7 @@ RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint
         worker_ = new CoroutineWorker(this);
     }
     
-    pipelineFactory_ = new TcpPipelineFactory(worker_, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+    pipelineFactory_.reset(new TcpPipelineFactory(worker_, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
 }
 
 RpcServer::~RpcServer() {}

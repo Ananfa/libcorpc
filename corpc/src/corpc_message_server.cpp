@@ -491,11 +491,11 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
 TcpMessageServer::TcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new TcpAcceptor(this, ip, port);
     
-    pipelineFactory_ = new TcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES);
+    pipelineFactory_.reset(new TcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
 }
 
 UdpMessageServer::UdpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new UdpAcceptor(this, ip, port);
     
-    pipelineFactory_ = new UdpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE);
+    pipelineFactory_.reset(new UdpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE));
 }

@@ -36,7 +36,20 @@ namespace corpc {
         
     public:
         MPSC_NoLockQueue():head_(NULL), outqueue_(NULL) {}
-        ~MPSC_NoLockQueue() {}
+        ~MPSC_NoLockQueue() {
+            while (outqueue_) {
+                Node *tnode = outqueue_;
+                outqueue_ = outqueue_->next;
+                delete tnode;
+            }
+
+            outqueue_ = head_;
+            while (outqueue_) {
+                Node *tnode = outqueue_;
+                outqueue_ = outqueue_->next;
+                delete tnode;
+            }
+        }
         
         void push(T& v) {
             Node *newNode = new Node;

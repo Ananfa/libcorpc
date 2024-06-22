@@ -38,6 +38,12 @@ namespace corpc {
     private:
         std::atomic<int> res_;
         std::list<RoutineInfo> waitRoutines_;
+
+    private:
+        Semaphore(Semaphore const&) = delete;                    // copy ctor delete
+        Semaphore(Semaphore &&) = delete;                        // move ctor delete
+        Semaphore& operator=(Semaphore const&) = delete;         // assign op. delete
+        Semaphore& operator=(Semaphore &&) = delete;             // move assign op. delete
     };
 
 }
