@@ -774,7 +774,7 @@ void MultiThreadReceiver::threadEntry(ThreadData *tdata) {
 bool MultiThreadReceiver::start() {
     // 启动线程
     for (auto& td : threadDatas_) {
-        td.queueContext_.receiver_ = this;
+        //td.queueContext_.receiver_ = this;
         td.t_ = std::thread(threadEntry, &td);
     }
     
@@ -974,7 +974,7 @@ void *Sender::connectionRoutine( void * arg ) {
 bool MultiThreadSender::start() {
     // 启动线程
     for (auto& td : threadDatas_) {
-        td.queueContext_.sender_ = this;
+        //td.queueContext_.sender_ = this;
         td.t_ = std::thread(threadEntry, &td);
     }
     

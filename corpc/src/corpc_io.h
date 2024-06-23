@@ -415,7 +415,7 @@ namespace corpc {
     class Receiver {
     protected:
         struct QueueContext {
-            Receiver *receiver_;
+            //Receiver *receiver_;
             
             // 消息队列
             ReceiverTaskQueue queue_;
@@ -466,7 +466,7 @@ namespace corpc {
     
     class CoroutineReceiver: public Receiver {
     public:
-        CoroutineReceiver(IO *io): Receiver(io) { queueContext_.receiver_ = this; }
+        CoroutineReceiver(IO *io): Receiver(io) { /*queueContext_.receiver_ = this;*/ }
         virtual ~CoroutineReceiver() {}
         
         virtual bool start();
@@ -481,7 +481,7 @@ namespace corpc {
     class Sender {
     protected:
         struct QueueContext {
-            Sender *sender_;
+            //Sender *sender_;
             
             // 消息队列
             SenderTaskQueue queue_;
@@ -533,7 +533,7 @@ namespace corpc {
     
     class CoroutineSender: public Sender {
     public:
-        CoroutineSender(IO *io): Sender(io) { queueContext_.sender_ = this; }
+        CoroutineSender(IO *io): Sender(io) { /*queueContext_.sender_ = this;*/ }
         virtual ~CoroutineSender() {}
         
         virtual bool start();
