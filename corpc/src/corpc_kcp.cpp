@@ -137,9 +137,9 @@ int KcpMessageServer::Connection::rawOut(const char *buf, int len, ikcpcb *kcp, 
     return sentNum;
 }
 
-KcpMessageServer::KcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
+KcpMessageServer::KcpMessageServer(corpc::IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, worker, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new UdpAcceptor(this, ip, port);
-    
+
     pipelineFactory_.reset(new KcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
 }
 
@@ -226,14 +226,14 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
                 }
             }
             
-            void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
+            WorkerTask *task = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
             
             if (connection->isDecodeError()) {
                 return false;
             }
             
-            if (msg) {
-                worker_->addMessage(msg);
+            if (task) {
+                worker_->addTask(task);
             }
             
             // 处理完一个请求消息，复位状态

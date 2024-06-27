@@ -33,7 +33,7 @@
 
 using namespace corpc;
 
-void * RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+WorkerTask* RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
     std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
     
     uint32_t respSize = *(uint32_t *)head;

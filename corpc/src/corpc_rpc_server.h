@@ -30,7 +30,7 @@
 namespace corpc {
 
     class RpcServer: public corpc::Server {
-        
+        /*
         class MultiThreadWorker: public corpc::MultiThreadWorker {
         public:
             MultiThreadWorker(RpcServer *server, uint16_t threadNum): corpc::MultiThreadWorker(threadNum), server_(server) {}
@@ -39,7 +39,7 @@ namespace corpc {
         protected:
             static void *taskCallRoutine( void * arg );
             
-            virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
+            virtual void handleTask(WorkerTask *task); // 注意：处理完消息需要自己删除task
             
         private:
             RpcServer *server_;
@@ -53,11 +53,12 @@ namespace corpc {
         protected:
             static void *taskCallRoutine( void * arg );
             
-            virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
+            virtual void handleTask(WorkerTask *task); // 注意：处理完消息需要自己删除task
             
         private:
             RpcServer *server_;
         };
+        */
         
         class Connection: public corpc::Connection {
         public:
@@ -71,13 +72,35 @@ namespace corpc {
             RpcServer *server_;
         };
 
-        struct WorkerTask {
+        class RpcWorkerTask: public corpc::WorkerTask {
+        protected:
+            RpcWorkerTask() {}
+            virtual ~RpcWorkerTask() {}
+
+        public:
+            static RpcWorkerTask* create() {
+                return new RpcWorkerTask();
+            }
+
+            void destory() {
+                delete this;
+            }
+
+            static void *taskCallRoutine( void * arg );
+
+            virtual void doTask();
+        public:
             std::shared_ptr<corpc::Connection> connection;
             std::shared_ptr<RpcServerTask> rpcTask;
         };
+
+        //struct WorkerTask {
+        //    std::shared_ptr<corpc::Connection> connection;
+        //    std::shared_ptr<RpcServerTask> rpcTask;
+        //};
         
     public:
-        static RpcServer* create(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        static RpcServer* create(IO *io, Worker *worker, const std::string& ip, uint16_t port);
         
         bool registerService(::google::protobuf::Service *rpcService);
         
@@ -95,10 +118,10 @@ namespace corpc {
         virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
         
     private:
-        RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port);
+        RpcServer(IO *io, Worker *worker, const std::string& ip, uint16_t port);
         virtual ~RpcServer();  // 不允许在栈上创建server
         
-        static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        static WorkerTask* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         
         static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum);
         

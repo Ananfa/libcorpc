@@ -55,7 +55,7 @@ namespace corpc {
         };
 
     public:
-        KcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
+        KcpMessageServer(corpc::IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
         virtual ~KcpMessageServer() {}
 
     protected:

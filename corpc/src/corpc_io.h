@@ -34,6 +34,7 @@ namespace corpc {
     class Connection;
     class Pipeline;
     class Heartbeater;
+    class WorkerTask;
     
     // 接收数据和发送数据的pipeline流水线处理，流水线中的处理单元是有状态的，难点：1.流水线中的处理单元的处理数据类型 2.会增加内存分配和数据拷贝影响效率
     // 上流流水线处理流程：
@@ -43,11 +44,19 @@ namespace corpc {
     // 下流流水线处理流程：
     //   1.编码器链：根据数据类型进行编码，从链头编码器开始，如果当前编码器认识要处理的数据类型则编码并返回，否则交由链中下一个编码器处理，直到有编码器可处理数据为止，若无编码器可处理数据，则报错
     
-    typedef std::function<void* (std::shared_ptr<Connection>&, uint8_t*, uint8_t*, int)> DecodeFunction;
+    typedef std::function<WorkerTask* (std::shared_ptr<Connection>&, uint8_t*, uint8_t*, int)> DecodeFunction;
     typedef std::function<bool (std::shared_ptr<Connection>&, std::shared_ptr<void>&, uint8_t*, int, int&, std::string&, uint32_t&)> EncodeFunction;
     
-    typedef MPMC_NoLockBlockQueue<void*> WorkerMessageQueue;
+    typedef MPMC_NoLockBlockQueue<WorkerTask*> WorkerMessageQueue;
     
+    class WorkerTask {
+    public:
+        WorkerTask() {}
+        virtual ~WorkerTask() = 0;
+
+        virtual void doTask() = 0; // 注意：处理完消息需要自己删除自己
+    };
+
     class Worker {
     public:
         Worker() {}
@@ -55,12 +64,12 @@ namespace corpc {
         
         virtual void start() = 0;
         
-        void addMessage(void *msg);
+        void addTask(WorkerTask *task);
         
     protected:
-        static void *msgHandleRoutine(void * arg);
+        static void *taskHandleRoutine(void * arg);
         
-        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
 
     protected:
         WorkerMessageQueue queue_;
@@ -69,14 +78,14 @@ namespace corpc {
     class MultiThreadWorker: public Worker {
     public:
         MultiThreadWorker(uint16_t threadNum): threadNum_(threadNum), ts_(threadNum) {}
-        virtual ~MultiThreadWorker() = 0;
+        virtual ~MultiThreadWorker() {}
         
         virtual void start();
         
     protected:
         static void threadEntry( Worker *self );
         
-        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
         
     private:
         uint16_t threadNum_;
@@ -86,12 +95,12 @@ namespace corpc {
     class CoroutineWorker: public Worker {
     public:
         CoroutineWorker() {}
-        virtual ~CoroutineWorker() = 0;
+        virtual ~CoroutineWorker() {}
         
         virtual void start();
         
-    protected:
-        virtual void handleMessage(void *msg) = 0; // 注意：处理完消息需要自己删除msg
+    //protected:
+        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
     };
     
     class Pipeline {
@@ -581,9 +590,14 @@ namespace corpc {
         
     };
     
+    // 注意：
+    // 1. IO对象不支持释放销毁，因为线程的协程运行环境不支持销毁（即带协程环境的线程启动后就一直运行）
+    //    由于receiver、sender和worker都是可自带线程的，因此也不能销毁
+    // 2. 当threadNum为0时表示在当前线程中启动处理协程
+    // 3. sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误
     class IO {
     public:
-        static IO* create(uint16_t receiveThreadNum, uint16_t sendThreadNum);
+        static IO* create(uint16_t receiveThreadNum, uint16_t sendThreadNum, uint16_t workThreadNum);
         
         bool start();
         
@@ -591,21 +605,23 @@ namespace corpc {
         
         Receiver *getReceiver() { return receiver_; }
         Sender *getSender() { return sender_; }
+        Worker *getWorker() { return worker_; }
         
         void addConnection(std::shared_ptr<Connection>& connection);
         void removeConnection(std::shared_ptr<Connection>& connection);
         
     private:
-        // 注意：sendThreadNum和receiveThreadNum不能同为0，因为同一线程中一个fd不能同时在两个协程中进行处理，会触发EEXIST错误
-        IO(uint16_t receiveThreadNum, uint16_t sendThreadNum);
+        IO(uint16_t receiveThreadNum, uint16_t sendThreadNum, uint16_t workThreadNum);
         ~IO() {}  // 不允许在栈上创建IO
         
     private:
         uint16_t receiveThreadNum_;
         uint16_t sendThreadNum_;
+        uint16_t workThreadNum_;
         
         Receiver *receiver_;
         Sender *sender_;
+        Worker *worker_;
         
     public:
         friend class Connection;

@@ -26,33 +26,38 @@
 // TODO: 使用统一的Log接口记录Log
 using namespace corpc;
 
+WorkerTask::~WorkerTask() {
+    
+}
+
 Worker::~Worker() {
     
 }
 
-void Worker::addMessage(void *msg) {
-    queue_.push(msg);
+void Worker::addTask(WorkerTask *task) {
+    queue_.push(task);
 }
 
-void *Worker::msgHandleRoutine( void * arg ) {
+void *Worker::taskHandleRoutine( void * arg ) {
     Worker *self = (Worker *)arg;
     WorkerMessageQueue& queue = self->queue_;
 
     while (true) {
         // 处理任务队列
-        void *msg = queue.pop();
+        WorkerTask *task = queue.pop();
 
-        self->handleMessage(msg);
+        //self->handleTask(task);
+        task->doTask();
         
         RoutineEnvironment::pauseIfRuntimeBusy();
     }
 }
 
-MultiThreadWorker::~MultiThreadWorker() {}
+//MultiThreadWorker::~MultiThreadWorker() {}
 
 void MultiThreadWorker::threadEntry( Worker *self ) {
     // 启动rpc任务处理协程
-    RoutineEnvironment::startCoroutine(msgHandleRoutine, self);
+    RoutineEnvironment::startCoroutine(taskHandleRoutine, self);
     
     RoutineEnvironment::runEventLoop();
 }
@@ -64,11 +69,11 @@ void MultiThreadWorker::start() {
     }
 }
 
-CoroutineWorker::~CoroutineWorker() {}
+//CoroutineWorker::~CoroutineWorker() {}
 
 void CoroutineWorker::start() {
     // 启动rpc任务处理协程
-    RoutineEnvironment::startCoroutine(msgHandleRoutine, this);
+    RoutineEnvironment::startCoroutine(taskHandleRoutine, this);
 }
 
 Pipeline::Pipeline(std::shared_ptr<Connection> &connection, Worker *worker): connection_(connection), worker_(worker) {
@@ -192,14 +197,14 @@ bool TcpPipeline::upflow(uint8_t *buf, int size) {
             }
         }
         
-        void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
+        WorkerTask *task = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
         
         if (connection->isDecodeError()) {
             return false;
         }
         
-        if (msg) {
-            worker_->addMessage(msg);
+        if (task) {
+            worker_->addTask(task);
         }
         
         // 处理完一个请求消息，复位状态
@@ -233,14 +238,14 @@ bool UdpPipeline::upflow(uint8_t *buf, int size) {
         memcpy(bodyBuf_, buf + headSize_, bodySize_);
     }
     
-    void *msg = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
+    WorkerTask *task = decodeFun_(connection, headBuf_, bodyBuf_, bodySize_);
     
     if (connection->isDecodeError()) {
         return false;
     }
     
-    if (msg) {
-        worker_->addMessage(msg);
+    if (task) {
+        worker_->addTask(task);
     }
     
     return true;
@@ -1198,16 +1203,16 @@ void Heartbeater::removeConnection(std::shared_ptr<Connection>& connection) {
     queue_.push(task);
 }
 
-IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum): receiveThreadNum_(receiveThreadNum), sendThreadNum_(sendThreadNum) {
+IO::IO(uint16_t receiveThreadNum, uint16_t sendThreadNum, uint16_t workThreadNum): receiveThreadNum_(receiveThreadNum), sendThreadNum_(sendThreadNum), workThreadNum_(workThreadNum) {
 }
 
-IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum) {
+IO* IO::create(uint16_t receiveThreadNum, uint16_t sendThreadNum, uint16_t workThreadNum) {
     if (receiveThreadNum == 0 && sendThreadNum == 0) {
         ERROR_LOG("IO::create() -- sender and receiver can't run at same thread.\n");
         return nullptr;
     }
     
-    IO *io = new IO(receiveThreadNum, sendThreadNum);
+    IO *io = new IO(receiveThreadNum, sendThreadNum, workThreadNum);
     io->start();
     
     return io;
@@ -1219,18 +1224,22 @@ bool IO::start() {
         return false;
     }
     
-    // 根据需要启动receiver线程或协程
     if (receiveThreadNum_ > 0) {
         receiver_ = new MultiThreadReceiver(this, receiveThreadNum_);
     } else {
         receiver_ = new CoroutineReceiver(this);
     }
     
-    // 根据需要启动sender线程或协程
     if (sendThreadNum_ > 0) {
         sender_ = new MultiThreadSender(this, sendThreadNum_);
     } else {
         sender_ = new CoroutineSender(this);
+    }
+
+    if (workThreadNum_ > 0) {
+        worker_ = new MultiThreadWorker(workThreadNum_);
+    } else {
+        worker_ = new CoroutineWorker();
     }
     
     if (!receiver_->start()) {
@@ -1242,6 +1251,8 @@ bool IO::start() {
         ERROR_LOG("IO::start() -- start sender failed.\n");
         return false;
     }
+
+    worker_->start();
     
     return true;
 }

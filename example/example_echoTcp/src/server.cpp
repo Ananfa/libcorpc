@@ -115,9 +115,9 @@ int main(int argc, const char * argv[]) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
 
     // 注册服务
-    corpc::IO *io = corpc::IO::create(1, 1);
+    corpc::IO *io = corpc::IO::create(1, 1, 0);
     
-    corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, true, true, true, true, ip, port);
+    corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, nullptr, true, true, true, true, ip, port);
     server->start();
     
     server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {

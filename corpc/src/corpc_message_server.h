@@ -26,7 +26,7 @@
 
 namespace corpc {
     class MessageServer: public corpc::Server {
-        class Worker;
+        class MessageWorkerTask;
     public:
         class Connection: public corpc::Connection {
         public:
@@ -54,7 +54,7 @@ namespace corpc {
             uint32_t recvSerial_; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
         public:
             friend class MessageServer;
-            friend class MessageServer::Worker;
+            friend class MessageServer::MessageWorkerTask;
         };
         
     private:
@@ -68,7 +68,25 @@ namespace corpc {
             bool banned; // 屏蔽
         };
         
-        struct WorkerTask {
+        class MessageWorkerTask: public corpc::WorkerTask {
+        protected:
+            MessageWorkerTask() {}
+            virtual ~MessageWorkerTask() {}
+
+        public:
+            static MessageWorkerTask* create() {
+                return new MessageWorkerTask();
+            }
+
+            void destory() {
+                delete this;
+            }
+
+            static void *taskCallRoutine( void * arg );
+
+            virtual void doTask();
+            
+        public:
             int16_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
             uint16_t tag; // 客户端向服务器发带tag消息，服务器对这消息应答消息也需带相同的tag（客户端会等待tag消息返回）
             uint32_t reqSerial; // 连接对方收到的最后消息序号
@@ -76,8 +94,8 @@ namespace corpc {
             std::shared_ptr<Connection> connection;  // 消息来源的连接，注意：当type为-1时表示新建立连接，当type为-2时表示断开的连接
             std::shared_ptr<void> msg; // 接收到的消息，注意：当type为-1或-2时，msg中无数据
         };
-        
-        
+
+        /*
         class Worker: public corpc::CoroutineWorker {
         public:
             Worker(MessageServer *server): server_(server) {}
@@ -86,14 +104,15 @@ namespace corpc {
         protected:
             static void *taskCallRoutine( void * arg );
             
-            virtual void handleMessage(void *msg); // 注意：处理完消息需要自己删除msg
+            virtual void handleTask(WorkerTask *task); // 注意：处理完消息需要自己删除task
             
         private:
             MessageServer *server_;
         };
-        
+        */
+
     public:
-        MessageServer(IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial);
+        MessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial);
         virtual ~MessageServer() = 0;
         
         bool registerMessage(int type,
@@ -108,7 +127,7 @@ namespace corpc {
         //bool banMessage(int type);
         //bool unbanMessage(int type);
         
-        static void* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
+        static WorkerTask* decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size);
         
         static bool encode(std::shared_ptr<corpc::Connection> &connection, std::shared_ptr<void>& data, uint8_t *buf, int space, int &size, std::string &downflowBuf, uint32_t &downflowBufSentNum);
         
@@ -134,13 +153,13 @@ namespace corpc {
     
     class TcpMessageServer: public MessageServer {
     public:
-        TcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
+        TcpMessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
         virtual ~TcpMessageServer() {}
     };
     
     class UdpMessageServer: public MessageServer {
     public:
-        UdpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
+        UdpMessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port);
         virtual ~UdpMessageServer() {}
     };
 }

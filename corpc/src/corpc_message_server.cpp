@@ -46,7 +46,7 @@ void MessageServer::Connection::send(int16_t type, bool isRaw, bool needCrypt, b
         return;
     }
 
-    std::shared_ptr<corpc::SendMessageInfo> sendInfo(new corpc::SendMessageInfo);
+    std::shared_ptr<SendMessageInfo> sendInfo(new SendMessageInfo);
     sendInfo->type = type;
     sendInfo->isRaw = isRaw;
     sendInfo->needCrypt = needCrypt;
@@ -79,8 +79,9 @@ void MessageServer::Connection::resend() {
     }
 }
 
+/*
 void * MessageServer::Worker::taskCallRoutine( void * arg ) {
-    WorkerTask *task = (WorkerTask *)arg;
+    MessageWorkerTask *task = (MessageWorkerTask *)arg;
     
     MessageServer *server = static_cast<MessageServer *>(task->connection->getServer());
     
@@ -94,9 +95,9 @@ void * MessageServer::Worker::taskCallRoutine( void * arg ) {
     return NULL;
 }
 
-void MessageServer::Worker::handleMessage(void *msg) {
+void MessageServer::Worker::handleTask(WorkerTask *wt) {
     // 注意：处理完消息需要自己删除msg
-    WorkerTask *task = (WorkerTask *)msg;
+    MessageWorkerTask *task = (MessageWorkerTask *)wt;
 
     switch (task->type) {
         case CORPC_MSG_TYPE_CONNECT: // 新连接建立
@@ -146,9 +147,80 @@ void MessageServer::Worker::handleMessage(void *msg) {
         delete task;
     }
 }
+*/
 
-MessageServer::MessageServer(IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial): corpc::Server(io), needHB_(needHB), enableSendCRC_(enableSendCRC), enableRecvCRC_(enableRecvCRC), enableSerial_(enableSerial) {
-    worker_ = new Worker(this);
+void * MessageServer::MessageWorkerTask::taskCallRoutine( void * arg ) {
+    MessageWorkerTask *task = (MessageWorkerTask *)arg;
+    
+    MessageServer *server = static_cast<MessageServer *>(task->connection->getServer());
+    
+    auto iter = server->registerMessageMap_.find(task->type);
+    
+    std::shared_ptr<google::protobuf::Message> msg = std::static_pointer_cast<google::protobuf::Message>(task->msg);
+    iter->second.handle(task->type, task->tag, msg, task->connection);
+    
+    task->destory();
+    
+    return NULL;
+}
+
+void MessageServer::MessageWorkerTask::doTask() {
+    // 注意：处理完消息需要自己删除msg
+    switch (type) {
+        case CORPC_MSG_TYPE_CONNECT: // 新连接建立
+            DEBUG_LOG("MessageServer::Worker::handleMessage -- fd %d connect\n", connection->getfd());
+            // TODO:
+            break;
+        case CORPC_MSG_TYPE_CLOSE: // 连接断开
+            DEBUG_LOG("MessageServer::Worker::handleMessage -- fd %d close\n", connection->getfd());
+            // TODO:
+            break;
+        default:
+            if (connection->getServer()->enableSerial_) {
+                if (connection->msgBuffer_) {
+                    connection->msgBuffer_->scrapMessages(reqSerial);
+                }
+            }
+
+            if (type == CORPC_MSG_TYPE_HEARTBEAT) {
+                destory();
+                return;
+            }
+    }
+
+    //DEBUG_LOG("MessageServer::Worker::handleMessage msgType:%d\n", type);
+
+    auto iter = banned?connection->getServer()->registerMessageMap_.find(CORPC_MSG_TYPE_BANNED):connection->getServer()->registerMessageMap_.find(type);
+
+    if (iter == connection->getServer()->registerMessageMap_.end()) {
+        if (!banned && connection->getServer()->otherMessageHandle_) {
+            // 其他消息处理（一般用于直接转发给其他服务器）
+            std::shared_ptr<std::string> real_msg = std::static_pointer_cast<std::string>(msg);
+            connection->getServer()->otherMessageHandle_(type, tag, real_msg, connection);
+        } else {
+            ERROR_LOG("MessageServer::Worker::handleMessage -- no handler with msg type %d\n", type);
+        }
+
+        destory();
+        return;
+    }
+
+    if (iter->second.needCoroutine) {
+        RoutineEnvironment::startCoroutine(taskCallRoutine, this);
+    } else {
+        std::shared_ptr<google::protobuf::Message> real_msg = std::static_pointer_cast<google::protobuf::Message>(msg);
+        iter->second.handle(type, tag, real_msg, connection);
+        
+        destory();
+    }
+}
+
+MessageServer::MessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial): corpc::Server(io), needHB_(needHB), enableSendCRC_(enableSendCRC), enableRecvCRC_(enableRecvCRC), enableSerial_(enableSerial) {
+    if (worker != NULL) {
+        worker_ = worker;
+    } else {
+        worker_ = io->getWorker();
+    }
 }
 
 MessageServer::~MessageServer() {}
@@ -216,24 +288,24 @@ corpc::Connection *MessageServer::buildConnection(int fd) {
 }
 
 void MessageServer::onConnect(std::shared_ptr<corpc::Connection>& connection) {
-    WorkerTask *task = new WorkerTask;
+    MessageWorkerTask *task = MessageWorkerTask::create();
     task->type = CORPC_MSG_TYPE_CONNECT;
     task->banned = false;
     task->connection = std::static_pointer_cast<Connection>(connection);
     
-    worker_->addMessage(task);
+    worker_->addTask(task);
 }
 
 void MessageServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
-    WorkerTask *task = new WorkerTask;
+    MessageWorkerTask *task = MessageWorkerTask::create();
     task->type = CORPC_MSG_TYPE_CLOSE;
     task->banned = false;
     task->connection = std::static_pointer_cast<Connection>(connection);
     
-    worker_->addMessage(task);
+    worker_->addTask(task);
 }
 
-void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+WorkerTask* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
     std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
     std::shared_ptr<Crypter> crypter = conn->getCrypter();
     MessageServer *server = conn->getServer();
@@ -258,7 +330,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
                 reqSerial = *(uint32_t *)(head + 10);
                 reqSerial = be32toh(reqSerial);
 
-                WorkerTask *task = new WorkerTask;
+                MessageWorkerTask *task = MessageWorkerTask::create();
                 task->type = msgType;
                 task->reqSerial = reqSerial;
                 task->connection = conn;
@@ -320,7 +392,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
     if (iter == server->registerMessageMap_.end()) {
         if (server->otherMessageHandle_) {
             // 旁路消息处理
-            WorkerTask *task = new WorkerTask;
+            MessageWorkerTask *task = MessageWorkerTask::create();
             task->type = msgType;
             task->tag = tag;
             task->reqSerial = reqSerial;
@@ -355,7 +427,7 @@ void* MessageServer::decode(std::shared_ptr<corpc::Connection> &connection, uint
             }
         }
 
-        WorkerTask *task = new WorkerTask;
+        MessageWorkerTask *task = MessageWorkerTask::create();
         task->type = msgType;
         task->tag = tag;
         task->reqSerial = reqSerial;
@@ -488,13 +560,13 @@ bool MessageServer::encode(std::shared_ptr<corpc::Connection> &connection, std::
     return true;
 }
 
-TcpMessageServer::TcpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
+TcpMessageServer::TcpMessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, worker, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new TcpAcceptor(this, ip, port);
     
-    pipelineFactory_.reset(new TcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
+    pipelineFactory_.reset(new TcpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, MessagePipeline::FOUR_BYTES));
 }
 
-UdpMessageServer::UdpMessageServer(corpc::IO *io, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
+UdpMessageServer::UdpMessageServer(IO *io, Worker *worker, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, const std::string& ip, uint16_t port): MessageServer(io, worker, needHB, enableSendCRC, enableRecvCRC, enableSerial) {
     acceptor_ = new UdpAcceptor(this, ip, port);
     
     pipelineFactory_.reset(new UdpPipelineFactory(worker_, decode, encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE));

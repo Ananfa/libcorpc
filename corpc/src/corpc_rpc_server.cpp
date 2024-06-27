@@ -55,8 +55,9 @@ void RpcServer::Connection::onClose() {
     server_->onClose(self);
 }
 
+/*
 void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
-    WorkerTask *task = (WorkerTask *)arg;
+    RpcWorkerTask *task = (RpcWorkerTask *)arg;
     
     task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
     
@@ -70,8 +71,8 @@ void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
     return NULL;
 }
 
-void RpcServer::MultiThreadWorker::handleMessage(void *msg) {
-    WorkerTask *task = (WorkerTask *)msg;
+void RpcServer::MultiThreadWorker::handleTask(WorkerTask *wt) {
+    RpcWorkerTask *task = (RpcWorkerTask *)wt;
     
     bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
     
@@ -92,7 +93,7 @@ void RpcServer::MultiThreadWorker::handleMessage(void *msg) {
 }
 
 void *RpcServer::CoroutineWorker::taskCallRoutine( void * arg ) {
-    WorkerTask *task = (WorkerTask *)arg;
+    RpcWorkerTask *task = (RpcWorkerTask *)arg;
     
     task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
     
@@ -106,8 +107,8 @@ void *RpcServer::CoroutineWorker::taskCallRoutine( void * arg ) {
     return NULL;
 }
 
-void RpcServer::CoroutineWorker::handleMessage(void *msg) {
-    WorkerTask *task = (WorkerTask *)msg;
+void RpcServer::CoroutineWorker::handleTask(WorkerTask *wt) {WorkerTask *wt) {
+    RpcWorkerTask *task = (RpcWorkerTask *)wt;
     
     bool needCoroutine = task->rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
     
@@ -126,15 +127,49 @@ void RpcServer::CoroutineWorker::handleMessage(void *msg) {
         delete task;
     }
 }
+*/
 
-RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port): corpc::Server(io) {
+void *RpcServer::RpcWorkerTask::taskCallRoutine( void * arg ) {
+    RpcWorkerTask *task = (RpcWorkerTask *)arg;
+    
+    task->rpcTask->service->CallMethod(task->rpcTask->method_descriptor, task->rpcTask->controller, task->rpcTask->request, task->rpcTask->response, task->rpcTask->done);
+    
+    if (task->rpcTask->response != NULL) {
+        // 处理结果发给sender处理
+        task->connection->send(task->rpcTask);
+    }
+    
+    task->destory();
+    
+    return NULL;
+}
+
+void RpcServer::RpcWorkerTask::doTask() {
+    bool needCoroutine = rpcTask->method_descriptor->options().GetExtension(corpc::need_coroutine);
+    
+    if (needCoroutine) {
+        // 启动协程进行rpc处理
+        RoutineEnvironment::startCoroutine(taskCallRoutine, this);
+    } else {
+        // rpc处理方法调用
+        rpcTask->service->CallMethod(rpcTask->method_descriptor, rpcTask->controller, rpcTask->request, rpcTask->response, rpcTask->done);
+        
+        if (rpcTask->response != NULL) {
+            // 处理结果发给sender处理
+            connection->send(rpcTask);
+        }
+        
+        destory();
+    }
+}
+
+RpcServer::RpcServer(IO *io, Worker *worker, const std::string& ip, uint16_t port): corpc::Server(io) {
     acceptor_ = new TcpAcceptor(this, ip, port);
 
-    // 根据需要创建多线程worker或协程worker
-    if (workThreadNum > 0) {
-        worker_ = new MultiThreadWorker(this, workThreadNum);
+    if (worker != NULL) {
+        worker_ = worker;
     } else {
-        worker_ = new CoroutineWorker(this);
+        worker_ = io->getWorker();
     }
     
     pipelineFactory_.reset(new TcpPipelineFactory(worker_, decode, encode, CORPC_REQUEST_HEAD_SIZE, CORPC_MAX_REQUEST_SIZE, 0, corpc::MessagePipeline::FOUR_BYTES));
@@ -142,15 +177,15 @@ RpcServer::RpcServer(IO *io, uint16_t workThreadNum, const std::string& ip, uint
 
 RpcServer::~RpcServer() {}
 
-RpcServer* RpcServer::create(IO *io, uint16_t workThreadNum, const std::string& ip, uint16_t port) {
+RpcServer* RpcServer::create(IO *io, Worker *worker, const std::string& ip, uint16_t port) {
     assert(io);
-    RpcServer *server = new RpcServer(io, workThreadNum, ip, port);
+    RpcServer *server = new RpcServer(io, worker, ip, port);
     
     server->start();
     return server;
 }
 
-void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
+WorkerTask* RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
     std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
     
     RpcServer *server = conn->getServer();
@@ -183,7 +218,7 @@ void * RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t
         google::protobuf::Message *response = method_descriptor->options().GetExtension(corpc::not_care_response) ? NULL : methodData->response_proto->New();
         
         // 将收到的请求传给worker
-        WorkerTask *task = new WorkerTask;
+        RpcWorkerTask *task = RpcWorkerTask::create();
         task->connection = conn;
         task->rpcTask = std::shared_ptr<RpcServerTask>(new RpcServerTask);
         task->rpcTask->service = server->getService(serviceId);
