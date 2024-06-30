@@ -78,6 +78,7 @@ namespace corpc {
             Connection(std::shared_ptr<ChannelCore> channel);
             ~Connection() {}
             
+            virtual void onConnect() {}
             virtual void onClose();
             virtual void cleanDataOnClosing(std::shared_ptr<void>& data);
             

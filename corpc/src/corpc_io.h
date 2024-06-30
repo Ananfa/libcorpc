@@ -220,6 +220,7 @@ namespace corpc {
         Connection(int fd, IO* io, bool needHB);
         virtual ~Connection() = 0;
         
+        virtual void onConnect() = 0;
         virtual void onClose() = 0;
         virtual void cleanDataOnClosing(std::shared_ptr<void>& data) {}
 
@@ -301,9 +302,9 @@ namespace corpc {
     protected:
         virtual bool start();
         
-        virtual Connection * buildConnection(int fd) = 0;
-        virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
-        virtual void onClose(std::shared_ptr<Connection>& connection) = 0;
+        virtual Connection *buildConnection(int fd) = 0;
+        //virtual void onConnect(std::shared_ptr<Connection>& connection) = 0;
+        //virtual void onClose(std::shared_ptr<Connection>& connection) = 0;
     protected:
         IO *io_;
         

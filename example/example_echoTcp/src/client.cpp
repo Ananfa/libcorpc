@@ -44,6 +44,7 @@ void *testRoutine(void *arg) {
     uint16_t recvTag = 0;
     while (true) {
         if (serverReady) {
+//DEBUG_LOG("testRoutine 1\n");
             // send FooRequest
             std::shared_ptr<FooRequest> request(new FooRequest);
             request->set_text("hello world!");
@@ -54,6 +55,7 @@ void *testRoutine(void *arg) {
 
         std::shared_ptr<google::protobuf::Message> rMsg;
         do {
+//DEBUG_LOG("testRoutine 2\n");
             client->recv(rType, recvTag, rMsg);
             if (!rType) {
                 if (!client->isRunning()) {
@@ -128,8 +130,8 @@ int main(int argc, const char * argv[])
     sigaction( SIGPIPE, &sa, NULL );
 
     // 启动多个线程创建client
-    int threadNum = 4;
-    int clientPerThread = 20;
+    int threadNum = 1;//4;
+    int clientPerThread = 1;//20;
     std::vector<std::thread> threads;
     for (int i = 0; i < threadNum; i++) {
         threads.push_back(std::thread(testThread, host, port, clientPerThread));

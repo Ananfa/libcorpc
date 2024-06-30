@@ -24,6 +24,96 @@
 
 using namespace corpc;
 
+
+
+#if 0
+
+MessageClient::MessageClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter): io_(io), terminal_(terminal), crypter_(crypter) {
+    if (worker) {
+        worker_ = worker;
+    } else {
+        worker_ = io->getWorker();
+    }
+}
+
+MessageClient::~MessageClient() {
+    if (connection_) {
+        connection_->close();
+
+        connection_.reset();
+    }
+}
+
+std::shared_ptr<corpc::Connection> MessageClient::buildAndAddConnection(int fd) {
+    LOG("fd %d connected\n", fd);
+    std::shared_ptr<corpc::Connection> connection(buildConnection(fd));
+    std::shared_ptr<corpc::Pipeline> pipeline = pipelineFactory_->buildPipeline(connection);
+    connection->setPipeline(pipeline);
+    
+    // 注意：onConnect原先是放在最后处理，现在调整到这里。原因是发现放在最后会出现连接消息处理前就收到业务消息处理，经过
+    // 分析，将onConnect调整到这里不会出现“onConnect中会有conn->close()操作导致连接未加到IO就先要从IO删除的问题”
+    // 通知连接建立
+    connection->onConnect();
+    
+    // 将接受的连接分别发给Receiver和Sender
+    io_->addConnection(connection);
+    
+    // 判断是否需要心跳
+    if (connection->needHB()) {
+        Heartbeater::Instance().addConnection(connection);
+    }
+    
+    return connection;
+}
+
+corpc::Connection *MessageClient::buildConnection(int fd) {
+    return terminal_->buildConnection(fd, io_, worker_);
+}
+
+TcpClient::TcpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter, const std::string& host, uint16_t port): MessageClient(io, worker, terminal, crypter), host_(host), port_(port) {
+    pipelineFactory_.reset(new TcpPipelineFactory(worker_, MessageTerminal::decode, MessageTerminal::encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_MESSAGE_SIZE, 0, MessagePipeline::FOUR_BYTES));
+}
+
+bool TcpClient::connect() {
+    if (connection_ && connection_->isOpen()) {
+        return false;
+    }
+
+    int s;
+    if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+        ERROR_LOG("can't create socket\n");
+        return false;
+    }
+    co_set_timeout(connection->fd_, -1, 1000);
+    
+    struct sockaddr_in addr;
+    bzero(&addr,sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port_);
+    int nIP = inet_addr(host_.c_str());
+    addr.sin_addr.s_addr = nIP;
+    
+    if (connect(s, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        ERROR_LOG("can't connect\n");
+        ::close(s);
+        return false;
+    }
+    
+
+
+}
+
+UdpClient::UdpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> crypter, const std::string& host, uint16_t port, uint16_t local_port): MessageClient(io, worker, terminal, crypter), host_(host), port_(port), local_port_(local_port) {
+    pipelineFactory_.reset(new UdpPipelineFactory(worker_, MessageTerminal::decode, MessageTerminal::encode, CORPC_MESSAGE_HEAD_SIZE, CORPC_MAX_UDP_MESSAGE_SIZE));
+}
+
+bool UdpClient::connect() {
+    
+}
+
+
+#else
+
 //uint8_t MessageClient::_heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
 
 MessageClient::~MessageClient() {
@@ -1862,3 +1952,5 @@ int KcpClient::rawOut(const char *buf, int len, ikcpcb *kcp, void *obj) {
     assert(len == sentNum);
     return sentNum;
 }
+
+#endif

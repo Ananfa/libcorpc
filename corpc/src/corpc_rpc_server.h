@@ -65,7 +65,8 @@ namespace corpc {
             Connection(int fd, RpcServer* server);
             virtual ~Connection();
             
-            virtual void onClose();
+            virtual void onConnect() {}
+            virtual void onClose() {}
             
             RpcServer *getServer() { return server_; }
         private:
@@ -112,10 +113,10 @@ namespace corpc {
         virtual corpc::Connection * buildConnection(int fd);
         
         // override
-        virtual void onConnect(std::shared_ptr<corpc::Connection>& connection) {}
+        //virtual void onConnect(std::shared_ptr<corpc::Connection>& connection) {}
         
         // override
-        virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
+        //virtual void onClose(std::shared_ptr<corpc::Connection>& connection);
         
     private:
         RpcServer(IO *io, Worker *worker, const std::string& ip, uint16_t port);

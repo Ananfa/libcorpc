@@ -319,7 +319,7 @@ std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
     // 注意：onConnect原先是放在最后处理，现在调整到这里。原因是发现放在最后会出现连接消息处理前就收到业务消息处理，经过
     // 分析，将onConnect调整到这里不会出现“onConnect中会有conn->close()操作导致连接未加到IO就先要从IO删除的问题”
     // 通知连接建立
-    onConnect(connection);
+    connection->onConnect();
     
     // 将接受的连接分别发给Receiver和Sender
     io_->addConnection(connection);

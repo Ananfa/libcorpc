@@ -23,6 +23,65 @@
 #include <google/protobuf/message.h>
 #include <memory>
 
+#if 0
+
+namespace corpc {
+    class MessageClient {
+    public:
+        MessageClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter);
+        virtual ~MessageClient();
+
+        virtual bool connect() = 0;
+
+    protected:
+        std::shared_ptr<corpc::Connection> buildAndAddConnection(int fd);
+
+        corpc::Connection *buildConnection(int fd);
+
+    protected:
+        IO *io_;
+        
+        Worker *worker_;
+        
+        MessageTerminal *terminal_;
+
+        std::shared_ptr<Crypter> crypter_;
+
+        std::unique_ptr<PipelineFactory> pipelineFactory_;
+
+        std::shared_ptr<MessageTerminal::Connection> connection_; // 注意：Connection中对MessageClient也有引用，因此关闭MessageClient时需要先释放此引用
+    };
+
+    class TcpClient: public MessageClient {
+    public:
+        TcpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter, const std::string& host, uint16_t port);
+        ~TcpClient() {}
+
+        virtual bool connect();
+
+    private:
+        std::string host_;
+        uint16_t port_;
+    };
+
+    class UdpClient: public MessageClient {
+    public:
+        UdpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> crypter, const std::string& host, uint16_t port, uint16_t local_port): MessageClient(io, worker, terminal, crypter), host_(host), port_(port), local_port_(local_port) {}
+        ~UdpClient() {}
+
+        virtual bool connect();
+
+    private:
+        std::string host_;
+        uint16_t port_;
+        uint16_t local_port_;
+    };
+
+}
+
+
+#else
+
 namespace corpc {
     class MessageClient: public std::enable_shared_from_this<MessageClient> {
     public:
@@ -137,5 +196,7 @@ namespace corpc {
         ikcpcb* pkcp_;
     };
 }
+
+#endif
 
 #endif /* corpc_message_client_h */

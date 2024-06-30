@@ -50,10 +50,10 @@ RpcServer::Connection::~Connection() {
     LOG("INFO: RpcServer::Connection::~Connection -- fd:%d in thread:%d\n", fd_, GetPid());
 }
 
-void RpcServer::Connection::onClose() {
-    std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
-    server_->onClose(self);
-}
+//void RpcServer::Connection::onClose() {
+//    std::shared_ptr<corpc::Connection> self = corpc::Connection::shared_from_this();
+//    server_->onClose(self);
+//}
 
 /*
 void *RpcServer::MultiThreadWorker::taskCallRoutine( void * arg ) {
@@ -166,7 +166,7 @@ void RpcServer::RpcWorkerTask::doTask() {
 RpcServer::RpcServer(IO *io, Worker *worker, const std::string& ip, uint16_t port): corpc::Server(io) {
     acceptor_ = new TcpAcceptor(this, ip, port);
 
-    if (worker != NULL) {
+    if (worker) {
         worker_ = worker;
     } else {
         worker_ = io->getWorker();
@@ -353,6 +353,6 @@ corpc::Connection *RpcServer::buildConnection(int fd) {
     return new Connection(fd, this);
 }
 
-void RpcServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
-    LOG("RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
-}
+//void RpcServer::onClose(std::shared_ptr<corpc::Connection>& connection) {
+//    LOG("RpcServer::onClose -- connection fd:%d is closed\n", connection->getfd());
+//}

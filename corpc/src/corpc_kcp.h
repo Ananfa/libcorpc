@@ -22,6 +22,87 @@
 #include "ikcp.h"
 
 namespace corpc {
+    class KcpMessageTerminal: public MessageTerminal {
+    public:
+        class Connection: public MessageTerminal::Connection {
+        public:
+            Connection(int fd, IO *io, Worker *worker, KcpMessageTerminal *terminal);
+            virtual ~Connection();
+            
+            virtual void onSenderInit();
+
+            void kcpUpdate(uint32_t current);
+            uint32_t kcpCheck(uint32_t current);
+            int kcpInput(const char *data, long size);
+            int kcpSend(const char *buffer, int len);
+            int kcpRecv(char *buffer, int len);
+            void kcpFlush();
+
+        protected:
+            virtual ssize_t write(const void *buf, size_t nbyte);
+
+        private:
+            static void *updateRoutine( void * arg );
+
+            static int rawOut(const char *buf, int len, ikcpcb *kcp, void *obj);
+
+        private:
+            ikcpcb* pkcp_;
+            Mutex kcpMtx_; // pkcp_同步访问锁
+
+        public:
+            friend class KcpPipeline;
+        };
+
+    public:
+        KcpMessageTerminal(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial);
+        virtual ~KcpMessageTerminal() {}
+
+    protected:
+        virtual corpc::Connection * buildConnection(int fd, IO *io, Worker *worker);
+    };
+
+    class KcpMessageServer: public MessageServer {
+    public:
+        KcpMessageServer(corpc::IO *io, Worker *worker, KcpMessageTerminal *terminal, const std::string& ip, uint16_t port);
+        virtual ~KcpMessageServer() {}
+
+    protected:
+        //virtual corpc::Connection * buildConnection(int fd);
+    };
+
+    class KcpPipeline: public MessagePipeline {
+    public:
+        KcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
+        virtual ~KcpPipeline() {}
+        
+        virtual bool upflow(uint8_t *buf, int size);
+
+    private:
+        std::string data_;
+        uint8_t *dataBuf_;
+
+        uint headNum_;
+        uint bodyNum_;
+        
+        uint bodySizeOffset_;
+        SIZE_TYPE bodySizeType_;
+    };
+    
+    class KcpPipelineFactory: public MessagePipelineFactory {
+    public:
+        KcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType) {}
+        ~KcpPipelineFactory() {}
+        
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
+        
+    public:
+        uint bodySizeOffset_;
+        MessagePipeline::SIZE_TYPE bodySizeType_;
+    };
+    
+#if 0
+
     class KcpMessageServer: public MessageServer {
     public:
         class Connection: public MessageServer::Connection {
@@ -92,6 +173,8 @@ namespace corpc {
         MessagePipeline::SIZE_TYPE bodySizeType_;
     };
     
+#endif
+
 }
 
 #endif /* corpc_kcp_h */

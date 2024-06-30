@@ -71,7 +71,7 @@ static void *ban_routine( void *arg )
 {
     co_enable_hook_sys();
 
-    corpc::TcpMessageServer *server = (corpc::TcpMessageServer*)arg;
+    corpc::MessageTerminal *terminal = (corpc::MessageTerminal*)arg;
 
     bool banned = false;
     while (true) {
@@ -85,7 +85,7 @@ static void *ban_routine( void *arg )
             banMsgs.push_back(1);
         }
 
-        server->setBanMessages(banMsgs);
+        terminal->setBanMessages(banMsgs);
         banned = !banned;
     }
 
@@ -124,12 +124,11 @@ int main(int argc, const char * argv[]) {
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
 
     // 注册服务
-    corpc::IO *io = corpc::IO::create(1, 1);
+    corpc::IO *io = corpc::IO::create(1, 1, 0);
+
+    corpc::KcpMessageTerminal *terminal = new corpc::KcpMessageTerminal(true, true, true, true);
     
-    corpc::KcpMessageServer *server = new corpc::KcpMessageServer(io, true, true, true, true, ip, port);
-    server->start();
-    
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
         std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(true));
@@ -140,11 +139,11 @@ int main(int argc, const char * argv[]) {
         conn->send(3, false, true, true, 0, readyMsg);
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d closed\n", conn->getfd());
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         g_bcnt++;
         std::shared_ptr<BanResponse> response(new BanResponse);
         response->set_type(type);
@@ -152,7 +151,7 @@ int main(int argc, const char * argv[]) {
         conn->send(2, false, true, true, tag, response);
     });
 
-    server->registerMessage(1, new FooRequest, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(1, new FooRequest, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
 //DEBUG_LOG("recv foo request and send response, tag:%d\n", tag);
 
@@ -168,8 +167,11 @@ int main(int argc, const char * argv[]) {
         conn->send(1, false, true, true, tag, response);
     });
 
+    corpc::KcpMessageServer *server = new corpc::KcpMessageServer(io, nullptr, terminal, ip, port);
+    server->start();
+    
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
-    corpc::RoutineEnvironment::startCoroutine(ban_routine, server);
+    corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
     
     corpc::RoutineEnvironment::runEventLoop();
 }
