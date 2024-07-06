@@ -49,6 +49,7 @@ include_directories(/usr/local/include)
 include_directories(/usr/local/include/co)
 include_directories(/usr/local/include/corpc)
 include_directories(/usr/local/include/corpc/proto)
+include_directories(/usr/local/include/corpc/kcp)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/../proto)
 

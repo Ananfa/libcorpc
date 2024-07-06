@@ -46,14 +46,11 @@ void *Worker::taskHandleRoutine( void * arg ) {
         // 处理任务队列
         WorkerTask *task = queue.pop();
 
-        //self->handleTask(task);
         task->doTask();
         
         RoutineEnvironment::pauseIfRuntimeBusy();
     }
 }
-
-//MultiThreadWorker::~MultiThreadWorker() {}
 
 void MultiThreadWorker::threadEntry( Worker *self ) {
     // 启动rpc任务处理协程
@@ -68,8 +65,6 @@ void MultiThreadWorker::start() {
         ts_[i] = std::thread(threadEntry, this);
     }
 }
-
-//CoroutineWorker::~CoroutineWorker() {}
 
 void CoroutineWorker::start() {
     // 启动rpc任务处理协程
@@ -263,7 +258,7 @@ std::shared_ptr<corpc::Pipeline> UdpPipelineFactory::buildPipeline(std::shared_p
     return std::shared_ptr<corpc::Pipeline>( new corpc::UdpPipeline(connection, worker_, decodeFun_, encodeFun_, headSize_, maxBodySize_) );
 }
 
-Connection::Connection(int fd, IO* io, bool needHB): fd_(fd), io_(io), needHB_(needHB), routineHang_(false), routine_(NULL), sendThreadIndex_(-1), recvThreadIndex_(-1), decodeError_(false), closed_(false), isClosing_(false), closeSem_(0), lastRecvHBTime_(0) {
+Connection::Connection(int fd, IO* io, bool needHB): fd_(fd), io_(io), needHB_(needHB), routineHang_(false), routine_(NULL), sendThreadIndex_(-1), recvThreadIndex_(-1), decodeError_(false), closed_(false), isClosing_(false), isHBing_(false), closeSem_(0), lastRecvHBTime_(0) {
 }
 
 Connection::~Connection() {
@@ -280,7 +275,7 @@ void Connection::close() {
         std::shared_ptr<Connection> self = shared_from_this();
         io_->removeConnection(self);
 
-        if (self->needHB()) {
+        if (isHBing()) {
             Heartbeater::Instance().removeConnection(self);
         }
     }
@@ -327,6 +322,7 @@ std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
     // 判断是否需要心跳
     if (connection->needHB()) {
         Heartbeater::Instance().addConnection(connection);
+
     }
     
     return connection;
@@ -495,7 +491,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             
             continue;
         }
-DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
+        DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
         uint32_t bodySize = *(uint32_t *)buf;
         bodySize = be32toh(bodySize);
         int16_t msgType = *(int16_t *)(buf + 4);
@@ -746,24 +742,21 @@ void *Receiver::connectionRoutine( void * arg ) {
             break;
         }
     }
-DEBUG_LOG("Receiver::connectionRoutine -- 1\n");
+
     io->sender_->removeConnection(connection); // 通知sender关闭connection
     shutdown(fd, SHUT_WR);  // 让sender中的fd相关协程退出
     
-DEBUG_LOG("Receiver::connectionRoutine -- 2\n");
     // 等待写关闭
     connection->closeSem_.wait();
-    //while (!connection->canClose_) {
-    //    // sleep 100 milisecond
-    //    msleep(100);
-    //}
     
-DEBUG_LOG("Receiver::connectionRoutine -- 3\n");
     close(fd);
     
     connection->closed_ = true;
+
+    if (connection->isHBing()) {
+        Heartbeater::Instance().removeConnection(connection);
+    }
     
-DEBUG_LOG("Receiver::connectionRoutine -- 4\n");
     connection->onClose();
     DEBUG_LOG("Receiver::connectionRoutine -- routine end for fd %d\n", fd);
     return NULL;
@@ -905,21 +898,15 @@ void *Sender::connectionRoutine( void * arg ) {
     
     std::string buffs(CORPC_MAX_BUFFER_SIZE, 0);
     uint8_t *buf = (uint8_t *)buffs.data();
-    //uint32_t startIndex = 0;
-    //uint32_t endIndex = 0;
     
     // 若无数据可以发送则挂起，否则整理发送数据并发送
     while (true) {
         int dataSize = 0;
-        if (!connection->getPipeline()->downflow(buf/* + endIndex*/, CORPC_MAX_BUFFER_SIZE/* - endIndex*/, dataSize)) {
+        if (!connection->getPipeline()->downflow(buf, CORPC_MAX_BUFFER_SIZE, dataSize)) {
             break;
         }
         
-        //endIndex += tmp;
-        
-        //int dataSize = endIndex - startIndex;
         if (dataSize == 0) {
-            //assert(startIndex == 0);
             // 等数据发完再关
             if (connection->isClosing_) {
                 break;
@@ -934,36 +921,12 @@ void *Sender::connectionRoutine( void * arg ) {
         }
         
         // 发数据
-        int ret = connection->write(buf/* + startIndex*/, dataSize);
+        int ret = connection->write(buf, dataSize);
         if (ret < 0) {
             break;
         }
 
         assert(ret == dataSize);
-        //startIndex = endIndex = 0;
-
-
-//        int ret;
-//        do {
-//            ret = (int)write(connection->fd_, buf + startIndex, dataSize);
-//            if (ret > 0) {
-//                assert(ret <= dataSize);
-//                startIndex += ret;
-//                dataSize -= ret;
-//            }
-//        } while (dataSize > 0 && errno == EAGAIN);
-//        
-//        if (dataSize > 0) {
-//            WARN_LOG("Sender::connectionRoutine -- write resphead fd %d ret %d errno %d (%s)\n",
-//                   connection->fd_, ret, errno, strerror(errno));
-//            
-//            break;
-//        }
-//        
-//        assert(startIndex == endIndex);
-//        if (startIndex == endIndex) {
-//            startIndex = endIndex = 0;
-//        }
     }
     
     connection->isClosing_ = true;
@@ -1179,7 +1142,7 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         }
 
         self->heartbeatList_.remove(node);
-DEBUG_LOG("Heartbeater::heartbeatRoutine() -- send heartbeat for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
+//DEBUG_LOG("Heartbeater::heartbeatRoutine() -- send heartbeat for conn: %lu fd %d\n", (uint64_t)conn.get(), conn->getfd());
         // 发心跳包
         conn->send(self->heartbeatmsg_);
 
@@ -1190,6 +1153,8 @@ DEBUG_LOG("Heartbeater::heartbeatRoutine() -- send heartbeat for conn: %lu fd %d
 }
 
 void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {
+    connection->isHBing_ = true;
+
     HeartbeatTask *task = new HeartbeatTask;
     task->type = HeartbeatTask::START;
     task->connection = connection;
@@ -1197,6 +1162,8 @@ void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {
 }
 
 void Heartbeater::removeConnection(std::shared_ptr<Connection>& connection) {
+    connection->isHBing_ = false;
+    
     HeartbeatTask *task = new HeartbeatTask;
     task->type = HeartbeatTask::STOP;
     task->connection = connection;

@@ -24,6 +24,107 @@ using namespace corpc;
 
 #define LOCAL_PORT 20020
 
+#ifdef NEW_MESSAGE_CLIENT_IMPLEMENT
+
+int main(int argc, const char * argv[])
+{
+    co_start_hook();
+
+    if(argc<3){
+        printf("Usage:\n"
+               "echoUdpclt [HOST] [PORT]\n");
+        return -1;
+    }
+    
+    uint16_t sendTag = 0;
+
+    std::string host = argv[1];
+    uint16_t port = atoi(argv[2]);
+    
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sigaction( SIGPIPE, &sa, NULL );
+
+    std::string key = "1234567fvxcvc";
+    std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
+
+    // 注册服务
+    corpc::IO *io = corpc::IO::create(1, 1, 0);
+
+    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, false);
+    
+    corpc::UdpClient *client = new corpc::UdpClient(io, nullptr, terminal, host, port, LOCAL_PORT);
+    
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        LOG("connect %d\n", conn->getfd());
+        conn->setCrypter(crypter);
+        std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(false));
+        conn->setMsgBuffer(msgBuffer);
+    });
+
+    terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        LOG("connect %d close\n", conn->getfd());
+
+        delete client;
+        client = new corpc::UdpClient(io, nullptr, terminal, host, port, LOCAL_PORT);
+        while (!client->connect()) {
+            LOG("client reconnect\n");
+            sleep(1);
+        }
+    });
+
+    terminal->registerMessage(1, new FooResponse, false, [&sendTag](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        FooResponse * response = static_cast<FooResponse*>(msg.get());
+        //printf("FooResponse tag:%d -- %s\n", tag, response->text().c_str());
+
+        if (sendTag != tag) {
+            ERROR_LOG("tag not match %d != %d\n", sendTag, tag);
+        }
+
+        // send FooRequest
+        std::shared_ptr<FooRequest> request(new FooRequest);
+        request->set_text("hello world!");
+        request->set_times(10);
+        
+        conn->send(1, false, true, true, ++sendTag, std::static_pointer_cast<google::protobuf::Message>(request));
+    });
+
+    terminal->registerMessage(2, new BanResponse, false, [&sendTag](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        BanResponse * response = static_cast<BanResponse*>(msg.get());
+        //printf("BanResponse tag:%d\n", tag);
+
+        if (sendTag != tag) {
+            ERROR_LOG("tag not match %d != %d\n", sendTag, tag);
+        }
+        
+        conn->close();
+        // send FooRequest
+        //std::shared_ptr<FooRequest> request(new FooRequest);
+        //request->set_text("hello world!");
+        //request->set_times(10);
+        //
+        //conn->send(1, false, true, true, ++sendTag, std::static_pointer_cast<google::protobuf::Message>(request));
+    });
+
+    terminal->registerMessage(3, new ServerReady, false, [&sendTag](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        printf("ServerReady tag:%d\n", tag);
+        
+        // send FooRequest
+        std::shared_ptr<FooRequest> request(new FooRequest);
+        request->set_text("hello world!");
+        request->set_times(10);
+        
+        conn->send(1, false, true, true, ++sendTag, std::static_pointer_cast<google::protobuf::Message>(request));
+    });
+
+    client->connect();
+
+    RoutineEnvironment::runEventLoop();
+    return 0;
+}
+
+#else
+
 struct Address {
     std::string host;
     uint16_t port;
@@ -87,18 +188,18 @@ void *testRoutine(void *arg) {
         switch (rType) {
             case 1: {
                 std::shared_ptr<FooResponse> response = std::static_pointer_cast<FooResponse>(rMsg);
-                //printf("%s\n", response->text().c_str());
+                printf("foo response %s\n", response->text().c_str());
                 break;
             }
             case 2: {
                 std::shared_ptr<BanResponse> response = std::static_pointer_cast<BanResponse>(rMsg);
-                //printf("%s\n", response->text().c_str());
+                printf("ban\n");
                 break;
             }
             case 3: {
                 std::shared_ptr<ServerReady> response = std::static_pointer_cast<ServerReady>(rMsg);
                 serverReady = true;
-                //printf("ban %d\n", response->type());
+                printf("ServerReady\n");
                 break;
             }
             default:
@@ -141,8 +242,8 @@ int main(int argc, const char * argv[])
     sigaction( SIGPIPE, &sa, NULL );
 
     // 启动多个线程创建client
-    int threadNum = 4;
-    int clientPerThread = 40;
+    int threadNum = 1;
+    int clientPerThread = 1;
     std::vector<std::thread> threads;
     for (int i = 0; i < threadNum; i++) {
         uint16_t local_port = LOCAL_PORT + i * clientPerThread;
@@ -153,3 +254,4 @@ int main(int argc, const char * argv[])
     return 0;
 }
 
+#endif

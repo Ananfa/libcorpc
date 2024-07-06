@@ -68,7 +68,7 @@ static void *ban_routine( void *arg )
 {
     co_enable_hook_sys();
 
-    corpc::TcpMessageServer *server = (corpc::TcpMessageServer*)arg;
+    corpc::MessageTerminal *terminal = (corpc::MessageTerminal*)arg;
 
     bool banned = false;
     while (true) {
@@ -82,11 +82,20 @@ static void *ban_routine( void *arg )
             banMsgs.push_back(1);
         }
 
-        server->setBanMessages(banMsgs);
+        terminal->setBanMessages(banMsgs);
         banned = !banned;
     }
 
     return NULL;
+}
+
+void sigintHandler( int signum ) {
+    LOG("Interrupt signal (%d) received.\n", signum);
+
+    // cleanup and close up stuff here  
+    // terminate program  
+
+    exit(signum);
 }
 
 int main(int argc, const char * argv[]) {
@@ -105,16 +114,17 @@ int main(int argc, const char * argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction( SIGPIPE, &sa, NULL );
     
+    signal(SIGINT, sigintHandler);
+
     std::string key = "1234567fvxcvc";
     std::shared_ptr<corpc::Crypter> crypter = std::shared_ptr<corpc::Crypter>(new corpc::SimpleXORCrypter(key));
 
     // 注册服务
-    corpc::IO *io = corpc::IO::create(1, 1);
+    corpc::IO *io = corpc::IO::create(1, 1, 0);
     
-    corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, true, true, true, false, ip, port);
-    server->start();
+    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, false);
     
-    server->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
         
@@ -123,11 +133,11 @@ int main(int argc, const char * argv[]) {
         conn->send(3, false, true, false, 0, readyMsg);
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d closed\n", conn->getfd());
     });
 
-    server->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_BANNED, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         g_bcnt++;
         std::shared_ptr<BanResponse> response(new BanResponse);
         response->set_type(type);
@@ -135,7 +145,7 @@ int main(int argc, const char * argv[]) {
         conn->send(2, false, true, false, tag, response);
     });
 
-    server->registerMessage(1, new FooRequest, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageServer::Connection> conn) {
+    terminal->registerMessage(1, new FooRequest, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         FooRequest * request = static_cast<FooRequest*>(msg.get());
         
         g_cnt++;
@@ -150,8 +160,11 @@ int main(int argc, const char * argv[]) {
         conn->send(1, false, true, false, tag, response);
     });
     
+    corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, nullptr, terminal, ip, port);
+    server->start();
+    
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
-    corpc::RoutineEnvironment::startCoroutine(ban_routine, server);
+    corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
     
     corpc::RoutineEnvironment::runEventLoop();
 }

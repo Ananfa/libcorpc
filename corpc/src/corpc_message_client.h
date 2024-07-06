@@ -17,18 +17,21 @@
 #ifndef corpc_message_client_h
 #define corpc_message_client_h
 
+#include "corpc_io.h"
 #include "corpc_define.h"
-#include "corpc_crypter.h"
-#include "ikcp.h"
+#include "corpc_message_terminal.h"
+#include "corpc_kcp.h"
 #include <google/protobuf/message.h>
 #include <memory>
 
-#if 0
+#define NEW_MESSAGE_CLIENT_IMPLEMENT
+
+#ifdef NEW_MESSAGE_CLIENT_IMPLEMENT
 
 namespace corpc {
     class MessageClient {
     public:
-        MessageClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter);
+        MessageClient(IO *io, Worker *worker, MessageTerminal *terminal);
         virtual ~MessageClient();
 
         virtual bool connect() = 0;
@@ -45,17 +48,15 @@ namespace corpc {
         
         MessageTerminal *terminal_;
 
-        std::shared_ptr<Crypter> crypter_;
-
         std::unique_ptr<PipelineFactory> pipelineFactory_;
 
-        std::shared_ptr<MessageTerminal::Connection> connection_; // 注意：Connection中对MessageClient也有引用，因此关闭MessageClient时需要先释放此引用
+        std::shared_ptr<MessageTerminal::Connection> connection_;
     };
 
     class TcpClient: public MessageClient {
     public:
-        TcpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> &crypter, const std::string& host, uint16_t port);
-        ~TcpClient() {}
+        TcpClient(IO *io, Worker *worker, MessageTerminal *terminal, const std::string& host, uint16_t port);
+        virtual ~TcpClient() {}
 
         virtual bool connect();
 
@@ -66,8 +67,8 @@ namespace corpc {
 
     class UdpClient: public MessageClient {
     public:
-        UdpClient(IO *io, Worker *worker, MessageTerminal *terminal, std::shared_ptr<Crypter> crypter, const std::string& host, uint16_t port, uint16_t local_port): MessageClient(io, worker, terminal, crypter), host_(host), port_(port), local_port_(local_port) {}
-        ~UdpClient() {}
+        UdpClient(IO *io, Worker *worker, MessageTerminal *terminal, const std::string& host, uint16_t port, uint16_t local_port);
+        virtual ~UdpClient() {}
 
         virtual bool connect();
 
@@ -77,6 +78,11 @@ namespace corpc {
         uint16_t local_port_;
     };
 
+    class KcpClient: public UdpClient {
+    public:
+        KcpClient(IO *io, Worker *worker, KcpMessageTerminal *terminal, const std::string& host, uint16_t port, uint16_t local_port);
+        virtual ~KcpClient() {}
+    };
 }
 
 

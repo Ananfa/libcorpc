@@ -68,8 +68,6 @@ namespace corpc {
         
     protected:
         static void *taskHandleRoutine(void * arg);
-        
-        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
 
     protected:
         WorkerMessageQueue queue_;
@@ -85,8 +83,6 @@ namespace corpc {
     protected:
         static void threadEntry( Worker *self );
         
-        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
-        
     private:
         uint16_t threadNum_;
         std::vector<std::thread> ts_;
@@ -98,9 +94,6 @@ namespace corpc {
         virtual ~CoroutineWorker() {}
         
         virtual void start();
-        
-    //protected:
-        //virtual void handleTask(WorkerTask *task) = 0; // 注意：处理完消息需要自己删除task
     };
     
     class Pipeline {
@@ -257,6 +250,7 @@ namespace corpc {
         void popFrontData() { datas_.pop_front(); }
         
         bool isOpen() const { return !(isClosing_ || closed_); }
+        bool isHBing() const { return isHBing_; }
 
     protected:
         virtual ssize_t write(const void *buf, size_t nbyte);
@@ -279,6 +273,7 @@ namespace corpc {
         bool decodeError_; // 是否数据解码出错
         std::atomic<bool> closed_; // 是否已关闭
         std::atomic<bool> isClosing_; // 是否正在关闭
+        std::atomic<bool> isHBing_; // 是否正在心跳
 
         Semaphore closeSem_; // 关闭同步用信号量（注意：应该用条件变量更合适）
         //std::atomic<bool> canClose_; // 是否可调用close（当sender中fd相关协程退出时设置canClose为true，receiver中fd相关协程才可以进行close调用）

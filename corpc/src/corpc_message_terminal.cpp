@@ -21,7 +21,7 @@
 using namespace corpc;
 
 MessageTerminal::Connection::Connection(int fd, IO *io, Worker *worker, MessageTerminal *terminal): corpc::Connection(fd, io, terminal->needHB_), terminal_(terminal), worker_(worker), crypter_(nullptr), recvSerial_(0) {
-    //time(&createTime_);
+
 }
 
 MessageTerminal::Connection::~Connection() {
@@ -276,8 +276,9 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
         uint16_t crc = *(uint16_t *)(head + 18);
         crc = be16toh(crc);
 
-        uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 18);
-        crc1 = CRC::CheckSum(body, crc1, size);
+        //uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 18);
+        //crc1 = CRC::CheckSum(body, crc1, size);
+        uint16_t crc1 = CRC::CheckSum(body, 0xFFFF, size);
 
         if (crc != crc1) {
             ERROR_LOG("MessageTerminal::decode -- crc not match, need:%d get:%d\n", crc1, crc);
@@ -463,6 +464,7 @@ bool MessageTerminal::encode(std::shared_ptr<corpc::Connection> &connection, std
     *(uint16_t *)(buf + 6) = htobe16(msgInfo->tag);
     uint16_t flag = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
     *(uint16_t *)(buf + 8) = htobe16(flag);
+    *(uint32_t *)(buf + 10) = htobe32(conn->recvSerial_);
     *(uint32_t *)(buf + 14) = htobe32(msgInfo->serial);
     *(uint16_t *)(buf + 18) = htobe16(crc);
 

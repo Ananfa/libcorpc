@@ -43,6 +43,8 @@ namespace corpc {
             std::shared_ptr<MessageBuffer> &getMsgBuffer() { return msgBuffer_; }
             void setMsgBuffer(std::shared_ptr<MessageBuffer> &msgBuffer) { msgBuffer_ = msgBuffer; }
             //uint64_t getCreateTime() { return createTime_; }
+            void setRecvSerial(uint32_t serial) { recvSerial_ = serial; }
+            uint32_t getRecvSerial() { return recvSerial_; }
 
             // 以下3个方法都会对消息缓存操作，消息缓存不是线程安全的，需要在worker中处理
             void scrapMessages(uint32_t serial); // 擦除已确认消息
