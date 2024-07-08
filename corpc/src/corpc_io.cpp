@@ -273,7 +273,12 @@ void Connection::send(std::shared_ptr<void> data) {
 void Connection::close() {
     if (isOpen()) {
         std::shared_ptr<Connection> self = shared_from_this();
-        io_->removeConnection(self);
+        
+        {
+            LockGuard lock(self->getLock());
+            
+            io_->removeConnection(self);
+        }
 
         if (isHBing()) {
             Heartbeater::Instance().removeConnection(self);
@@ -311,18 +316,22 @@ std::shared_ptr<Connection> Server::buildAndAddConnection(int fd) {
     std::shared_ptr<corpc::Pipeline> pipeline = pipelineFactory_->buildPipeline(connection);
     connection->setPipeline(pipeline);
     
-    // 注意：onConnect原先是放在最后处理，现在调整到这里。原因是发现放在最后会出现连接消息处理前就收到业务消息处理，经过
-    // 分析，将onConnect调整到这里不会出现“onConnect中会有conn->close()操作导致连接未加到IO就先要从IO删除的问题”
-    // 通知连接建立
-    connection->onConnect();
-    
-    // 将接受的连接分别发给Receiver和Sender
-    io_->addConnection(connection);
-    
     // 判断是否需要心跳
     if (connection->needHB()) {
         Heartbeater::Instance().addConnection(connection);
 
+    }
+    
+    // 注意：onConnect原先是放在最后处理，现在调整到这里。原因是发现放在最后会出现连接消息处理前就收到业务消息处理，
+    //      会出现“onConnect中会有conn->close()操作导致连接未加到IO就先要从IO删除的问题”，因此需要上锁
+    // 通知连接建立
+    {
+        LockGuard lock(connection->getLock());
+
+        connection->onConnect();
+        
+        // 将接受的连接分别发给Receiver和Sender
+        io_->addConnection(connection);
     }
     
     return connection;
