@@ -43,6 +43,12 @@ MessageClient::~MessageClient() {
     }
 }
 
+void MessageClient::send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
+    if (connection_) {
+        connection_->send(type, isRaw, needCrypt, needBuffer, tag, msg);
+    }
+}
+
 std::shared_ptr<corpc::Connection> MessageClient::buildAndAddConnection(int fd) {
     LOG("fd %d connected\n", fd);
     std::shared_ptr<corpc::Connection> connection(buildConnection(fd));

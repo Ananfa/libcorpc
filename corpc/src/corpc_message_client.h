@@ -36,6 +36,8 @@ namespace corpc {
 
         virtual bool connect() = 0;
 
+        void send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
+
     protected:
         std::shared_ptr<corpc::Connection> buildAndAddConnection(int fd);
 

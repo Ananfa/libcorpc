@@ -118,15 +118,14 @@ namespace corpc {
                 channel_ = channel.channel_;
                 guard_ = channel.guard_;
             }
+            virtual ~Channel() {}
+
             virtual void CallMethod(const google::protobuf::MethodDescriptor *method, google::protobuf::RpcController *controller, const google::protobuf::Message *request, google::protobuf::Message *response, google::protobuf::Closure *done) {
                 channel_->CallMethod(method, controller, request, response, done);
             }
             
             const std::string& getHost() const { return channel_->host_; }
             uint32_t getPort() const { return channel_->port_; }
-            
-        private:
-            virtual ~Channel() {}
             
         private:
             std::shared_ptr<Guard> guard_;

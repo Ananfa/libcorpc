@@ -36,7 +36,7 @@ void RWMutex::unlock() {
     int r = readerCount_.fetch_add(RWMUTEXMAXREADERS);
 
     if (r >= 0) {
-        ERROR_LOG("RWMutex::runlock -- RUnlock of unlocked RWMutex\n");
+        ERROR_LOG("RWMutex::unlock -- Unlock of unlocked RWMutex\n");
         abort();
     }
 
@@ -51,6 +51,12 @@ void RWMutex::unlock() {
 
 void RWMutex::rlock() {
     int r = readerCount_.fetch_add(1);
+
+    if (r == -1 || r >= RWMUTEXMAXREADERS - 1) {
+        ERROR_LOG("RWMutex::runlock -- rlock overflow\n");
+        abort();
+    }
+
     if (r < 0) {
         readerSem_.wait();
     }
