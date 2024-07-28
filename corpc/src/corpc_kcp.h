@@ -39,7 +39,7 @@ namespace corpc {
             void kcpFlush();
 
         protected:
-            virtual ssize_t write(const void *buf, size_t nbyte);
+            ssize_t write(const void *buf, size_t nbyte);
 
         private:
             static void *updateRoutine( void * arg );
@@ -59,7 +59,7 @@ namespace corpc {
         virtual ~KcpMessageTerminal() {}
 
     protected:
-        virtual corpc::Connection * buildConnection(int fd, IO *io, Worker *worker);
+        virtual corpc::Connection * buildConnection(int fd, IO *io, Worker *worker) override;
     };
 
     class KcpPipeline: public MessagePipeline {
@@ -67,7 +67,7 @@ namespace corpc {
         KcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~KcpPipeline() {}
         
-        virtual bool upflow(uint8_t *buf, int size);
+        virtual bool upflow(uint8_t *buf, int size) override;
 
     private:
         std::string data_;
@@ -85,7 +85,7 @@ namespace corpc {
         KcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType) {}
         ~KcpPipelineFactory() {}
         
-        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) override;
         
     public:
         uint bodySizeOffset_;

@@ -32,9 +32,9 @@ namespace corpc {
         MessageServer(IO *io, Worker *worker, MessageTerminal *terminal);
         virtual ~MessageServer() = 0;
         
-        virtual bool start() { return corpc::Server::start(); }
+        virtual bool start() override { return corpc::Server::start(); }
     protected:
-        virtual corpc::Connection * buildConnection(int fd);
+        virtual corpc::Connection * buildConnection(int fd) override;
         
     protected:
         MessageTerminal *terminal_;

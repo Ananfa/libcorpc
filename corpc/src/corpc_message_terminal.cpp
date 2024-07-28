@@ -52,7 +52,7 @@ void MessageTerminal::Connection::scrapMessages(uint32_t serial) {
     }
 }
 
-void MessageTerminal::Connection::send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
+void MessageTerminal::Connection::send(int32_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
     if (!isOpen() && !(terminal_->enableSerial_ && msgBuffer_->needBuf())) {
         return;
     }
@@ -170,7 +170,7 @@ MessageTerminal::~MessageTerminal() {
     }
 }
 
-bool MessageTerminal::registerMessage(int type,
+bool MessageTerminal::registerMessage(int32_t type,
                                     google::protobuf::Message *proto,
                                     bool needCoroutine,
                                     MessageHandle handle) {
@@ -191,8 +191,8 @@ bool MessageTerminal::registerMessage(int type,
     return true;
 }
 
-bool MessageTerminal::setBanMessages(std::list<int> &msgTypes) {
-    std::map<int, bool> msgTypeM;
+bool MessageTerminal::setBanMessages(std::list<int32_t> &msgTypes) {
+    std::map<int32_t, bool> msgTypeM;
     for (auto msgType : msgTypes) {
         msgTypeM[msgType] = true;
     }
@@ -219,11 +219,11 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
     Crypter *crypter = conn->getCrypter();
     MessageTerminal *terminal = conn->getTerminal();
     
-    int16_t msgType = *(int16_t *)(head + 4);
-    msgType = be16toh(msgType);
-    uint16_t tag = *(uint16_t *)(head + 6);
+    int32_t msgType = *(int32_t *)(head + 4);
+    msgType = be32toh(msgType);
+    uint16_t tag = *(uint16_t *)(head + 8);
     tag = be16toh(tag);
-    uint16_t flag = *(uint16_t *)(head + 8);
+    uint16_t flag = *(uint16_t *)(head + 10);
     flag = be16toh(flag);
     
     uint32_t reqSerial = 0;
@@ -236,7 +236,7 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
 
             // 接收最大序列号并发给worker处理消息清理
             if (terminal->enableSerial_) {
-                reqSerial = *(uint32_t *)(head + 10);
+                reqSerial = *(uint32_t *)(head + 12);
                 reqSerial = be32toh(reqSerial);
 
                 MessageWorkerTask *task = MessageWorkerTask::create();
@@ -258,7 +258,7 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
     if (terminal->enableSerial_) {
         conn->recvSerial_++;
 
-        uint32_t serial = *(uint32_t *)(head + 14);
+        uint32_t serial = *(uint32_t *)(head + 16);
         serial = be32toh(serial);
 
         if (conn->recvSerial_ != serial) {
@@ -267,13 +267,13 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
             return nullptr;
         }
 
-        reqSerial = *(uint32_t *)(head + 10);
+        reqSerial = *(uint32_t *)(head + 12);
         reqSerial = be32toh(reqSerial);
     }
 
     // CRC校验（CRC码计算需要包含除crc外的包头）
     if (terminal->enableRecvCRC_) {
-        uint16_t crc = *(uint16_t *)(head + 18);
+        uint16_t crc = *(uint16_t *)(head + 20);
         crc = be16toh(crc);
 
         //uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 18);
@@ -458,15 +458,15 @@ bool MessageTerminal::encode(std::shared_ptr<corpc::Connection> &connection, std
     }
     
     *(uint32_t *)buf = htobe32(msgSize);
-    *(uint16_t *)(buf + 4) = htobe16(msgInfo->type);
+    *(uint32_t *)(buf + 4) = htobe32(msgInfo->type);
     
     // 头部设置加密标志
-    *(uint16_t *)(buf + 6) = htobe16(msgInfo->tag);
+    *(uint16_t *)(buf + 8) = htobe16(msgInfo->tag);
     uint16_t flag = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
-    *(uint16_t *)(buf + 8) = htobe16(flag);
-    *(uint32_t *)(buf + 10) = htobe32(conn->recvSerial_);
-    *(uint32_t *)(buf + 14) = htobe32(msgInfo->serial);
-    *(uint16_t *)(buf + 18) = htobe16(crc);
+    *(uint16_t *)(buf + 10) = htobe16(flag);
+    *(uint32_t *)(buf + 12) = htobe32(conn->recvSerial_);
+    *(uint32_t *)(buf + 16) = htobe32(msgInfo->serial);
+    *(uint16_t *)(buf + 20) = htobe16(crc);
 
     return true;
 }

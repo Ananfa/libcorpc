@@ -43,7 +43,7 @@ MessageClient::~MessageClient() {
     }
 }
 
-void MessageClient::send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
+void MessageClient::send(int32_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
     if (connection_) {
         connection_->send(type, isRaw, needCrypt, needBuffer, tag, msg);
     }
@@ -211,10 +211,10 @@ bool UdpClient::connect() {
     char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
     
     memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake1msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
+    *(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     
     memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake3msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+    *(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
@@ -255,8 +255,8 @@ STEP1_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     ERROR_LOG("recv data not handshake2\n");
@@ -308,8 +308,8 @@ STEP2_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     continue;
@@ -369,7 +369,7 @@ void MessageClient::close() {
     //}
 }
 
-void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg) {
+void MessageClient::send(int32_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg) {
     MessageInfo *info = new MessageInfo;
     info->type = type;
     info->tag = tag;
@@ -379,7 +379,7 @@ void MessageClient::send(int16_t type, uint16_t tag, bool needCrypter, std::shar
     sendQueue_.push(info);
 }
 
-void MessageClient::recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg) {
+void MessageClient::recv(int32_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg) {
     MessageInfo *info = recvQueue_.pop();
     if (info) {
         type = info->type;
@@ -394,7 +394,7 @@ void MessageClient::recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::p
     }
 }
 
-bool MessageClient::registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto) {
+bool MessageClient::registerMessage(int32_t type, std::shared_ptr<google::protobuf::Message> proto) {
     MessageInfo info;
     info.type = type;
     info.proto = proto;
@@ -449,7 +449,7 @@ void *TcpClient::workRoutine( void * arg ) {
 
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
+    *(int32_t *)(heartbeatmsg + 4) = htobe32(CORPC_MSG_TYPE_HEARTBEAT);
     
     int s = self->s_;
     struct pollfd fd_in, fd_out;
@@ -469,7 +469,7 @@ void *TcpClient::workRoutine( void * arg ) {
     int bodyNum = 0;
     
     uint32_t bodySize = 0;
-    int16_t msgType = 0;
+    int32_t msgType = 0;
     uint16_t tag = 0;
     uint16_t flag = 0;
     
@@ -539,11 +539,11 @@ void *TcpClient::workRoutine( void * arg ) {
                     if (headNum == CORPC_MESSAGE_HEAD_SIZE) {
                         bodySize = *(uint32_t *)headBuf;
                         bodySize = be32toh(bodySize);
-                        msgType = *(int16_t *)(headBuf + 4);
-                        msgType = be16toh(msgType);
-                        tag = *(uint16_t *)(headBuf + 6);
+                        msgType = *(int32_t *)(headBuf + 4);
+                        msgType = be32toh(msgType);
+                        tag = *(uint16_t *)(headBuf + 8);
                         tag = be16toh(tag);
-                        flag = *(uint16_t *)(headBuf + 8);
+                        flag = *(uint16_t *)(headBuf + 10);
                         flag = be16toh(flag);
                     } else {
                         assert(remainNum == 0);
@@ -579,7 +579,7 @@ void *TcpClient::workRoutine( void * arg ) {
                         //assert(bodySize > 0);
                         // 校验序列号
                         if (self->enableSerial_) {
-                            uint32_t serial = *(uint32_t *)(headBuf + 14);
+                            uint32_t serial = *(uint32_t *)(headBuf + 16);
                             serial = be32toh(serial);
 
                             if (serial != 0) {
@@ -596,7 +596,7 @@ void *TcpClient::workRoutine( void * arg ) {
                         if (bodySize > 0) {
                             // 校验CRC
                             if (self->enableRecvCRC_) {
-                                uint16_t crc = *(uint16_t *)(headBuf + 18);
+                                uint16_t crc = *(uint16_t *)(headBuf + 20);
                                 crc = be16toh(crc);
 
                                 uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
@@ -669,7 +669,7 @@ void *TcpClient::workRoutine( void * arg ) {
             
             if (nowms - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
                 if (self->enableSerial_) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(heartbeatmsg + 12) = htobe32(self->lastRecvSerial_);
                 }
 
                 if (write(s, heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
@@ -704,25 +704,27 @@ void *TcpClient::workRoutine( void * arg ) {
                 if (info->needCrypter) {
                     assert(self->crypter_);
                     self->crypter_->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-                    *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
+                    *(uint16_t *)(buf + sendNum + 10) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 } else {
-                    *(uint16_t *)(buf + sendNum + 8) = 0;
+                    *(uint16_t *)(buf + sendNum + 10) = 0;
                 }
                 
                 *(uint32_t *)(buf + sendNum) = htobe32(msgSize);
-                *(int16_t *)(buf + sendNum + 4) = htobe16(info->type);
+                *(int32_t *)(buf + sendNum + 4) = htobe32(info->type);
 
-                *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
+                *(uint16_t *)(buf + sendNum + 8) = htobe16(info->tag);
                 
                 if (self->enableSerial_) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->lastRecvSerial_);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->lastSendSerial_);
+                    *(uint32_t *)(buf + sendNum + 12) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(buf + sendNum + 16) = htobe32(++self->lastSendSerial_);
                 }
 
                 if (self->enableSendCRC_) {
-                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
-                    crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
-                    *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
+                    //uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 20);
+                    //crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
+                    //*(uint16_t *)(buf + sendNum + 20) = htobe16(crc);
+                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
+                    *(uint16_t *)(buf + sendNum + 20) = htobe16(crc);
                 }
                 
                 sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
@@ -816,10 +818,10 @@ bool UdpClient::start() {
     char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
     
     memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake1msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
+    *(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     
     memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake3msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+    *(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
@@ -860,8 +862,8 @@ STEP1_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     ERROR_LOG("recv data not handshake2\n");
@@ -913,8 +915,8 @@ STEP2_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     continue;
@@ -957,7 +959,7 @@ void *UdpClient::workRoutine( void * arg ) {
 
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
+    *(int32_t *)(heartbeatmsg + 4) = htobe32(CORPC_MSG_TYPE_HEARTBEAT);
 
     int s = self->s_;
     struct pollfd fd;
@@ -967,7 +969,7 @@ void *UdpClient::workRoutine( void * arg ) {
     int ret;
     
     uint32_t bodySize = 0;
-    int16_t msgType = 0;
+    int32_t msgType = 0;
     uint16_t tag = 0;
     uint16_t flag = 0;
     
@@ -1013,11 +1015,11 @@ void *UdpClient::workRoutine( void * arg ) {
             } else {
                 bodySize = *(uint32_t *)buf;
                 bodySize = be32toh(bodySize);
-                msgType = *(int16_t *)(buf + 4);
-                msgType = be16toh(msgType);
-                tag = *(uint16_t *)(buf + 6);
+                msgType = *(int32_t *)(buf + 4);
+                msgType = be32toh(msgType);
+                tag = *(uint16_t *)(buf + 8);
                 tag = be16toh(tag);
-                flag = *(uint16_t *)(buf + 8);
+                flag = *(uint16_t *)(buf + 10);
                 flag = be16toh(flag);
 
                 //DEBUG_LOG("recv msg type:%d\n", msgType);
@@ -1037,7 +1039,7 @@ void *UdpClient::workRoutine( void * arg ) {
                     assert(bodySize > 0);
                     // 校验序列号
                     if (self->enableSerial_) {
-                        uint32_t serial = *(uint32_t *)(buf + 14);
+                        uint32_t serial = *(uint32_t *)(buf + 16);
                         serial = be32toh(serial);
 
                         if (serial != ++self->lastRecvSerial_) {
@@ -1050,7 +1052,7 @@ void *UdpClient::workRoutine( void * arg ) {
 
                     // 校验CRC
                     if (self->enableRecvCRC_) {
-                        uint16_t crc = *(uint16_t *)(buf + 18);
+                        uint16_t crc = *(uint16_t *)(buf + 20);
                         crc = be16toh(crc);
 
                         uint16_t crc1 = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, bodySize);
@@ -1134,19 +1136,19 @@ void *UdpClient::workRoutine( void * arg ) {
             if (info->needCrypter) {
                 assert(self->crypter_);
                 self->crypter_->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-                *(uint16_t *)(buf + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
+                *(uint16_t *)(buf + 10) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
             } else {
-                *(uint16_t *)(buf + 8) = 0;
+                *(uint16_t *)(buf + 10) = 0;
             }
 
             *(uint32_t *)buf = htobe32(msgSize);
-            *(int16_t *)(buf + 4) = htobe16(info->type);
+            *(int32_t *)(buf + 4) = htobe32(info->type);
 
-            *(uint16_t *)(buf + 6) = htobe16(info->tag);
+            *(uint16_t *)(buf + 8) = htobe16(info->tag);
 
             if (self->enableSerial_) {
-                *(uint32_t *)(buf + 10) = htobe32(self->lastRecvSerial_); // 由于UDP的包顺序会错乱，无法通过序号来删除缓存序号靠前的消息
-                *(uint32_t *)(buf + 14) = htobe32(++self->lastSendSerial_);
+                *(uint32_t *)(buf + 12) = htobe32(self->lastRecvSerial_); // 由于UDP的包顺序会错乱，无法通过序号来删除缓存序号靠前的消息
+                *(uint32_t *)(buf + 16) = htobe32(++self->lastSendSerial_);
             }
 
             if (self->enableSendCRC_) {
@@ -1154,7 +1156,7 @@ void *UdpClient::workRoutine( void * arg ) {
                 //crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
                 uint16_t crc = corpc::CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
 
-                *(uint16_t *)(buf + 18) = htobe16(crc);
+                *(uint16_t *)(buf + 20) = htobe16(crc);
             }
             
             int size = msgSize + CORPC_MESSAGE_HEAD_SIZE;
@@ -1235,10 +1237,10 @@ bool KcpClient::start() {
     char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
     
     memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake1msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
+    *(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     
     memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(handshake3msg + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
+    *(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
@@ -1279,8 +1281,8 @@ STEP1_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     ERROR_LOG("recv data not handshake2\n");
@@ -1332,8 +1334,8 @@ STEP2_POLLAGAIN:
                     return false;
                 }
                 
-                int16_t msgtype = *(int16_t *)(buf + 4);
-                msgtype = be16toh(msgtype);
+                int32_t msgtype = *(int32_t *)(buf + 4);
+                msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
                     continue;
@@ -1394,7 +1396,7 @@ void *KcpClient::recvRoutine(void *arg) {
     int bodyNum = 0;
     
     uint32_t bodySize = 0;
-    int16_t msgType = 0;
+    int32_t msgType = 0;
     uint16_t tag = 0;
     uint16_t flag = 0;
 
@@ -1460,11 +1462,11 @@ void *KcpClient::recvRoutine(void *arg) {
                     if (headNum == CORPC_MESSAGE_HEAD_SIZE) {
                         bodySize = *(uint32_t *)headBuf;
                         bodySize = be32toh(bodySize);
-                        msgType = *(int16_t *)(headBuf + 4);
-                        msgType = be16toh(msgType);
-                        tag = *(uint16_t *)(headBuf + 6);
+                        msgType = *(int32_t *)(headBuf + 4);
+                        msgType = be32toh(msgType);
+                        tag = *(uint16_t *)(headBuf + 8);
                         tag = be16toh(tag);
-                        flag = *(uint16_t *)(headBuf + 8);
+                        flag = *(uint16_t *)(headBuf + 10);
                         flag = be16toh(flag);
                     } else {
                         assert(remainNum == 0);
@@ -1500,7 +1502,7 @@ void *KcpClient::recvRoutine(void *arg) {
                         //assert(bodySize > 0);
                         // 校验序列号
                         if (self->enableSerial_) {
-                            uint32_t serial = *(uint32_t *)(headBuf + 14);
+                            uint32_t serial = *(uint32_t *)(headBuf + 16);
                             serial = be32toh(serial);
 
                             if (serial != 0) {
@@ -1516,7 +1518,7 @@ void *KcpClient::recvRoutine(void *arg) {
                         if (bodySize > 0) {
                             // 校验CRC
                             if (self->enableRecvCRC_) {
-                                uint16_t crc = *(uint16_t *)(headBuf + 18);
+                                uint16_t crc = *(uint16_t *)(headBuf + 20);
                                 crc = be16toh(crc);
 
                                 uint16_t crc1 = corpc::CRC::CheckSum(bodyBuf, 0xFFFF, bodySize);
@@ -1641,25 +1643,25 @@ void *KcpClient::sendRoutine(void *arg) {
                 if (info->needCrypter) {
                     assert(self->crypter_);
                     self->crypter_->encrypt(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, msgSize);
-                    *(uint16_t *)(buf + sendNum + 8) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
+                    *(uint16_t *)(buf + sendNum + 10) = htobe16(CORPC_MESSAGE_FLAG_CRYPT);
                 } else {
-                    *(uint16_t *)(buf + sendNum + 8) = 0;
+                    *(uint16_t *)(buf + sendNum + 10) = 0;
                 }
                 
                 *(uint32_t *)(buf + sendNum) = htobe32(msgSize);
-                *(int16_t *)(buf + sendNum + 4) = htobe16(info->type);
+                *(int32_t *)(buf + sendNum + 4) = htobe32(info->type);
 
-                *(uint16_t *)(buf + sendNum + 6) = htobe16(info->tag);
+                *(uint16_t *)(buf + sendNum + 8) = htobe16(info->tag);
                 
                 if (self->enableSerial_) {
-                    *(uint32_t *)(buf + sendNum + 10) = htobe32(self->lastRecvSerial_);
-                    *(uint32_t *)(buf + sendNum + 14) = htobe32(++self->lastSendSerial_);
+                    *(uint32_t *)(buf + sendNum + 12) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(buf + sendNum + 16) = htobe32(++self->lastSendSerial_);
                 }
 
                 if (self->enableSendCRC_) {
-                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 18);
+                    uint16_t crc = corpc::CRC::CheckSum(buf + sendNum, 0xFFFF, 20);
                     crc = corpc::CRC::CheckSum(buf + sendNum + CORPC_MESSAGE_HEAD_SIZE, crc, msgSize);
-                    *(uint16_t *)(buf + sendNum + 18) = htobe16(crc);
+                    *(uint16_t *)(buf + sendNum + 20) = htobe16(crc);
                 }
                 
                 sendNum += msgSize + CORPC_MESSAGE_HEAD_SIZE;
@@ -1700,7 +1702,7 @@ void *KcpClient::updateRoutine(void *arg) {
 
     uint8_t heartbeatmsg[CORPC_MESSAGE_HEAD_SIZE];
     memset(heartbeatmsg, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(heartbeatmsg + 4) = htobe16(CORPC_MSG_TYPE_HEARTBEAT);
+    *(int32_t *)(heartbeatmsg + 4) = htobe32(CORPC_MSG_TYPE_HEARTBEAT);
     
     while (self->running_) {
         uint64_t now = mtime();
@@ -1715,7 +1717,7 @@ void *KcpClient::updateRoutine(void *arg) {
             
             if (now - self->lastSendHBTime_ > CORPC_HEARTBEAT_PERIOD) {
                 if (self->enableSerial_) {
-                    *(uint32_t *)(heartbeatmsg + 10) = htobe32(self->lastRecvSerial_);
+                    *(uint32_t *)(heartbeatmsg + 12) = htobe32(self->lastRecvSerial_);
                 }
 
                 if (self->write(heartbeatmsg, CORPC_MESSAGE_HEAD_SIZE) < 0) {

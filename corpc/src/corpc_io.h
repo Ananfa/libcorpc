@@ -144,7 +144,7 @@ namespace corpc {
         TcpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, SIZE_TYPE bodySizeType);
         virtual ~TcpPipeline() {}
         
-        virtual bool upflow(uint8_t *buf, int size);
+        virtual bool upflow(uint8_t *buf, int size) override;
         
     private:
         uint headNum_;
@@ -159,7 +159,7 @@ namespace corpc {
         UdpPipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
         virtual ~UdpPipeline() {}
         
-        virtual bool upflow(uint8_t *buf, int size);
+        virtual bool upflow(uint8_t *buf, int size) override;
     };
     
     class PipelineFactory {
@@ -178,7 +178,7 @@ namespace corpc {
         MessagePipelineFactory(corpc::Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): PipelineFactory(worker), decodeFun_(decodeFun), encodeFun_(encodeFun), headSize_(headSize), maxBodySize_(maxBodySize) {}
         virtual ~MessagePipelineFactory() = 0;
         
-        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
+        //virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) = 0;
         
     protected:
         DecodeFunction decodeFun_;
@@ -193,7 +193,7 @@ namespace corpc {
         TcpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize, uint bodySizeOffset, MessagePipeline::SIZE_TYPE bodySizeType): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize), bodySizeOffset_(bodySizeOffset), bodySizeType_(bodySizeType) {}
         ~TcpPipelineFactory() {}
         
-        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) override;
         
     public:
         uint bodySizeOffset_;
@@ -205,7 +205,7 @@ namespace corpc {
         UdpPipelineFactory(Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize): MessagePipelineFactory(worker, decodeFun, encodeFun, headSize, maxBodySize) {}
         ~UdpPipelineFactory() {}
         
-        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection);
+        virtual std::shared_ptr<Pipeline> buildPipeline(std::shared_ptr<Connection> &connection) override;
     };
     
     class Connection: public std::enable_shared_from_this<Connection> {
@@ -336,7 +336,7 @@ namespace corpc {
         TcpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port) {}
         virtual ~TcpAcceptor() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
     private:
         static void *acceptRoutine( void * arg );
@@ -369,7 +369,7 @@ namespace corpc {
         UdpAcceptor(Server *server, const std::string& ip, uint16_t port);
         virtual ~UdpAcceptor() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
     private:
         // 启动新线程来负责连接握手
@@ -459,9 +459,9 @@ namespace corpc {
         MultiThreadReceiver(IO *io, uint16_t threadNum): Receiver(io), threadNum_(threadNum), lastThreadIndex_(0), threadDatas_(threadNum) {}
         virtual ~MultiThreadReceiver() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
-        virtual void addConnection(std::shared_ptr<Connection>& connection);
+        virtual void addConnection(std::shared_ptr<Connection>& connection) override;
         
     protected:
         static void threadEntry( ThreadData *tdata );
@@ -477,9 +477,9 @@ namespace corpc {
         CoroutineReceiver(IO *io): Receiver(io) { /*queueContext_.receiver_ = this;*/ }
         virtual ~CoroutineReceiver() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
-        virtual void addConnection(std::shared_ptr<Connection>& connection);
+        virtual void addConnection(std::shared_ptr<Connection>& connection) override;
         
     private:
         QueueContext queueContext_;
@@ -525,11 +525,11 @@ namespace corpc {
         MultiThreadSender(IO *io, uint16_t threadNum): Sender(io), threadNum_(threadNum), lastThreadIndex_(0), threadDatas_(threadNum) {}
         virtual ~MultiThreadSender() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
-        virtual void addConnection(std::shared_ptr<Connection>& connection);
-        virtual void removeConnection(std::shared_ptr<Connection>& connection);
-        virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
+        virtual void addConnection(std::shared_ptr<Connection>& connection) override;
+        virtual void removeConnection(std::shared_ptr<Connection>& connection) override;
+        virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) override;
     private:
         static void threadEntry( ThreadData *tdata );
         
@@ -544,11 +544,11 @@ namespace corpc {
         CoroutineSender(IO *io): Sender(io) { /*queueContext_.sender_ = this;*/ }
         virtual ~CoroutineSender() {}
         
-        virtual bool start();
+        virtual bool start() override;
         
-        virtual void addConnection(std::shared_ptr<Connection>& connection);
-        virtual void removeConnection(std::shared_ptr<Connection>& connection);
-        virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data);
+        virtual void addConnection(std::shared_ptr<Connection>& connection) override;
+        virtual void removeConnection(std::shared_ptr<Connection>& connection) override;
+        virtual void send(std::shared_ptr<Connection>& connection, std::shared_ptr<void> data) override;
     private:
         QueueContext queueContext_;
     };

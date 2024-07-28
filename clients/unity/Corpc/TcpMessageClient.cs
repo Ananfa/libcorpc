@@ -30,8 +30,10 @@ namespace Corpc
             _enableSerial = enableSerial;
 
             _heartbeatmsg = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE];
-            _heartbeatmsg[4] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 8) & 0xFF);
-            _heartbeatmsg[5] = (byte)(Constants.CORPC_MSG_TYPE_HEARTBEAT & 0xFF);
+            _heartbeatmsg[4] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 24) & 0xFF);
+            _heartbeatmsg[5] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 16) & 0xFF);
+            _heartbeatmsg[6] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 8) & 0xFF);
+            _heartbeatmsg[7] = (byte)(Constants.CORPC_MSG_TYPE_HEARTBEAT & 0xFF);
         }
 
         public bool Start()
@@ -154,17 +156,17 @@ namespace Corpc
             while (true) {
                 try {
                     // 读出消息头部（4字节类型+4字节长度）
-                    // |body size(4 bytes)|message type(2 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
+                    // |body size(4 bytes)|message type(4 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
                     int remainLen = Constants.CORPC_MESSAGE_HEAD_SIZE;
                     while (remainLen > 0)
                     {
                         remainLen -= _stream.Read(head, Constants.CORPC_MESSAGE_HEAD_SIZE - remainLen, remainLen);
                     }
 
-                    uint msgLen = (uint)((head[0] << 24) + (head[1] << 16) + (head[2] << 8) + head[3]);
-                    short msgType = (short)((head[4] << 8) + head[5]);
-                    ushort tag = (ushort)((head[6] << 8) + head[7]);
-                    ushort flag = (ushort)((head[8] << 8) + head[9]);
+                    uint msgLen = (uint)((head[0] << 24) | (head[1] << 16) | (head[2] << 8) | head[3]);
+                    int msgType = (int)((head[4] << 24) | (head[5] << 16) | (head[6] << 8) | head[7]);
+                    ushort tag = (ushort)((head[8] << 8) | head[9]);
+                    ushort flag = (ushort)((head[10] << 8) | head[11]);
 
                     // 读取消息体
                     byte[] data = null;
@@ -185,7 +187,7 @@ namespace Corpc
                     if (msgType > 0) {
                         // 校验序号
                         if (_enableSerial) {
-                            uint serial = (uint)((head[14] << 24) + (head[15] << 16) + (head[16] << 8) + head[17]);
+                            uint serial = (uint)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
                             if (serial != 0 && serial != _lastRecvSerial+1) {
                                 Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", _lastRecvSerial, serial);
                                 _recvMsgQueue.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
@@ -199,7 +201,7 @@ namespace Corpc
                             // 校验CRC
                             if (_enableRecvCRC)
                             {
-                                ushort crc = (ushort)((head[18] << 8) + head[19]);
+                                ushort crc = (ushort)((head[20] << 8) | head[21]);
                                 ushort crc1 = CRC.CheckSum(data, 0, 0xFFFF, msgLen);
 
                                 if (crc != crc1)
@@ -300,34 +302,37 @@ namespace Corpc
                             buf[1] = (byte)((dataLength >> 16) & 0xFF);
                             buf[2] = (byte)((dataLength >> 8) & 0xFF);
                             buf[3] = (byte)(dataLength & 0xFF);
-                            buf[4] = (byte)((msg.Type >> 8) & 0xFF);
-                            buf[5] = (byte)(msg.Type & 0xFF);
-                            buf[6] = (byte)((msg.Tag >> 8) & 0xFF);
-                            buf[7] = (byte)(msg.Tag & 0xFF);
-                            buf[8] = (byte)((flag >> 8) & 0xFF);
-                            buf[9] = (byte)(flag & 0xFF);
+                            buf[4] = (byte)((msg.Type >> 24) & 0xFF);
+                            buf[5] = (byte)((msg.Type >> 16) & 0xFF);
+                            buf[6] = (byte)((msg.Type >> 8) & 0xFF);
+                            buf[7] = (byte)(msg.Type & 0xFF);
+                            buf[8] = (byte)((msg.Tag >> 8) & 0xFF);
+                            buf[9] = (byte)(msg.Tag & 0xFF);
+                            buf[10] = (byte)((flag >> 8) & 0xFF);
+                            buf[11] = (byte)(flag & 0xFF);
 
                             if (_enableSerial)
                             {
                                 // _lastRecvSerial是否会导致线程同步问题？
-                                buf[10] = (byte)((_lastRecvSerial >> 24) & 0xFF);
-                                buf[11] = (byte)((_lastRecvSerial >> 16) & 0xFF);
-                                buf[12] = (byte)((_lastRecvSerial >> 8) & 0xFF);
-                                buf[13] = (byte)(_lastRecvSerial & 0xFF);
+                                buf[12] = (byte)((_lastRecvSerial >> 24) & 0xFF);
+                                buf[13] = (byte)((_lastRecvSerial >> 16) & 0xFF);
+                                buf[14] = (byte)((_lastRecvSerial >> 8) & 0xFF);
+                                buf[15] = (byte)(_lastRecvSerial & 0xFF);
                                 _lastSendSerial++;
-                                buf[14] = (byte)((_lastSendSerial >> 24) & 0xFF);
-                                buf[15] = (byte)((_lastSendSerial >> 16) & 0xFF);
-                                buf[16] = (byte)((_lastSendSerial >> 8) & 0xFF);
-                                buf[17] = (byte)(_lastSendSerial & 0xFF);
+                                buf[16] = (byte)((_lastSendSerial >> 24) & 0xFF);
+                                buf[17] = (byte)((_lastSendSerial >> 16) & 0xFF);
+                                buf[18] = (byte)((_lastSendSerial >> 8) & 0xFF);
+                                buf[19] = (byte)(_lastSendSerial & 0xFF);
                             }
 
                             if (_enableSendCRC)
                             {
-                                ushort crc = CRC.CheckSum(buf, 0, 0xFFFF, Constants.CORPC_MESSAGE_HEAD_SIZE - 2);
-                                crc = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, crc, dataLength);
+                                //ushort crc = CRC.CheckSum(buf, 0, 0xFFFF, Constants.CORPC_MESSAGE_HEAD_SIZE - 2);
+                                //crc = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, crc, dataLength);
+                                ushort crc = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, dataLength);
 
-                                buf[18] = (byte)((crc >> 8) & 0xFF);
-                                buf[19] = (byte)(crc & 0xFF);
+                                buf[20] = (byte)((crc >> 8) & 0xFF);
+                                buf[21] = (byte)(crc & 0xFF);
                             }
 
                             _stream.Write(buf, 0, Constants.CORPC_MESSAGE_HEAD_SIZE + (int)dataLength);

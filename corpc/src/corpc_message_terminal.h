@@ -33,8 +33,8 @@ namespace corpc {
             Connection(int fd, IO *io, Worker *worker, MessageTerminal *terminal);
             virtual ~Connection();
 
-            virtual void onConnect();
-            virtual void onClose();
+            virtual void onConnect() override;
+            virtual void onClose() override;
             
             MessageTerminal *getTerminal() { return terminal_; }
             Worker *getWorker() { return worker_; }
@@ -48,7 +48,7 @@ namespace corpc {
 
             // 以下3个方法都会对消息缓存操作，消息缓存不是线程安全的，需要在worker中处理
             void scrapMessages(uint32_t serial); // 擦除已确认消息
-            void send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
+            void send(int32_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
             void resend(); // 重发消息缓存中所有消息
         private:
             MessageTerminal *terminal_;
@@ -63,8 +63,8 @@ namespace corpc {
         };
         
     private:
-        typedef std::function<void(int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
-        typedef std::function<void(int16_t type, uint16_t tag, std::shared_ptr<std::string>, std::shared_ptr<Connection>)> OtherMessageHandle;
+        typedef std::function<void(int32_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message>, std::shared_ptr<Connection>)> MessageHandle;
+        typedef std::function<void(int32_t type, uint16_t tag, std::shared_ptr<std::string>, std::shared_ptr<Connection>)> OtherMessageHandle;
         
         struct RegisterMessageInfo {
             google::protobuf::Message *proto;
@@ -89,10 +89,10 @@ namespace corpc {
 
             static void *taskCallRoutine( void * arg );
 
-            virtual void doTask();
+            virtual void doTask() override;
             
         public:
-            int16_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
+            int32_t type; // 正数类型消息为proto消息，负数类型消息用于系统消息，如：建立连接(-1)、断开连接(-2)
             uint16_t tag; // 客户端向服务器发带tag消息，服务器对这消息应答消息也需带相同的tag（客户端会等待tag消息返回）
             uint32_t reqSerial; // 连接对方收到的最后消息序号
             bool banned; // 屏蔽
@@ -104,7 +104,7 @@ namespace corpc {
         MessageTerminal(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial);
         virtual ~MessageTerminal();
         
-        bool registerMessage(int type,
+        bool registerMessage(int32_t type,
                              google::protobuf::Message *proto,
                              bool needCoroutine,
                              MessageHandle handle);
@@ -112,7 +112,7 @@ namespace corpc {
         void setOtherMessageHandle(OtherMessageHandle handle) { otherMessageHandle_ = handle; };
 
         // 接收完整的封禁列表
-        bool setBanMessages(std::list<int> &msgTypes);
+        bool setBanMessages(std::list<int32_t> &msgTypes);
         
         virtual corpc::Connection * buildConnection(int fd, IO *io, Worker *worker);
 
@@ -125,7 +125,7 @@ namespace corpc {
         bool enableSendCRC_; // 是否需要发包时校验CRC码
         bool enableRecvCRC_; // 是否需要收包时校验CRC码
         bool enableSerial_;  // 是否需要消息序号
-        std::map<int, RegisterMessageInfo> registerMessageMap_;
+        std::map<int32_t, RegisterMessageInfo> registerMessageMap_;
         OtherMessageHandle otherMessageHandle_;  // 其他未注册消息的处理
     };
 }

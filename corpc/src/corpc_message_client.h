@@ -36,7 +36,7 @@ namespace corpc {
 
         virtual bool connect() = 0;
 
-        void send(int16_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
+        void send(int32_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg);
 
     protected:
         std::shared_ptr<corpc::Connection> buildAndAddConnection(int fd);
@@ -60,7 +60,7 @@ namespace corpc {
         TcpClient(IO *io, Worker *worker, MessageTerminal *terminal, const std::string& host, uint16_t port);
         virtual ~TcpClient() {}
 
-        virtual bool connect();
+        virtual bool connect() override;
 
     private:
         std::string host_;
@@ -72,7 +72,7 @@ namespace corpc {
         UdpClient(IO *io, Worker *worker, MessageTerminal *terminal, const std::string& host, uint16_t port, uint16_t local_port);
         virtual ~UdpClient() {}
 
-        virtual bool connect();
+        virtual bool connect() override;
 
     private:
         std::string host_;
@@ -105,10 +105,10 @@ namespace corpc {
 
         bool isRunning() { return running_; };
         
-        void send(int16_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
-        void recv(int16_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
+        void send(int32_t type, uint16_t tag, bool needCrypter, std::shared_ptr<google::protobuf::Message> msg);
+        void recv(int32_t& type, uint16_t& tag, std::shared_ptr<google::protobuf::Message>& msg); // 收不到数据时type为0，msg为nullptr
         
-        bool registerMessage(int16_t type, std::shared_ptr<google::protobuf::Message> proto);
+        bool registerMessage(int32_t type, std::shared_ptr<google::protobuf::Message> proto);
         
         uint32_t getLastRecvSerial() { return lastRecvSerial_; }
         uint32_t getLastSendSerial() { return lastSendSerial_; }
@@ -118,7 +118,7 @@ namespace corpc {
 
     protected:
         struct MessageInfo {
-            int16_t type;
+            int32_t type;
             uint16_t tag;
             std::shared_ptr<google::protobuf::Message> proto;
             bool needCrypter;   // 发送消息时标记消息是否需要加密
@@ -139,7 +139,7 @@ namespace corpc {
         Co_MPSC_NoLockQueue<MessageInfo*> sendQueue_;
         MPSC_NoLockQueue<MessageInfo*> recvQueue_;
         
-        std::map<int16_t, MessageInfo> registerMessageMap_;
+        std::map<int32_t, MessageInfo> registerMessageMap_;
         
         uint64_t lastRecvHBTime_ = 0; // 最后一次收到心跳的时间
         uint64_t lastSendHBTime_ = 0; // 最后一次发送心跳的时间
@@ -154,7 +154,7 @@ namespace corpc {
         TcpClient(const std::string& host, uint16_t port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> &crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), host_(host), port_(port) {}
         ~TcpClient() {}
         
-        virtual bool start();
+        virtual bool start() override;
 
     private:
         static void *workRoutine( void * arg ); // 数据收发协程
@@ -169,7 +169,7 @@ namespace corpc {
         UdpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0): MessageClient(needHB, enableSendCRC, enableRecvCRC, enableSerial, crypter, lastRecvSerial), host_(host), port_(port), local_port_(local_port) {}
         ~UdpClient() {}
 
-        virtual bool start();
+        virtual bool start() override;
 
     private:
         static void *workRoutine( void * arg ); // 数据收发协程
@@ -185,7 +185,7 @@ namespace corpc {
         KcpClient(const std::string& host, uint16_t port, uint16_t local_port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial, std::shared_ptr<Crypter> crypter, uint32_t lastRecvSerial = 0);
         ~KcpClient();
 
-        virtual bool start();
+        virtual bool start() override;
 
         ssize_t write(const void *buf, size_t nbyte);
     private:

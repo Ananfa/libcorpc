@@ -45,8 +45,8 @@
 // |body size(4 bytes)|coroutine ptr(8 bytes)|expire time(8 bytes)|error code(4 bytes)|
 #define CORPC_RESPONSE_HEAD_SIZE 24
 // message head format
-// |body size(4 bytes)|message type(2 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
-#define CORPC_MESSAGE_HEAD_SIZE 20
+// |body size(4 bytes)|message type(4 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
+#define CORPC_MESSAGE_HEAD_SIZE 22
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540
 #define CORPC_MAX_KCP_PACKAGE_SIZE 0x1000
@@ -191,7 +191,7 @@ namespace corpc {
     };
 
     struct SendMessageInfo {
-        int16_t type;
+        int32_t type;
         bool isRaw;
         bool needCrypt;
         uint16_t tag;

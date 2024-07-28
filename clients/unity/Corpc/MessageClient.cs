@@ -13,11 +13,11 @@ namespace Corpc
 
 	public class MessageRegInfo
 	{
-		public short Type { get; }
+		public int Type { get; }
 		public MessageParser Parser { get; }
 		public MessageHandler Handler { get; }
 
-		public MessageRegInfo(short type, MessageParser parser, MessageHandler handler)
+		public MessageRegInfo(int type, MessageParser parser, MessageHandler handler)
         {
 			Type = type;
 			Parser = parser;
@@ -48,7 +48,7 @@ namespace Corpc
 
 		protected ICrypter _crypter = null;
 
-		Dictionary<short, MessageRegInfo> _registerTable = new Dictionary<short, MessageRegInfo>();
+		Dictionary<int, MessageRegInfo> _registerTable = new Dictionary<int, MessageRegInfo>();
 
         public bool Running
         {
@@ -74,7 +74,7 @@ namespace Corpc
 			_enableSerial = enableSerial;
 		}
 
-		public bool Register(short type, MessageParser parser, MessageHandler handler)
+		public bool Register(int type, MessageParser parser, MessageHandler handler)
 		{
 			if (_registerTable.ContainsKey(type))
             {
@@ -86,14 +86,14 @@ namespace Corpc
 			return true;
 		}
 
-		public void Unregister(short type)
+		public void Unregister(int type)
 		{
 			if (_registerTable.ContainsKey(type)) {
 				_registerTable.Remove(type);
 			}
 		}
 
-		protected void HandleMessage(short type, IMessage msg)
+		protected void HandleMessage(int type, IMessage msg)
 		{
 			if (!_registerTable.ContainsKey(type))
 			{
@@ -115,7 +115,7 @@ namespace Corpc
 			return null;
 		}
 
-		protected IMessage Deserialize(short type, byte[] data, int offset, int length)
+		protected IMessage Deserialize(int type, byte[] data, int offset, int length)
 		{
 			if (!_registerTable.ContainsKey(type))
             {
@@ -127,7 +127,7 @@ namespace Corpc
 		}
 
         // 异步发送数据
-        public void Send(short type, ushort tag, IMessage msg, bool needCrypter)
+        public void Send(int type, ushort tag, IMessage msg, bool needCrypter)
         {
             _sendMsgQueue.Enqueue(new ProtoMessage(type, tag, msg, needCrypter));
         }

@@ -459,13 +459,13 @@ bool TcpAcceptor::start() {
 UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), shakemsg2_(CORPC_MESSAGE_HEAD_SIZE, 0), shakemsg4_(CORPC_MESSAGE_HEAD_SIZE, 0), unshakemsg_(CORPC_MESSAGE_HEAD_SIZE, 0) {
     shakemsg2buf_ = (uint8_t *)shakemsg2_.data();
     memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(shakemsg2buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+    *(int32_t *)(shakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
     shakemsg4buf_ = (uint8_t *)shakemsg4_.data();
     memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(shakemsg4buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
+    *(int32_t *)(shakemsg4buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
     unshakemsg2buf_ = (uint8_t *)unshakemsg_.data();
     memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int16_t *)(unshakemsg2buf_ + 4) = htobe16(CORPC_MSG_TYPE_UDP_UNSHAKE);
+    *(int32_t *)(unshakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
 }
 
 void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -503,8 +503,8 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
         uint32_t bodySize = *(uint32_t *)buf;
         bodySize = be32toh(bodySize);
-        int16_t msgType = *(int16_t *)(buf + 4);
-        msgType = be16toh(msgType);
+        int32_t msgType = *(int32_t *)(buf + 4);
+        msgType = be32toh(msgType);
         
         // 判断是否“连接请求”消息
         if (msgType != CORPC_MSG_TYPE_UDP_HANDSHAKE_1) {
@@ -603,8 +603,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
             break;
         } else {
             // 判断是否“最终确认消息”
-            int16_t msgtype = *(int16_t *)(buf + 4);
-            msgtype = be16toh(msgtype);
+            int32_t msgtype = *(int32_t *)(buf + 4);
+            msgtype = be32toh(msgtype);
             
             if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
                 // 消息类型不对
