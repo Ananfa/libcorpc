@@ -20,7 +20,7 @@
 
 using namespace corpc;
 
-MessageTerminal::Connection::Connection(int fd, IO *io, Worker *worker, MessageTerminal *terminal): corpc::Connection(fd, io, terminal->needHB_), terminal_(terminal), worker_(worker), crypter_(nullptr), recvSerial_(0) {
+MessageTerminal::Connection::Connection(int fd, IO *io, Worker *worker, MessageTerminal *terminal): corpc::Connection(fd, io, terminal->needHB_), terminal_(terminal), worker_(worker), crypter_(nullptr), recvSerial_(0), lastSendSerial_(0) {
 
 }
 
@@ -53,9 +53,29 @@ void MessageTerminal::Connection::scrapMessages(uint32_t serial) {
 }
 
 void MessageTerminal::Connection::send(int32_t type, bool isRaw, bool needCrypt, bool needBuffer, uint16_t tag, std::shared_ptr<void> msg) {
-    if (!isOpen() && !(terminal_->enableSerial_ && msgBuffer_->needBuf())) {
-        return;
+    if (!isOpen()) {
+        if (type < 0) {
+            return;
+        }
+
+        if (!msgBuffer_) {
+            return;
+        }
+
+        assert(terminal_->enableSerial_);
+
+        if (!needBuffer) {
+            return;
+        }
     }
+
+    // 注意：服务器向客户端发的序号为0的消息不进行序号校验，一般用于底层控制型消息（如：连接、心跳等，此类消息type<0）
+    //      序号和发送缓存概念有点绑定，序号是用于消息校验，缓存用于重连补发消息。如果带序号的消息没进行缓存，补发消息时会因序号不连续导致校验不通过。
+    //      因此，当配置了缓存时，不进行缓存的消息序号一定为0，进行缓存的消息序号一定不为0。
+    //      由于缓存消息一定有序号，所以当配置了缓存时，terminal_->enableSerial_一定为true。
+    // 问题：
+    //      1.为了让上层功能的消息也可不进行缓存，是否可以将消息序号改为非强制，序号为0时不进行序号校验，大于0时才进行序号校验？不安全，无法防消息复制重发
+    //      2.如何让一些上层消息不缓存但又有序号？重连补发消息时，当相邻两缓存消息序号不一致时补发一个特殊控制型消息（通知对方丢弃的消息序号范围）（TODO）
 
     std::shared_ptr<SendMessageInfo> sendInfo(new SendMessageInfo);
     sendInfo->type = type;
@@ -64,11 +84,17 @@ void MessageTerminal::Connection::send(int32_t type, bool isRaw, bool needCrypt,
     sendInfo->tag = tag;
     sendInfo->msg = msg;
 
-    if (needBuffer && terminal_->enableSerial_) {
-        assert(msgBuffer_);
-        msgBuffer_->insertMessage(sendInfo);
+    if (type > 0 && terminal_->enableSerial_) {
+        sendInfo->serial = ++lastSendSerial_;
+
+        if (msgBuffer_) {
+            if (needBuffer) {
+                msgBuffer_->insertMessage(sendInfo);
+            } else {
+                msgBuffer_->jumpToSerial(sendInfo->serial);
+            }
+        }
     } else {
-        // 注意：服务器向客户端发的序号为0的消息不进行序号校验，用于给上层发特殊消息
         sendInfo->serial = 0;
     }
     
@@ -79,12 +105,26 @@ void MessageTerminal::Connection::send(int32_t type, bool isRaw, bool needCrypt,
 
 void MessageTerminal::Connection::resend() {
     if (msgBuffer_) {
-        msgBuffer_->traverse([this](std::shared_ptr<SendMessageInfo> &sendInfo) -> bool {
+        uint32_t lastSerial = 0;
+        msgBuffer_->traverse([this, &lastSerial](std::shared_ptr<SendMessageInfo> &sendInfo) -> bool {
             if (!isOpen()) {
                 return false;
             }
 
+            if (lastSerial > 0 && sendInfo->serial != lastSerial + 1) {
+                // 发送序号跳过消息
+                std::shared_ptr<SendMessageInfo> sendInfo1(new SendMessageInfo);
+                sendInfo1->type = CORPC_MSG_TYPE_JUMP_SERIAL;
+                sendInfo1->isRaw = true;
+                sendInfo1->needCrypt = false;
+                sendInfo1->tag = 0;
+                sendInfo1->serial = sendInfo->serial - 1;
+
+                corpc::Connection::send(sendInfo1);
+            }
+
             corpc::Connection::send(sendInfo);
+            lastSerial = sendInfo->serial;
             return true;
         });
     }
@@ -246,6 +286,17 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
                 
                 return task;
             }
+        } else if (msgType == CORPC_MSG_TYPE_JUMP_SERIAL) {
+            uint32_t serial = *(uint32_t *)(head + 16);
+            serial = be32toh(serial);
+
+            if (serial <= conn->recvSerial_) {
+                ERROR_LOG("MessageTerminal::decode -- jump serial invaild, %d <= %d\n", serial, conn->recvSerial_);
+                connection->setDecodeError();
+                return nullptr;
+            }
+
+            conn->recvSerial_ = serial;
         } else {
             WARN_LOG("MessageTerminal::decode -- recv system message: %d\n", msgType);
         }

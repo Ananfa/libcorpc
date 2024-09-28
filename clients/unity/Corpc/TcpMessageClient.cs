@@ -158,8 +158,7 @@ namespace Corpc
                     // 读出消息头部（4字节类型+4字节长度）
                     // |body size(4 bytes)|message type(4 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
                     int remainLen = Constants.CORPC_MESSAGE_HEAD_SIZE;
-                    while (remainLen > 0)
-                    {
+                    while (remainLen > 0) {
                         remainLen -= _stream.Read(head, Constants.CORPC_MESSAGE_HEAD_SIZE - remainLen, remainLen);
                     }
 
@@ -170,17 +169,27 @@ namespace Corpc
 
                     // 读取消息体
                     byte[] data = null;
-                    if (msgLen > 0)
-                    {
+                    if (msgLen > 0) {
                         // TODO: 校验服务器发给客户端消息大小，超过阈值报警
                         // 注意：目前每个消息分配内存的实现会产生较多的回收垃圾，可以改为分配一个最大空间重复使用
                         data = new byte[msgLen];
                         remainLen = (int)msgLen;
-                        while (remainLen > 0)
-                        {
+                        while (remainLen > 0) {
                             remainLen -= _stream.Read(data, (int)msgLen - remainLen, remainLen);
                             //Console.WriteLine("remainLen = " + remainLen + " : " + (DateTime.Now.Ticks/TimeSpan.TicksPerMillisecond-startTimeStamp));
                         }
+                    }
+
+                    if (msgType == Constants.CORPC_MSG_TYPE_JUMP_SERIAL) {
+                        uint serial = (uint)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
+                        if (serial <= _lastRecvSerial) {
+                            Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", _lastRecvSerial, serial);
+                            _recvMsgQueue.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                            return;
+                        }
+
+                        _lastRecvSerial = serial;
+                        return;
                     }
 
                     IMessage protoData = null;
@@ -194,18 +203,18 @@ namespace Corpc
                                 return;
                             }
 
-                            _lastRecvSerial++;
+                            if (serial != 0) {
+                                _lastRecvSerial = serial;
+                            }
                         }
 
                         if (msgLen > 0) {
                             // 校验CRC
-                            if (_enableRecvCRC)
-                            {
+                            if (_enableRecvCRC) {
                                 ushort crc = (ushort)((head[20] << 8) | head[21]);
                                 ushort crc1 = CRC.CheckSum(data, 0, 0xFFFF, msgLen);
 
-                                if (crc != crc1)
-                                {
+                                if (crc != crc1) {
                                     Debug.LogErrorFormat("crc check failed, msgType:{0}, size:{1}, recv:{2}, cal:{3}\n", msgType, msgLen, crc, crc1);
                                     _recvMsgQueue.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                     return;
@@ -213,10 +222,8 @@ namespace Corpc
                             }
 
                             // 解密
-                            if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0)
-                            {
-                                if (_crypter == null)
-                                {
+                            if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                                if (_crypter == null) {
                                     Debug.LogError("cant decrypt message for crypter not exist\n");
                                     _recvMsgQueue.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                     return;

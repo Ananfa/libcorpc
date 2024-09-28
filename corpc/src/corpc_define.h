@@ -55,6 +55,7 @@
 
 #define CORPC_MSG_TYPE_CONNECT -1
 #define CORPC_MSG_TYPE_CLOSE -2
+#define CORPC_MSG_TYPE_JUMP_SERIAL -9
 #define CORPC_MSG_TYPE_BANNED -10
 #define CORPC_MSG_TYPE_UDP_UNSHAKE -110
 #define CORPC_MSG_TYPE_UDP_HANDSHAKE_1 -111
@@ -273,6 +274,7 @@ namespace corpc {
         void push_back(Node *node);
         Node* pop_front();
         void erase(Node *node);
+        void erase(const Iterator &iter);
         void eraseTo(Node *node);
         void moveToTail(Node *node);
         void clear();
@@ -354,6 +356,11 @@ namespace corpc {
         }
         
         delete node;
+    }
+
+    template <typename T>
+    void NormalLink<T>::erase(const Iterator &iter) {
+        erase(iter.ptr);
     }
 
     template <typename T>

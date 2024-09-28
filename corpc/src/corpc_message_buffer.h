@@ -34,11 +34,16 @@ namespace corpc {
         typedef std::function<bool(std::shared_ptr<SendMessageInfo>&)> MessageHandle;
         
     public:
-        MessageBuffer(bool needBuf): needBuf_(needBuf), lastSendSerial_(0) {}
+        MessageBuffer(uint32_t maxMsgNum = 0): broken_(false), maxMsgNum_(maxMsgNum), lastSerial_(0) {}
         ~MessageBuffer() {}
 
+        void reset();
+
         // 插入新消息，并为新消息添加消息序号（注意：心跳消息以及网络控制消息不会加到消息缓存中，且不需要消息序号）
-        void insertMessage(std::shared_ptr<SendMessageInfo> &msg);
+        bool insertMessage(std::shared_ptr<SendMessageInfo> &msg);
+
+        // 跳过一个序号
+        bool jumpToSerial(uint32_t serial);
 
         // 遍历所有消息执行handle，如果handle返回false则中断遍历
         void traverse(MessageHandle handle);
@@ -46,13 +51,15 @@ namespace corpc {
         // 删除某个消息序号之前的所有消息（包括消息序号消息）
         void scrapMessages(uint32_t serial);
 
-        bool needBuf() { return needBuf_; }
+        bool broken() { return broken_; }
+
     private:
         BufMessageLink bufMsglink_; // 缓存消息链
         std::map<uint64_t, BufMessageLink::Node*> bufMsgMap_; // 按消息序号索引链中消息节点
 
-        bool needBuf_; // 是否缓存消息
-        uint64_t lastSendSerial_; // 最后发送消息序列号
+        bool broken_; // 缓存是否损毁
+        uint32_t maxMsgNum_; // 最大缓存消息数量（0表示无限制）
+        uint32_t lastSerial_; // 上一消息序号
     };
 
 }

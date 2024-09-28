@@ -45,6 +45,8 @@ namespace corpc {
             //uint64_t getCreateTime() { return createTime_; }
             void setRecvSerial(uint32_t serial) { recvSerial_ = serial; }
             uint32_t getRecvSerial() { return recvSerial_; }
+            void setLastSendSerial(uint32_t serial) { lastSendSerial_ = serial; }
+            uint32_t getLastSendSerial() { return lastSendSerial_; }
 
             // 以下3个方法都会对消息缓存操作，消息缓存不是线程安全的，需要在worker中处理
             void scrapMessages(uint32_t serial); // 擦除已确认消息
@@ -57,6 +59,8 @@ namespace corpc {
             std::shared_ptr<MessageBuffer> msgBuffer_; // 已发送消息缓存（用于实现断线重连机制，在worker中处理才是安全的）
             //time_t createTime_;   // 连接创建时间
             uint32_t recvSerial_; // 接收消息序号（连接建立后从0开始，必须保持连续，包括心跳数据包，不连续则断线）
+            uint32_t lastSendSerial_; // 最后发送消息序列号
+
         public:
             friend class MessageTerminal;
             friend class MessageTerminal::MessageWorkerTask;
@@ -127,6 +131,9 @@ namespace corpc {
         bool enableSerial_;  // 是否需要消息序号
         std::map<int32_t, RegisterMessageInfo> registerMessageMap_;
         OtherMessageHandle otherMessageHandle_;  // 其他未注册消息的处理
+
+    public:
+        friend class MessageClient;
     };
 }
 

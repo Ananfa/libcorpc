@@ -15,6 +15,8 @@ namespace Corpc
 		public const int CORPC_MAX_NO_HEARTBEAT_TIME = 15000;
 
         public const int CORPC_MSG_TYPE_DISCONNECT = -1;
+        public const int CORPC_MSG_TYPE_JUMP_SERIAL = -9;
+        public const int CORPC_MSG_TYPE_BANNED = -10;
         public const int CORPC_MSG_TYPE_UDP_UNSHAKE = -110;
         public const int CORPC_MSG_TYPE_UDP_HANDSHAKE_1 = -111;
         public const int CORPC_MSG_TYPE_UDP_HANDSHAKE_2 = -112;

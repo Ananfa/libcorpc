@@ -21,43 +21,82 @@
 
 using namespace corpc;
 
-void MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
-    msg->serial = ++lastSendSerial_;
+void MessageBuffer::reset() {
+    broken_ = false;
+    bufMsglink_.clear();
+    bufMsgMap_.clear();
+}
 
-    if (needBuf_) {
+bool MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
+    if (!broken_) {
+        if (maxMsgNum_ > 0 && bufMsgMap_.size() >= maxMsgNum_) {
+            ERROR_LOG("msg buff broken because overflow\n");
+            broken_ = true;
+        }
+
+        if (msg->serial != lastSerial_ + 1) {
+            ERROR_LOG("msg buff broken because serial invalid: %d != %d + 1\n", msg->serial, lastSerial_);
+            broken_ = true;
+        }
+
+        if (broken_) {
+            bufMsglink_.clear();
+            bufMsgMap_.clear();
+            return false;
+        }
+
         BufMessageLink::Node *node = new BufMessageLink::Node();
         node->data = msg;
 
         bufMsglink_.push_back(node);
         bufMsgMap_.insert(std::make_pair(msg->serial, node));
+
+        lastSerial_ = msg->serial;
+
+        return true;
     }
+
+    return false;
+}
+
+bool MessageBuffer::jumpToSerial(uint32_t serial) {
+    if (!broken_) {
+        if (serial != lastSerial_ + 1) {
+            ERROR_LOG("msg buff broken because serial invalid: %d != %d + 1\n", serial, lastSerial_);
+            broken_ = true;
+        }
+
+        if (broken_) {
+            bufMsglink_.clear();
+            bufMsgMap_.clear();
+            return false;
+        }
+
+        lastSerial_ = serial;
+
+        return true;
+    }
+
+    return false;
 }
 
 void MessageBuffer::traverse(MessageBuffer::MessageHandle handle) {
-    if (needBuf_) {
-        for (auto it = bufMsglink_.begin(); it != bufMsglink_.end(); ++it) {
-            if (!handle(it->data)) {
-                return;
-            }
+    for (auto it = bufMsglink_.begin(); it != bufMsglink_.end(); ++it) {
+        if (!handle(it->data)) {
+            return;
         }
     }
 }
 
 void MessageBuffer::scrapMessages(uint32_t serial) {
-    if (needBuf_) {
-        auto it = bufMsgMap_.find(serial);
-        if (it != bufMsgMap_.end()) {
-            BufMessageLink::Node *node = it->second;
+    for (auto it1 = bufMsglink_.begin(); it1 != bufMsglink_.end();) {
+        auto curIt = it1++;
 
-            for (auto it1 = bufMsglink_.begin(); it1 != bufMsglink_.end(); ++it1) {
-                bufMsgMap_.erase(it1->data->serial);
-
-                if (it1->data->serial == serial) {
-                    break;
-                }
-            }
-            
-            bufMsglink_.eraseTo(node);
+        if (curIt->data->serial > serial) {
+            break;
         }
+
+        bufMsgMap_.erase(curIt->data->serial);
+        bufMsglink_.erase(curIt);
     }
 }
