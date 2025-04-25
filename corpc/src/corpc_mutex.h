@@ -64,7 +64,7 @@ namespace corpc {
     class LockGuard {
     private:
         // 禁止在堆中创建对象
-        void* operator new(size_t t) { return nullptr; }
+        void* operator new(size_t t) { throw std::bad_alloc(); }
         void operator delete(void* ptr) {}
 
     public:

@@ -25,7 +25,7 @@ void Semaphore::wait() {
     // _res值：为0时表示已上锁，大于0时表示未上锁，为-1时表示有协程正在进行排队，为-2时表示正在进行解锁
     pid_t pid = GetPid();
     stCoRoutine_t *coSelf = co_self();
-    int retryTimes = 0;
+    //int retryTimes = 0;
     while (true) {
         int v = res_.load();
         if (v == 0) {
@@ -63,7 +63,7 @@ void Semaphore::wait() {
 }
 
 void Semaphore::post() {
-    int retryTimes = 0;
+    //int retryTimes = 0;
     while (true) {
         int v = res_.load();
         if (v == 0) {
