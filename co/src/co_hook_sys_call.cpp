@@ -83,6 +83,9 @@ typedef ssize_t (*recvfrom_pfn_t)(int socket, void *buffer, size_t length,
 	                 int flags, struct sockaddr *address,
 					               socklen_t *address_len);
 
+typedef int (*recvmmsg_pfn_t)(int socket, struct mmsghdr *msgvec, unsigned int vlen,
+                    int flags, struct timespec *timeout);
+
 typedef ssize_t (*send_pfn_t)(int socket, const void *buffer, size_t length, int flags);
 typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t length, int flags);
 
@@ -118,6 +121,8 @@ static write_pfn_t g_sys_write_func     = (write_pfn_t)dlsym(RTLD_NEXT,"write");
 
 static sendto_pfn_t g_sys_sendto_func   = (sendto_pfn_t)dlsym(RTLD_NEXT,"sendto");
 static recvfrom_pfn_t g_sys_recvfrom_func = (recvfrom_pfn_t)dlsym(RTLD_NEXT,"recvfrom");
+
+static recvmmsg_pfn_t g_sys_recvmmsg_func = (recvmmsg_pfn_t)dlsym(RTLD_NEXT,"recvmmsg");
 
 static send_pfn_t g_sys_send_func       = (send_pfn_t)dlsym(RTLD_NEXT,"send");
 static recv_pfn_t g_sys_recv_func       = (recv_pfn_t)dlsym(RTLD_NEXT,"recv");
@@ -527,6 +532,37 @@ ssize_t recvfrom(int socket, void *buffer, size_t length,
 
 	ssize_t ret = g_sys_recvfrom_func( socket,buffer,length,flags,address,address_len );
 	return ret;
+}
+
+int recvmmsg(int socket, struct mmsghdr *msgvec, unsigned int vlen,
+                     int flags, struct timespec *timeout)
+{
+	HOOK_SYS_FUNC( recvmmsg );
+	if( !co_is_enable_sys_hook() )
+	{
+		return g_sys_recvmmsg_func( socket, msgvec, vlen, flags, timeout );
+	}
+
+	rpchook_t *lp = get_by_fd( socket );
+	if( !lp || ( O_NONBLOCK & lp->user_flag ) )
+	{
+		return g_sys_recvmmsg_func( socket, msgvec, vlen, flags, timeout );
+	}
+
+	struct pollfd pf = { 0 };
+	pf.fd = socket;
+	pf.events = ( POLLIN | POLLERR | POLLHUP );
+
+	int timeout_sec;
+	if (NULL == timeout) {
+		timeout_sec = -1;
+	} else {
+		timeout_sec = ( timeout->tv_sec * 1000 ) 
+				+ ( timeout->tv_nsec / 1000000 );
+	}
+
+	poll( &pf,1,timeout_sec );
+	return g_sys_recvmmsg_func( socket, msgvec, vlen, flags, NULL );
 }
 
 ssize_t send(int socket, const void *buffer, size_t length, int flags)
