@@ -47,6 +47,7 @@ namespace corpc {
             uint32_t getRecvSerial() { return recvSerial_; }
             void setLastSendSerial(uint32_t serial) { lastSendSerial_ = serial; }
             uint32_t getLastSendSerial() { return lastSendSerial_; }
+            void resetMsgBuffer();
 
             // 以下3个方法都会对消息缓存操作，消息缓存不是线程安全的，需要在worker中处理
             void scrapMessages(uint32_t serial); // 擦除已确认消息

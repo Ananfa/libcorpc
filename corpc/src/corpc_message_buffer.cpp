@@ -21,17 +21,24 @@
 
 using namespace corpc;
 
-void MessageBuffer::reset() {
+void MessageBuffer::reset(uint32_t serial) {
     broken_ = false;
     bufMsglink_.clear();
     bufMsgMap_.clear();
+
+    lastSerial_ = lastScrapSerial_ = serial;
 }
 
 bool MessageBuffer::insertMessage(std::shared_ptr<SendMessageInfo> &msg) {
     if (!broken_) {
         if (maxMsgNum_ > 0 && bufMsgMap_.size() >= maxMsgNum_) {
-            ERROR_LOG("msg buff broken because overflow\n");
-            broken_ = true;
+            WARN_LOG("msg buff broken because overflow\n");
+            // 此时应清理最旧消息
+            auto it = bufMsglink_.begin();
+            lastScrapSerial_ = it->data->serial;
+            bufMsgMap_.erase(lastScrapSerial_);
+            bufMsglink_.erase(it);
+            //broken_ = true;
         }
 
         if (msg->serial != lastSerial_ + 1) {
@@ -98,5 +105,9 @@ void MessageBuffer::scrapMessages(uint32_t serial) {
 
         bufMsgMap_.erase(curIt->data->serial);
         bufMsglink_.erase(curIt);
+    }
+
+    if (lastScrapSerial_ < serial) {
+        lastScrapSerial_ = serial;
     }
 }

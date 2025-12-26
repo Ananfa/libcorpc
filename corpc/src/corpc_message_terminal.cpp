@@ -46,6 +46,12 @@ void MessageTerminal::Connection::onClose() {
     worker_->addTask(task);
 }
 
+void MessageTerminal::Connection::resetMsgBuffer() {
+    if (msgBuffer_) {
+        msgBuffer_->reset(lastSendSerial_);
+    }
+}
+
 void MessageTerminal::Connection::scrapMessages(uint32_t serial) {
     if (msgBuffer_) {
         msgBuffer_->scrapMessages(serial);
@@ -73,9 +79,7 @@ void MessageTerminal::Connection::send(int32_t type, bool isRaw, bool needCrypt,
     //      序号和发送缓存概念有点绑定，序号是用于消息校验，缓存用于重连补发消息。如果带序号的消息没进行缓存，补发消息时会因序号不连续导致校验不通过。
     //      因此，当配置了缓存时，不进行缓存的消息序号一定为0，进行缓存的消息序号一定不为0。
     //      由于缓存消息一定有序号，所以当配置了缓存时，terminal_->enableSerial_一定为true。
-    // 问题：
-    //      1.为了让上层功能的消息也可不进行缓存，是否可以将消息序号改为非强制，序号为0时不进行序号校验，大于0时才进行序号校验？不安全，无法防消息复制重发
-    //      2.如何让一些上层消息不缓存但又有序号？重连补发消息时，当相邻两缓存消息序号不一致时补发一个特殊控制型消息（通知对方丢弃的消息序号范围）（TODO）
+    //      为了减轻缓存压力，允许指定消息是否需要缓存，当不缓存消息时，需要通知msgBuffer跳过消息序号，并在断线重连补发消息时通知客户端所跳过的序号
 
     std::shared_ptr<SendMessageInfo> sendInfo(new SendMessageInfo);
     sendInfo->type = type;

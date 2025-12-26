@@ -34,10 +34,10 @@ namespace corpc {
         typedef std::function<bool(std::shared_ptr<SendMessageInfo>&)> MessageHandle;
         
     public:
-        MessageBuffer(uint32_t maxMsgNum = 0): broken_(false), maxMsgNum_(maxMsgNum), lastSerial_(0) {}
+        MessageBuffer(uint32_t maxMsgNum = 0): broken_(false), maxMsgNum_(maxMsgNum), lastSerial_(0), lastScrapSerial_(0) {}
         ~MessageBuffer() {}
 
-        void reset();
+        void reset(uint32_t serial);
 
         // 插入新消息，并为新消息添加消息序号（注意：心跳消息以及网络控制消息不会加到消息缓存中，且不需要消息序号）
         bool insertMessage(std::shared_ptr<SendMessageInfo> &msg);
@@ -53,6 +53,8 @@ namespace corpc {
 
         bool broken() { return broken_; }
 
+        int32_t getLastScrapSerial() const { return lastScrapSerial_; }
+
     private:
         BufMessageLink bufMsglink_; // 缓存消息链
         std::map<uint64_t, BufMessageLink::Node*> bufMsgMap_; // 按消息序号索引链中消息节点
@@ -60,6 +62,7 @@ namespace corpc {
         bool broken_; // 缓存是否损毁
         uint32_t maxMsgNum_; // 最大缓存消息数量（0表示无限制）
         uint32_t lastSerial_; // 上一消息序号
+        uint32_t lastScrapSerial_; // 上一清理到的消息序号
     };
 
 }
