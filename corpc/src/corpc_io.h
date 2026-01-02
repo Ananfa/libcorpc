@@ -382,12 +382,15 @@ namespace corpc {
         int shake_fd_;
         std::thread t_;
         
-        std::string shakemsg2_;
-        uint8_t *shakemsg2buf_;
-        std::string shakemsg4_;
-        uint8_t *shakemsg4buf_;
-        std::string unshakemsg_;
-        uint8_t *unshakemsg2buf_;
+        //std::string shakemsg2_;
+        //uint8_t *shakemsg2buf_;
+        uint8_t shakemsg2buf_[CORPC_MESSAGE_HEAD_SIZE];
+        //std::string shakemsg4_;
+        //uint8_t *shakemsg4buf_;
+        uint8_t shakemsg4buf_[CORPC_MESSAGE_HEAD_SIZE];
+        //std::string unshakemsg_;
+        //uint8_t *unshakemsg2buf_;
+        uint8_t unshakemsg2buf_[CORPC_MESSAGE_HEAD_SIZE];
 
         std::map<sockaddr_in, bool, SockAddrCmp> shakingClient_;
     };

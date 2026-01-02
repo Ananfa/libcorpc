@@ -161,11 +161,13 @@ bool TcpPipeline::upflow(uint8_t *buf, int size) {
         if (!bodySize_) {
             // 解析消息长度值
             if (bodySizeType_ == TWO_BYTES) {
-                uint16_t x = *(uint16_t*)(headBuf_ + bodySizeOffset_);
+                uint16_t x;
+                std::memcpy(&x, headBuf_ + bodySizeOffset_, sizeof(x));
                 bodySize_ = be16toh(x);
             } else {
                 assert(bodySizeType_ == FOUR_BYTES);
-                uint32_t x = *(uint32_t*)(headBuf_ + bodySizeOffset_);
+                uint32_t x;
+                std::memcpy(&x, headBuf_ + bodySizeOffset_, sizeof(x));
                 bodySize_ = be32toh(x);
             }
             
@@ -456,16 +458,26 @@ bool TcpAcceptor::start() {
     return true;
 }
 
-UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port), shakemsg2_(CORPC_MESSAGE_HEAD_SIZE, 0), shakemsg4_(CORPC_MESSAGE_HEAD_SIZE, 0), unshakemsg_(CORPC_MESSAGE_HEAD_SIZE, 0) {
-    shakemsg2buf_ = (uint8_t *)shakemsg2_.data();
+UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): Acceptor(server, ip, port)/*, shakemsg2_(CORPC_MESSAGE_HEAD_SIZE, 0), shakemsg4_(CORPC_MESSAGE_HEAD_SIZE, 0), unshakemsg_(CORPC_MESSAGE_HEAD_SIZE, 0)*/ {
+    int32_t tmp;
+    //shakemsg2buf_ = (uint8_t *)shakemsg2_.data();
+    //memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //*(int32_t *)(shakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
     memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int32_t *)(shakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
-    shakemsg4buf_ = (uint8_t *)shakemsg4_.data();
+    tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
+    std::memcpy(shakemsg2buf_ + 4, &tmp, sizeof(tmp));
+    //shakemsg4buf_ = (uint8_t *)shakemsg4_.data();
+    //memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //*(int32_t *)(shakemsg4buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
     memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int32_t *)(shakemsg4buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
-    unshakemsg2buf_ = (uint8_t *)unshakemsg_.data();
+    tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
+    std::memcpy(shakemsg4buf_ + 4, &tmp, sizeof(tmp));
+    //unshakemsg2buf_ = (uint8_t *)unshakemsg_.data();
+    //memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //*(int32_t *)(unshakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
     memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
-    *(int32_t *)(unshakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
+    tmp = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
+    std::memcpy(unshakemsg2buf_ + 4, &tmp, sizeof(tmp));
 }
 
 void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -501,9 +513,11 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
             continue;
         }
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
-        uint32_t bodySize = *(uint32_t *)buf;
+        uint32_t bodySize;
+        std::memcpy(&bodySize, buf, sizeof(bodySize));
         bodySize = be32toh(bodySize);
-        int32_t msgType = *(int32_t *)(buf + 4);
+        int32_t msgType;
+        std::memcpy(&msgType, buf + 4, sizeof(msgType));
         msgType = be32toh(msgType);
         
         // 判断是否“连接请求”消息
@@ -603,7 +617,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
             break;
         } else {
             // 判断是否“最终确认消息”
-            int32_t msgtype = *(int32_t *)(buf + 4);
+            int32_t msgtype;
+            std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
             msgtype = be32toh(msgtype);
             
             if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {

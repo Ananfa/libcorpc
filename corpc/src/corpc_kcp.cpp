@@ -154,6 +154,33 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
     std::shared_ptr<corpc::Connection> connection = connection_.lock();
     std::shared_ptr<KcpMessageTerminal::Connection> kcpCon = std::static_pointer_cast<KcpMessageTerminal::Connection>(connection);
     assert(kcpCon);
+
+    // 注意：
+    //   当本端是服务端时
+    //      如果收到CORPC_MSG_TYPE_UDP_HANDSHAKE_3消息，说明对端可能仍在握手状态，需要重发CORPC_MSG_TYPE_UDP_HANDSHAKE_4给对端
+    //      在对端还未离开握手状态时，服务端可能会先发出通过kcp包装的心跳消息，导致对端出错关闭并导致本端
+    //   当本端是服务器或者客户端时
+    //      收到握手消息可以直接丢弃（因为这些消息是重复发送延迟到达了）
+    // 由于握手消息是22字节，kcp消息是大于24字节，因此这里直接通过消息长度来判断
+    if (size == CORPC_MESSAGE_HEAD_SIZE) {
+        int32_t msgtype;
+        std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+        msgtype = be32toh(msgtype);
+
+        if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
+            uint8_t shakemsg4buf[CORPC_MESSAGE_HEAD_SIZE] = {0};
+            int32_t tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
+            std::memcpy(shakemsg4buf + 4, &tmp, sizeof(tmp));
+
+            int ret = (int)::write(connection->getfd(), shakemsg4buf, CORPC_MESSAGE_HEAD_SIZE);
+            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                ERROR_LOG("KcpPipeline::upflow -- send shakemsg4 failed\n");
+                return false;
+            }
+        }
+
+        return true;
+    }
     
     int ret = kcpCon->kcpInput((const char*)buf, size);
     if (ret < 0) {
@@ -193,11 +220,13 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
             if (!bodySize_) {
                 // 解析消息长度值
                 if (bodySizeType_ == TWO_BYTES) {
-                    uint16_t x = *(uint16_t*)(headBuf_ + bodySizeOffset_);
+                    uint16_t x;
+                    std::memcpy(&x, headBuf_ + bodySizeOffset_, sizeof(x));
                     bodySize_ = be16toh(x);
                 } else {
                     assert(bodySizeType_ == FOUR_BYTES);
-                    uint32_t x = *(uint32_t*)(headBuf_ + bodySizeOffset_);
+                    uint32_t x;
+                    std::memcpy(&x, headBuf_ + bodySizeOffset_, sizeof(x));
                     bodySize_ = be32toh(x);
                 }
                 

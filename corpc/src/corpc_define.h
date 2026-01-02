@@ -46,6 +46,7 @@
 #define CORPC_RESPONSE_HEAD_SIZE 24
 // message head format
 // |body size(4 bytes)|message type(4 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
+// 注意：消息头部长度CORPC_MESSAGE_HEAD_SIZE不能大于等于24，因为那样会与kcp消息冲突
 #define CORPC_MESSAGE_HEAD_SIZE 22
 #define CORPC_MAX_MESSAGE_SIZE 0x10000
 #define CORPC_MAX_UDP_MESSAGE_SIZE 540

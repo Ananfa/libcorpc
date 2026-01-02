@@ -190,15 +190,20 @@ WorkerTask* RpcServer::decode(std::shared_ptr<corpc::Connection> &connection, ui
     
     RpcServer *server = conn->getServer();
     
-    uint32_t reqSize = *(uint32_t *)head;
+    uint32_t reqSize;
+    std::memcpy(&reqSize, head, sizeof(reqSize));
     reqSize = be32toh(reqSize);
-    uint32_t serviceId = *(uint32_t *)(head + 4);
+    uint32_t serviceId;
+    std::memcpy(&serviceId, head + 4, sizeof(serviceId));
     serviceId = be32toh(serviceId);
-    uint32_t methodId = *(uint32_t *)(head + 8);
+    uint32_t methodId;
+    std::memcpy(&methodId, head + 8, sizeof(methodId));
     methodId = be32toh(methodId);
-    uint64_t callId = *(uint64_t *)(head + 12);
+    uint64_t callId;
+    std::memcpy(&callId, head + 12, sizeof(callId));
     callId = be64toh(callId);
-    uint64_t expireTime = *(uint64_t *)(head + 20);
+    uint64_t expireTime;
+    std::memcpy(&expireTime, head + 20, sizeof(expireTime));
     expireTime = be64toh(expireTime);
     
     // 生成ServerRpcTask
@@ -260,15 +265,28 @@ bool RpcServer::encode(std::shared_ptr<corpc::Connection> &connection, std::shar
         }
     }
     
-    *(uint32_t *)buf = htobe32(msgSize);
-    *(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
-    *(uint64_t *)(buf + 12) = htobe64(rpcTask->expireTime);
+    uint32_t tmp_u32;
+    uint64_t tmp_u64;
+    
+    //*(uint32_t *)buf = htobe32(msgSize);
+    tmp_u32 = htobe32(msgSize);
+    std::memcpy(buf, &tmp_u32, sizeof(tmp_u32));
+
+    //*(uint64_t *)(buf + 4) = htobe64(rpcTask->callId);
+    tmp_u64 = htobe64(rpcTask->callId);
+    std::memcpy(buf + 4, &tmp_u64, sizeof(tmp_u64));
+
+    //*(uint64_t *)(buf + 12) = htobe64(rpcTask->expireTime);
+    tmp_u64 = htobe64(rpcTask->expireTime);
+    std::memcpy(buf + 12, &tmp_u64, sizeof(tmp_u64));
 
     if (rpcTask->controller->Failed()) {
-        *(uint32_t *)(buf + 20) = htobe32(((Controller *)rpcTask->controller)->GetErrorCode());
+        //*(uint32_t *)(buf + 20) = htobe32(((Controller *)rpcTask->controller)->GetErrorCode());
+        tmp_u32 = htobe32(((Controller *)rpcTask->controller)->GetErrorCode());
     } else {
-        *(uint32_t *)(buf + 20) = 0;
+        tmp_u32 = 0;
     }
+    std::memcpy(buf + 20, &tmp_u32, sizeof(tmp_u32));
     
     int spaceleft = space - CORPC_RESPONSE_HEAD_SIZE;
     if (spaceleft >= msgSize) {

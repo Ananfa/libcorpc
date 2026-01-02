@@ -263,11 +263,14 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
     Crypter *crypter = conn->getCrypter();
     MessageTerminal *terminal = conn->getTerminal();
     
-    int32_t msgType = *(int32_t *)(head + 4);
+    int32_t msgType;
+    std::memcpy(&msgType, head + 4, sizeof(msgType));
     msgType = be32toh(msgType);
-    uint16_t tag = *(uint16_t *)(head + 8);
+    uint16_t tag;
+    std::memcpy(&tag, head + 8, sizeof(tag));
     tag = be16toh(tag);
-    uint16_t flag = *(uint16_t *)(head + 10);
+    uint16_t flag;
+    std::memcpy(&flag, head + 10, sizeof(flag));
     flag = be16toh(flag);
     
     uint32_t reqSerial = 0;
@@ -280,7 +283,7 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
 
             // 接收最大序列号并发给worker处理消息清理
             if (terminal->enableSerial_) {
-                reqSerial = *(uint32_t *)(head + 12);
+                std::memcpy(&reqSerial, head + 12, sizeof(reqSerial));
                 reqSerial = be32toh(reqSerial);
 
                 MessageWorkerTask *task = MessageWorkerTask::create();
@@ -291,7 +294,8 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
                 return task;
             }
         } else if (msgType == CORPC_MSG_TYPE_JUMP_SERIAL) {
-            uint32_t serial = *(uint32_t *)(head + 16);
+            uint32_t serial;
+            std::memcpy(&serial, head + 16, sizeof(serial));
             serial = be32toh(serial);
 
             if (serial <= conn->recvSerial_) {
@@ -313,7 +317,8 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
     if (terminal->enableSerial_) {
         conn->recvSerial_++;
 
-        uint32_t serial = *(uint32_t *)(head + 16);
+        uint32_t serial;
+        std::memcpy(&serial, head + 16, sizeof(serial));
         serial = be32toh(serial);
 
         if (conn->recvSerial_ != serial) {
@@ -322,13 +327,14 @@ WorkerTask* MessageTerminal::decode(std::shared_ptr<corpc::Connection> &connecti
             return nullptr;
         }
 
-        reqSerial = *(uint32_t *)(head + 12);
+        std::memcpy(&reqSerial, head + 12, sizeof(reqSerial));
         reqSerial = be32toh(reqSerial);
     }
 
     // CRC校验（CRC码计算需要包含除crc外的包头）
     if (terminal->enableRecvCRC_) {
-        uint16_t crc = *(uint16_t *)(head + 20);
+        uint16_t crc;
+        std::memcpy(&crc, head + 20, sizeof(crc));
         crc = be16toh(crc);
 
         //uint16_t crc1 = CRC::CheckSum(head, 0xFFFF, 18);
@@ -512,16 +518,37 @@ bool MessageTerminal::encode(std::shared_ptr<corpc::Connection> &connection, std
         }
     }
     
-    *(uint32_t *)buf = htobe32(msgSize);
-    *(uint32_t *)(buf + 4) = htobe32(msgInfo->type);
+    uint32_t tmp_u32;
+    uint16_t tmp_u16;
+
+    //*(uint32_t *)buf = htobe32(msgSize);
+    tmp_u32 = htobe32(msgSize);
+    std::memcpy(buf, &tmp_u32, sizeof(tmp_u32));
+    //*(uint32_t *)(buf + 4) = htobe32(msgInfo->type);
+    tmp_u32 = htobe32(msgInfo->type);
+    std::memcpy(buf + 4, &tmp_u32, sizeof(tmp_u32));
     
     // 头部设置加密标志
-    *(uint16_t *)(buf + 8) = htobe16(msgInfo->tag);
+    //*(uint16_t *)(buf + 8) = htobe16(msgInfo->tag);
+    tmp_u16 = htobe16(msgInfo->tag);
+    std::memcpy(buf + 8, &tmp_u16, sizeof(tmp_u16));
+
     uint16_t flag = needCrypt?CORPC_MESSAGE_FLAG_CRYPT:0;
-    *(uint16_t *)(buf + 10) = htobe16(flag);
-    *(uint32_t *)(buf + 12) = htobe32(conn->recvSerial_);
-    *(uint32_t *)(buf + 16) = htobe32(msgInfo->serial);
-    *(uint16_t *)(buf + 20) = htobe16(crc);
+    //*(uint16_t *)(buf + 10) = htobe16(flag);
+    tmp_u16 = htobe16(flag);
+    std::memcpy(buf + 10, &tmp_u16, sizeof(tmp_u16));
+    
+    //*(uint32_t *)(buf + 12) = htobe32(conn->recvSerial_);
+    tmp_u32 = htobe32(conn->recvSerial_);
+    std::memcpy(buf + 12, &tmp_u32, sizeof(tmp_u32));
+
+    //*(uint32_t *)(buf + 16) = htobe32(msgInfo->serial);
+    tmp_u32 = htobe32(msgInfo->serial);
+    std::memcpy(buf + 16, &tmp_u32, sizeof(tmp_u32));
+
+    //*(uint16_t *)(buf + 20) = htobe16(crc);
+    tmp_u16 = htobe16(crc);
+    std::memcpy(buf + 20, &tmp_u16, sizeof(tmp_u16));
 
     return true;
 }

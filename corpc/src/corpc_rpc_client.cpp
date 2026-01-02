@@ -36,13 +36,17 @@ using namespace corpc;
 WorkerTask* RpcClient::decode(std::shared_ptr<corpc::Connection> &connection, uint8_t *head, uint8_t *body, int size) {
     std::shared_ptr<Connection> conn = std::static_pointer_cast<Connection>(connection);
     
-    uint32_t respSize = *(uint32_t *)head;
+    uint32_t respSize;
+    std::memcpy(&respSize, head, sizeof(respSize));
     respSize = be32toh(respSize);
-    uint64_t callId = *(uint64_t *)(head + 4);
+    uint64_t callId;
+    std::memcpy(&callId, head + 4, sizeof(callId));
     callId = be64toh(callId);
-    uint64_t expireTime = *(uint64_t *)(head + 12);
+    uint64_t expireTime;
+    std::memcpy(&expireTime, head + 12, sizeof(expireTime));
     expireTime = be64toh(expireTime);
-    uint32_t error_code = *(uint32_t *)(head + 20);
+    uint32_t error_code;
+    std::memcpy(&error_code, head + 20, sizeof(error_code));
     error_code = be32toh(error_code);
     assert(respSize == size);
     std::shared_ptr<ClientTask> task;
@@ -111,13 +115,30 @@ bool RpcClient::encode(std::shared_ptr<corpc::Connection> &connection, std::shar
     if (CORPC_REQUEST_HEAD_SIZE > space) {
         return true;
     }
+
+    uint32_t tmp_u32;
+    uint64_t tmp_u64;
     
-    *(uint32_t *)buf = htobe32(msgSize);
-    *(uint32_t *)(buf + 4) = htobe32(rpcTask->serviceId);
-    *(uint32_t *)(buf + 8) = htobe32(rpcTask->methodId);
+    //*(uint32_t *)buf = htobe32(msgSize);
+    tmp_u32 = htobe32(msgSize);
+    std::memcpy(buf, &tmp_u32, sizeof(tmp_u32));
+
+    //*(uint32_t *)(buf + 4) = htobe32(rpcTask->serviceId);
+    tmp_u32 = htobe32(rpcTask->serviceId);
+    std::memcpy(buf + 4, &tmp_u32, sizeof(tmp_u32));
+
+    //*(uint32_t *)(buf + 8) = htobe32(rpcTask->methodId);
+    tmp_u32 = htobe32(rpcTask->methodId);
+    std::memcpy(buf + 8, &tmp_u32, sizeof(tmp_u32));
+
     uint64_t callId = uint64_t(rpcTask->co);
-    *(uint64_t *)(buf + 12) = htobe64(callId);
-    *(uint64_t *)(buf + 20) = htobe64(rpcTask->expireTime);
+    //*(uint64_t *)(buf + 12) = htobe64(callId);
+    tmp_u64 = htobe64(callId);
+    std::memcpy(buf + 12, &tmp_u64, sizeof(tmp_u64));
+
+    //*(uint64_t *)(buf + 20) = htobe64(rpcTask->expireTime);
+    tmp_u64 = htobe64(rpcTask->expireTime);
+    std::memcpy(buf + 20, &tmp_u64, sizeof(tmp_u64));
 
     int spaceleft = space - CORPC_REQUEST_HEAD_SIZE;
     if (spaceleft >= msgSize) {
