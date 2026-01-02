@@ -45,7 +45,7 @@ void Mutex::lockSlow() {
             // Active spinning makes sense.
             // Try to set mutexWoken flag to inform Unlock
             // to not wake other blocked goroutines.
-            if (!awoke && (oldV & MUTEXWOKEN == 0) && (oldV >> MUTEXWAITERSHIFT != 0) &&
+            if (!awoke && ((oldV & MUTEXWOKEN) == 0) && (oldV >> MUTEXWAITERSHIFT != 0) &&
                 state_.compare_exchange_weak(oldV, oldV | MUTEXWOKEN)) {
                 awoke = true;
             }

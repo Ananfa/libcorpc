@@ -207,24 +207,24 @@ bool UdpClient::connect() {
     fd.events = POLLIN;
     
     // 准备握手消息
-    char handshake1msg[CORPC_MESSAGE_HEAD_SIZE];
-    char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
+    char handshake1msg[CORPC_UDP_HANDSHAKE_SIZE];
+    char handshake3msg[CORPC_UDP_HANDSHAKE_SIZE];
     int32_t tmp;
     
-    memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
-    std::memcpy(handshake1msg + 4, &tmp, sizeof(tmp));
+    std::memcpy(handshake1msg, &tmp, sizeof(tmp));
     
-    memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
-    std::memcpy(handshake3msg + 4, &tmp, sizeof(tmp));
+    std::memcpy(handshake3msg, &tmp, sizeof(tmp));
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
         // 阶段一：发送handshake1消息
-        if (write(s, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s, handshake1msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake1\n");
             ::close(s);
             return false;
@@ -254,14 +254,14 @@ STEP1_POLLAGAIN:
                 continue; // 回阶段一
             default: {
                 ret = (int)read(s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
@@ -278,7 +278,7 @@ STEP1_POLLAGAIN:
 STEP2:
     while (true) {
         // 阶段三：发hankshake3消息
-        if (write(s, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s, handshake3msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake3\n");
             ::close(s);
             return false;
@@ -308,14 +308,14 @@ STEP2_POLLAGAIN:
                 continue; // 回阶段三
             default: {
                 ret = (int)read(s, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
@@ -845,24 +845,24 @@ bool UdpClient::start() {
     fd.events = POLLIN;
     
     // 准备握手消息
-    char handshake1msg[CORPC_MESSAGE_HEAD_SIZE];
-    char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
+    char handshake1msg[CORPC_UDP_HANDSHAKE_SIZE];
+    char handshake3msg[CORPC_UDP_HANDSHAKE_SIZE];
     int32_t tmp;
     
-    memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
-    std::memcpy(handshake1msg + 4, &tmp, sizeof(tmp));
+    std::memcpy(handshake1msg, &tmp, sizeof(tmp));
     
-    memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
-    std::memcpy(handshake3msg + 4, &tmp, sizeof(tmp));
+    std::memcpy(handshake3msg, &tmp, sizeof(tmp));
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
         // 阶段一：发送handshake1消息
-        if (write(s_, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s_, handshake1msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake1\n");
             ::close(s_);
             return false;
@@ -892,14 +892,14 @@ STEP1_POLLAGAIN:
                 continue; // 回阶段一
             default: {
                 ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s_);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
@@ -916,7 +916,7 @@ STEP1_POLLAGAIN:
 STEP2:
     while (true) {
         // 阶段三：发hankshake3消息
-        if (write(s_, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (write(s_, handshake3msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake3\n");
             ::close(s_);
             return false;
@@ -946,14 +946,14 @@ STEP2_POLLAGAIN:
                 continue; // 回阶段三
             default: {
                 ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s_);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
@@ -1294,24 +1294,24 @@ bool KcpClient::start() {
     fd.events = POLLIN;
     
     // 准备握手消息
-    char handshake1msg[CORPC_MESSAGE_HEAD_SIZE];
-    char handshake3msg[CORPC_MESSAGE_HEAD_SIZE];
+    char handshake1msg[CORPC_UDP_HANDSHAKE_SIZE];
+    char handshake3msg[CORPC_UDP_HANDSHAKE_SIZE];
     uint32_t tmp_u32;
     
-    memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake1msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake1msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
     tmp_u32 = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_1);
-    std::memcpy(handshake1msg + 4, &tmp_u32, sizeof(tmp_u32));
+    std::memcpy(handshake1msg, &tmp_u32, sizeof(tmp_u32));
     
-    memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
+    //memset(handshake3msg, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(handshake3msg + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
     tmp_u32 = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_3);
-    std::memcpy(handshake3msg + 4, &tmp_u32, sizeof(tmp_u32));
+    std::memcpy(handshake3msg, &tmp_u32, sizeof(tmp_u32));
     
     // 握手阶段一：发送handshake1消息，然后等待handshake2消息到来，超时未到则重发handshake1消息
     while (true) {
         // 阶段一：发送handshake1消息
-        if (::write(s_, handshake1msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (::write(s_, handshake1msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake1\n");
             ::close(s_);
             return false;
@@ -1341,14 +1341,14 @@ STEP1_POLLAGAIN:
                 continue; // 回阶段一
             default: {
                 ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s_);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {
@@ -1365,7 +1365,7 @@ STEP1_POLLAGAIN:
 STEP2:
     while (true) {
         // 阶段三：发hankshake3消息
-        if (::write(s_, handshake3msg, CORPC_MESSAGE_HEAD_SIZE) != CORPC_MESSAGE_HEAD_SIZE) {
+        if (::write(s_, handshake3msg, CORPC_UDP_HANDSHAKE_SIZE) != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("can't send handshake3\n");
             ::close(s_);
             return false;
@@ -1395,14 +1395,14 @@ STEP2_POLLAGAIN:
                 continue; // 回阶段三
             default: {
                 ret = (int)read(s_, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-                if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+                if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                     ERROR_LOG("recv data size error\n");
                     ::close(s_);
                     return false;
                 }
                 
                 int32_t msgtype;
-                std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+                std::memcpy(&msgtype, buf, sizeof(msgtype));
                 msgtype = be32toh(msgtype);
                 
                 if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_2) {

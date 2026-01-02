@@ -384,13 +384,13 @@ namespace corpc {
         
         //std::string shakemsg2_;
         //uint8_t *shakemsg2buf_;
-        uint8_t shakemsg2buf_[CORPC_MESSAGE_HEAD_SIZE];
+        uint8_t shakemsg2buf_[CORPC_UDP_HANDSHAKE_SIZE];
         //std::string shakemsg4_;
         //uint8_t *shakemsg4buf_;
-        uint8_t shakemsg4buf_[CORPC_MESSAGE_HEAD_SIZE];
+        uint8_t shakemsg4buf_[CORPC_UDP_HANDSHAKE_SIZE];
         //std::string unshakemsg_;
         //uint8_t *unshakemsg2buf_;
-        uint8_t unshakemsg2buf_[CORPC_MESSAGE_HEAD_SIZE];
+        uint8_t unshakemsg2buf_[CORPC_UDP_HANDSHAKE_SIZE];
 
         std::map<sockaddr_in, bool, SockAddrCmp> shakingClient_;
     };

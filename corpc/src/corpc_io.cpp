@@ -50,6 +50,8 @@ void *Worker::taskHandleRoutine( void * arg ) {
         
         RoutineEnvironment::pauseIfRuntimeBusy();
     }
+
+    return NULL;
 }
 
 void MultiThreadWorker::threadEntry( Worker *self ) {
@@ -221,6 +223,33 @@ bool UdpPipeline::upflow(uint8_t *buf, int size) {
     std::shared_ptr<Connection> connection = connection_.lock();
     assert(connection);
     
+    // 注意：
+    //   当本端是服务端时
+    //      如果收到CORPC_MSG_TYPE_UDP_HANDSHAKE_3消息，说明对端可能仍在握手状态，需要重发CORPC_MSG_TYPE_UDP_HANDSHAKE_4给对端
+    //      在对端还未离开握手状态时，服务端可能会先发出通过kcp包装的心跳消息，导致对端出错关闭并导致本端
+    //   当本端是服务器或者客户端时
+    //      收到握手消息可以直接丢弃（因为这些消息是重复发送延迟到达了）
+    // 由于握手消息是4字节，kcp消息是大于24字节，因此这里直接通过消息长度来判断
+    if (size == CORPC_UDP_HANDSHAKE_SIZE) {
+        int32_t msgtype;
+        std::memcpy(&msgtype, buf, sizeof(msgtype));
+        msgtype = be32toh(msgtype);
+
+        if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
+            uint8_t shakemsg4buf[CORPC_UDP_HANDSHAKE_SIZE] = {0};
+            int32_t tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
+            std::memcpy(shakemsg4buf, &tmp, sizeof(tmp));
+
+            int ret = (int)::write(connection->getfd(), shakemsg4buf, CORPC_UDP_HANDSHAKE_SIZE);
+            if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
+                ERROR_LOG("KcpPipeline::upflow -- send shakemsg4 failed\n");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     if (size < headSize_) {
         ERROR_LOG("UdpPipeline::upflow -- package size too small\n");
         
@@ -293,7 +322,8 @@ ssize_t Connection::write(const void *buf, size_t nbyte) {
     uint32_t sentNum = 0;
     uint32_t leftNum = nbyte;
     do {
-        ret = (int)::write(fd_, buf + sentNum, leftNum);
+        ret = ::write(fd_, (static_cast<const uint8_t*>(buf) + sentNum), leftNum);
+        //ret = (int)::write(fd_, buf + sentNum, leftNum);
         if (ret > 0) {
             assert(ret <= leftNum);
             sentNum += ret;
@@ -463,21 +493,21 @@ UdpAcceptor::UdpAcceptor(Server *server, const std::string& ip, uint16_t port): 
     //shakemsg2buf_ = (uint8_t *)shakemsg2_.data();
     //memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(shakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
-    memset(shakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    memset(shakemsg2buf_, 0, CORPC_UDP_HANDSHAKE_SIZE);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_2);
-    std::memcpy(shakemsg2buf_ + 4, &tmp, sizeof(tmp));
+    std::memcpy(shakemsg2buf_, &tmp, sizeof(tmp));
     //shakemsg4buf_ = (uint8_t *)shakemsg4_.data();
     //memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(shakemsg4buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
-    memset(shakemsg4buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    memset(shakemsg4buf_, 0, CORPC_UDP_HANDSHAKE_SIZE);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
-    std::memcpy(shakemsg4buf_ + 4, &tmp, sizeof(tmp));
+    std::memcpy(shakemsg4buf_, &tmp, sizeof(tmp));
     //unshakemsg2buf_ = (uint8_t *)unshakemsg_.data();
     //memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
     //*(int32_t *)(unshakemsg2buf_ + 4) = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
-    memset(unshakemsg2buf_, 0, CORPC_MESSAGE_HEAD_SIZE);
+    memset(unshakemsg2buf_, 0, CORPC_UDP_HANDSHAKE_SIZE);
     tmp = htobe32(CORPC_MSG_TYPE_UDP_UNSHAKE);
-    std::memcpy(unshakemsg2buf_ + 4, &tmp, sizeof(tmp));
+    std::memcpy(unshakemsg2buf_, &tmp, sizeof(tmp));
 }
 
 void UdpAcceptor::threadEntry( UdpAcceptor *self ) {
@@ -505,19 +535,19 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
         bzero(&client_addr, slen);
         
         ssize_t ret = recvfrom(listen_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE, 0, (struct sockaddr *)&client_addr, &slen);
-        if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+        if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("UdpAcceptor::acceptRoutine() -- wrong msg.\n");
             
-            sendto(listen_fd, self->unshakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+            sendto(listen_fd, self->unshakemsg2buf_, CORPC_UDP_HANDSHAKE_SIZE, 0, (struct sockaddr *)&client_addr, slen);
             
             continue;
         }
         DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv from listen_fd.\n");
-        uint32_t bodySize;
-        std::memcpy(&bodySize, buf, sizeof(bodySize));
-        bodySize = be32toh(bodySize);
+        //uint32_t bodySize;
+        //std::memcpy(&bodySize, buf, sizeof(bodySize));
+        //bodySize = be32toh(bodySize);
         int32_t msgType;
-        std::memcpy(&msgType, buf + 4, sizeof(msgType));
+        std::memcpy(&msgType, buf, sizeof(msgType));
         msgType = be32toh(msgType);
         
         // 判断是否“连接请求”消息
@@ -526,7 +556,7 @@ void *UdpAcceptor::acceptRoutine( void * arg ) {
                 // 要求客户端重发握手3消息（应该由绑定四元组的new_fd接收握手3消息，但有时会被listen_fd接收）
                 DEBUG_LOG("UdpAcceptor::acceptRoutine() -- recv handshake3.\n");
             
-                sendto(listen_fd, self->shakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE, 0, (struct sockaddr *)&client_addr, slen);
+                sendto(listen_fd, self->shakemsg2buf_, CORPC_UDP_HANDSHAKE_SIZE, 0, (struct sockaddr *)&client_addr, slen);
             } else {
                 ERROR_LOG("UdpAcceptor::acceptRoutine() -- not handshake 1 msg.\n");
             }
@@ -590,8 +620,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
     while (trytimes > 0 && !shakeOK) {
         // 发送“连接确认”给客户的
         DEBUG_LOG("Send shake 2 msg, fd %d\n", shake_fd);
-        int ret = (int)write(shake_fd, self->shakemsg2buf_, CORPC_MESSAGE_HEAD_SIZE);
-        if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+        int ret = (int)write(shake_fd, self->shakemsg2buf_, CORPC_UDP_HANDSHAKE_SIZE);
+        if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
             ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 2 fail for fd %d ret %d errno %d (%s)\n",
                    shake_fd, ret, errno, strerror(errno));
             close(shake_fd);
@@ -600,7 +630,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
         
         // 接收“最终确认”
         ret = (int)read(shake_fd, buf, CORPC_MAX_UDP_MESSAGE_SIZE);
-        if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+        if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
             // ret 0 mean disconnected
             if (ret < 0 && errno == EAGAIN) {
                 waittime <<= 1;
@@ -618,7 +648,7 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
         } else {
             // 判断是否“最终确认消息”
             int32_t msgtype;
-            std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+            std::memcpy(&msgtype, buf, sizeof(msgtype));
             msgtype = be32toh(msgtype);
             
             if (msgtype != CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
@@ -630,8 +660,8 @@ void *UdpAcceptor::handshakeRoutine( void * arg ) {
 
             // 注意：由于发现绑定四元组socket后开始时handshake3消息有较大概率发到listen_fd，因此需要让客户端确认四元组socket确实收到消息
             // 这里需要发个shake4消息给客户端，客户端收到之后才能开始发数据消息（由于客户端能收到shake2消息因此shake4消息也能收到，若收不到就通过心跳机制关闭连接）
-            int ret = (int)write(shake_fd, self->shakemsg4buf_, CORPC_MESSAGE_HEAD_SIZE);
-            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+            int ret = (int)write(shake_fd, self->shakemsg4buf_, CORPC_UDP_HANDSHAKE_SIZE);
+            if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                 ERROR_LOG("UdpAcceptor::handshakeRoutine() -- write shake msg 4 fail for fd %d ret %d errno %d (%s)\n",
                        shake_fd, ret, errno, strerror(errno));
                 close(shake_fd);
@@ -1174,6 +1204,8 @@ void *Heartbeater::heartbeatRoutine( void * arg ) {
         // TODO: 不同连接允许不一样的心跳周期
         self->heartbeatList_.insert((uint64_t)conn.get(), nowms + CORPC_HEARTBEAT_PERIOD, conn);
     }
+
+    return NULL;
 }
 
 void Heartbeater::addConnection(std::shared_ptr<Connection>& connection) {

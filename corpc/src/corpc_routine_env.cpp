@@ -352,6 +352,8 @@ void *RoutineEnvironment::timeoutRoutine( void *arg ) {
             }
         }
     }
+
+    return NULL;
 }
 
 #ifdef MONITOR_ROUTINE

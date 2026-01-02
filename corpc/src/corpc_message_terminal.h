@@ -117,7 +117,7 @@ namespace corpc {
         void setOtherMessageHandle(OtherMessageHandle handle) { otherMessageHandle_ = handle; };
 
         // 接收完整的封禁列表
-        bool setBanMessages(std::list<int32_t> &msgTypes);
+        void setBanMessages(std::list<int32_t> &msgTypes);
         
         virtual corpc::Connection * buildConnection(int fd, IO *io, Worker *worker);
 

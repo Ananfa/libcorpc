@@ -235,7 +235,7 @@ bool MessageTerminal::registerMessage(int32_t type,
     return true;
 }
 
-bool MessageTerminal::setBanMessages(std::list<int32_t> &msgTypes) {
+void MessageTerminal::setBanMessages(std::list<int32_t> &msgTypes) {
     std::map<int32_t, bool> msgTypeM;
     for (auto msgType : msgTypes) {
         msgTypeM[msgType] = true;

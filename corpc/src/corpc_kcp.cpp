@@ -40,7 +40,7 @@ ssize_t KcpMessageTerminal::Connection::write(const void *buf, size_t nbyte) {
     do {
         uint32_t pkgSize = (leftNum > CORPC_MAX_KCP_PACKAGE_SIZE)?CORPC_MAX_KCP_PACKAGE_SIZE:leftNum;
 
-        ret = kcpSend((const char *)(buf + sentNum), pkgSize);
+        ret = kcpSend((const char *)(static_cast<const uint8_t*>(buf) + sentNum), pkgSize);
         if (ret < 0) {
             WARN_LOG("KcpMessageTerminal::Connection::write -- kcpSend ret %d\n", ret);
 
@@ -161,19 +161,19 @@ bool KcpPipeline::upflow(uint8_t *buf, int size) {
     //      在对端还未离开握手状态时，服务端可能会先发出通过kcp包装的心跳消息，导致对端出错关闭并导致本端
     //   当本端是服务器或者客户端时
     //      收到握手消息可以直接丢弃（因为这些消息是重复发送延迟到达了）
-    // 由于握手消息是22字节，kcp消息是大于24字节，因此这里直接通过消息长度来判断
-    if (size == CORPC_MESSAGE_HEAD_SIZE) {
+    // 由于握手消息是4字节，kcp消息是大于24字节，因此这里直接通过消息长度来判断
+    if (size == CORPC_UDP_HANDSHAKE_SIZE) {
         int32_t msgtype;
-        std::memcpy(&msgtype, buf + 4, sizeof(msgtype));
+        std::memcpy(&msgtype, buf, sizeof(msgtype));
         msgtype = be32toh(msgtype);
 
         if (msgtype == CORPC_MSG_TYPE_UDP_HANDSHAKE_3) {
-            uint8_t shakemsg4buf[CORPC_MESSAGE_HEAD_SIZE] = {0};
+            uint8_t shakemsg4buf[CORPC_UDP_HANDSHAKE_SIZE] = {0};
             int32_t tmp = htobe32(CORPC_MSG_TYPE_UDP_HANDSHAKE_4);
-            std::memcpy(shakemsg4buf + 4, &tmp, sizeof(tmp));
+            std::memcpy(shakemsg4buf, &tmp, sizeof(tmp));
 
-            int ret = (int)::write(connection->getfd(), shakemsg4buf, CORPC_MESSAGE_HEAD_SIZE);
-            if (ret != CORPC_MESSAGE_HEAD_SIZE) {
+            int ret = (int)::write(connection->getfd(), shakemsg4buf, CORPC_UDP_HANDSHAKE_SIZE);
+            if (ret != CORPC_UDP_HANDSHAKE_SIZE) {
                 ERROR_LOG("KcpPipeline::upflow -- send shakemsg4 failed\n");
                 return false;
             }
