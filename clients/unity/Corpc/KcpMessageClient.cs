@@ -5,12 +5,13 @@ using System.Text;
 using System.Net.Sockets;
 using System.Threading;
 using System.IO;
+using System.Runtime.InteropServices;
 using Google.Protobuf;
 using UnityEngine;
 
 namespace Corpc
 {   
-    public class UdpMessageClient : MessageClient
+    public class KcpMessageClient : MessageClient
     {
         private Socket udpSocket_ = null; // 与服务器的连接socket
 
@@ -18,13 +19,17 @@ namespace Corpc
         private int port_;
         private int localPort_;
 
+        private IntPtr kcp_;
+
         private byte[] handshake1msg_;
         private byte[] handshake3msg_;
 
         private byte[] heartbeatmsg_;
 
+        private readonly MemoryStream memoryStream_;
+
         // private constructor
-        public UdpMessageClient(string host, int port, int localPort, bool needHB, bool enableSendCRC, bool enableRecvCRC): base(needHB, enableSendCRC, enableRecvCRC, false)
+        public KcpMessageClient(string host, int port, int localPort, bool needHB, bool enableSendCRC, bool enableRecvCRC): base(needHB, enableSendCRC, enableRecvCRC, false)
         {
             host_ = host;
             port_ = port;
@@ -48,6 +53,14 @@ namespace Corpc
             heartbeatmsg_[5] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 16) & 0xFF);
             heartbeatmsg_[6] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 8) & 0xFF);
             heartbeatmsg_[7] = (byte)(Constants.CORPC_MSG_TYPE_HEARTBEAT & 0xFF);
+
+            memoryStream_ = SharedPools.Instance.GetStream("message", ushort.MaxValue);
+
+            kcp_ = Kcp.KcpCreate(1, new IntPtr(this));
+            Kcp.KcpNodelay(kcp_, 1, 10, 2, 1);
+            Kcp.KcpWndsize(kcp_, 32, 32);
+            Kcp.KcpSetmtu(kcp_, Constants.CORPC_KCP_MTU);
+            SetOutput();
         }
 
         public bool Start()
@@ -215,6 +228,8 @@ namespace Corpc
                     lastSendHBTime_ = nowms;
                 }
 
+                Kcp.KcpUpdate(kcp_, (uint)nowms);
+
                 // 心跳和断线消息需要特殊处理
                 ProtoMessage pmsg = recvMsgQueue_.Dequeue();
                 while (pmsg != null) {
@@ -241,9 +256,47 @@ namespace Corpc
             }
         }
 
+#if !ENABLE_IL2CPP
+        private KcpOutput kcpOutput;
+#endif
+
+        public void SetOutput()
+        {
+#if ENABLE_IL2CPP
+            Kcp.KcpSetoutput(kcp_, KcpOutput);
+#else
+            // 跟上一行一样写法，pc跟linux会出错, 保存防止被GC
+            kcpOutput = KcpOutput;
+            Kcp.KcpSetoutput(kcp_, kcpOutput);
+#endif
+        }
+
+#if ENABLE_IL2CPP
+        [AOT.MonoPInvokeCallback(typeof(KcpOutput))]
+#endif
+        public static int KcpOutput(IntPtr bytes, int len, IntPtr kcp, IntPtr user)
+        {
+            // 每条连接独享一个小数组，避免共享流
+            byte[] tmp = ArrayPool<byte>.Shared.Rent(len);
+            try
+            {
+                Marshal.Copy(bytes, tmp, 0, len);
+                lock (udpSocket_)
+                    udpSocket_.Send(tmp, 0, len, SocketFlags.None);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(tmp);
+            }
+            return len;
+        }
+
         private void RecvMsgLoop()
         {
-            byte[] buf = new byte[Constants.CORPC_MAX_UDP_MESSAGE_SIZE];
+            //byte[] buf = new byte[Constants.CORPC_MAX_UDP_MESSAGE_SIZE];
+            byte[] buf = memoryStream_.GetBuffer();
+            memoryStream_.SetLength(Constants.CORPC_MAX_UDP_MESSAGE_SIZE);
+            memoryStream_.Seek(0, SeekOrigin.Begin);
 
             while (true) {
                 try {
@@ -260,59 +313,90 @@ namespace Corpc
                         continue;
                     }
 
-                    Debug.Assert(i >= Constants.CORPC_MESSAGE_HEAD_SIZE);
-
-                    uint msgLen = (uint)((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
-                    int msgType = (int)((buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7]);
-                    ushort tag = (ushort)((buf[8] << 8) | buf[9]);
-                    ushort flag = (ushort)((buf[10] << 8) | buf[11]);
-
-                    Debug.Assert(i == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
-
-                    IMessage protoData = null;
-                    if (msgType > 0) {
-                        // 校验序号
-                        if (enableSerial_) {
-                            uint serial = (uint)((buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19]);
-                            if (serial != 0 && serial != lastRecvSerial_+1) {
-                                Debug.LogErrorFormat("serial check failed! need %d, recv %d", lastRecvSerial_, serial);
-                                recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                return;
-                            }
-
-                            lastRecvSerial_++;
-                        }
-
-                        if (msgLen > 0) {
-                            // 校验CRC
-                            if (enableRecvCRC_) {
-                                ushort crc = (ushort)((buf[20] << 8) | buf[21]);
-                                ushort crc1 = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, (uint)msgLen);
-
-                                if (crc != crc1)
-                                {
-                                    Debug.LogErrorFormat("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, msgLen, crc, crc1);
-                                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                    return;
-                                }
-                            }
-
-                            // 解密
-                            if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
-                                if (crypter_ == null) {
-                                    Debug.LogError("cant decrypt message for crypter not exist\n");
-                                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                    return;
-                                }
-
-                                crypter_.decrypt(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, (uint)msgLen);
-                            }
-
-                            protoData = Deserialize(msgType, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, (int)msgLen);
-                        }
+                    int ret = Kcp.KcpInput(kcp_, buf, 0, i);
+                    if (ret < 0) {
+                        Debug.LogErrorFormat("kcpInput failed");
+                        //return;
                     }
 
-                    recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
+                    while (true) {
+                        int n = Kcp.KcpPeeksize(kcp_);
+                        if (n < 0)
+                        {
+                            break;
+                        }
+                        if (n == 0)
+                        {
+                            Debug.LogErrorFormat("network reset");
+                            recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                            return;
+                        }
+
+                        byte[] buffer = memoryStream_.GetBuffer();
+                        memoryStream_.SetLength(n);
+                        memoryStream_.Seek(0, SeekOrigin.Begin);
+                        int count = Kcp.KcpRecv(kcp_, buffer, ushort.MaxValue);
+                        if (count <= 0)
+                        {
+                            break;
+                        }
+
+                        Debug.Assert(count >= Constants.CORPC_MESSAGE_HEAD_SIZE);
+
+                        uint msgLen = (uint)((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]);
+                        int msgType = (int)((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]);
+                        ushort tag = (ushort)((buffer[8] << 8) | buffer[9]);
+                        ushort flag = (ushort)((buffer[10] << 8) | buffer[11]);
+
+                        Debug.Assert(count == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
+
+                        IMessage protoData = null;
+                        if (msgType > 0) {
+                            // 校验序号
+                            if (enableSerial_) {
+                                uint serial = (uint)((buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19]);
+                                if (serial != 0 && serial != lastRecvSerial_+1) {
+                                    Debug.LogErrorFormat("serial check failed! need %d, recv %d", lastRecvSerial_, serial);
+                                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                    return;
+                                }
+
+                                lastRecvSerial_++;
+                            }
+
+                            if (msgLen > 0) {
+                                // 校验CRC
+                                if (enableRecvCRC_) {
+                                    ushort crc = (ushort)((buffer[20] << 8) | buffer[21]);
+                                    ushort crc1 = CRC.CheckSum(buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, (uint)msgLen);
+
+                                    if (crc != crc1)
+                                    {
+                                        Debug.LogErrorFormat("crc check failed, msgType:%d, size:%d, recv:%d, cal:%d\n", msgType, msgLen, crc, crc1);
+                                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                        return;
+                                    }
+                                }
+
+                                // 解密
+                                if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                                    if (crypter_ == null) {
+                                        Debug.LogError("cant decrypt message for crypter not exist\n");
+                                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                        return;
+                                    }
+
+                                    crypter_.decrypt(buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, (uint)msgLen);
+                                }
+
+                                protoData = Deserialize(msgType, buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, (int)msgLen);
+                            }
+                        }
+
+                        recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
+                    }
+
+                    Kcp.KcpFlush(kcp_);
                 } catch (System.Exception ex) {
                     Debug.LogError("RecvThread error!!!");
                     Debug.LogError(ex.ToString());
@@ -342,7 +426,7 @@ namespace Corpc
                         }
                     case Constants.CORPC_MSG_TYPE_HEARTBEAT:
                         {
-                            udpSocket_.Send(heartbeatmsg_, (int)Constants.CORPC_MESSAGE_HEAD_SIZE, SocketFlags.None);
+                            Write(heartbeatmsg_, (int)Constants.CORPC_MESSAGE_HEAD_SIZE);
                             break;
                         }
                     default:
@@ -411,7 +495,7 @@ namespace Corpc
                                 buf[21] = (byte)(crc & 0xFF);
                             }
 
-                            udpSocket_.Send(buf, (int)(Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength), SocketFlags.None);
+                            Write(buf, (int)(Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength));
                             break;
                         }
                     }
@@ -422,6 +506,32 @@ namespace Corpc
                     return;
                 }
             }
+        }
+
+        unsafe int Write(byte[] buf, int nbyte)
+        {
+            if (buf == null || nbyte <= 0) return 0;
+
+            int sent = 0, left = nbyte;
+            const int MAX = 1200;
+
+            fixed (byte* p = buf)               // 一次性固定整个数组
+            {
+                while (left > 0)
+                {
+                    int pkg = Math.Min(left, Constants.CORPC_MAX_KCP_PACKAGE_SIZE);
+                    IntPtr ptr = new IntPtr(p + sent);   // 计算子段首地址
+
+                    int ret = Kcp.KcpSend(kcp_, ptr, pkg);   // 见下方重载
+                    if (ret < 0) return ret;
+
+                    sent += pkg;
+                    left -= pkg;
+                }
+            }
+
+            Kcp.KcpFlush(kcp_);
+            return nbyte;
         }
     }
 }

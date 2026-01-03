@@ -10,18 +10,18 @@ namespace Corpc
 
     public class SimpleXORCrypter: ICrypter
     {
-        private byte[] _key;
-        private int _keySize;
+        private byte[] key_;
+        private int keySize_;
         public SimpleXORCrypter(byte[] key)
         {
-            _key = key;
-            _keySize = _key.Length;
+            key_ = key;
+            keySize_ = key_.Length;
         }
 
         public void encrypt(byte[] src, int srcOff, byte[] dst, int dstOff, uint size)
         {
             for (int i = 0; i < size; i++) {
-                dst[i + dstOff] = (byte)(src[i + srcOff]^_key[i%_keySize]);
+                dst[i + dstOff] = (byte)(src[i + srcOff]^key_[i%keySize_]);
             }
         }
 

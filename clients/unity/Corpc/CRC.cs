@@ -1,6 +1,6 @@
 namespace Corpc
 {
-    public class CRC
+    public static class CRC
     {
         static ushort[] MbTable = new ushort[256]{
             0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301, 0X03C0, 0X0280, 0XC241,

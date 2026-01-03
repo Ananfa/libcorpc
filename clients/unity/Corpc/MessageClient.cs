@@ -27,81 +27,81 @@ namespace Corpc
 
 	public abstract class MessageClient
 	{
-		protected LockProtoMessageQueue _recvMsgQueue = new LockProtoMessageQueue(); // 接收消息队列
-		protected BlockingDequeueProtoMessageQueue _sendMsgQueue = new BlockingDequeueProtoMessageQueue(); // 发送消息队列
+		protected LockProtoMessageQueue recvMsgQueue_ = new LockProtoMessageQueue(); // 接收消息队列
+		protected BlockingDequeueProtoMessageQueue sendMsgQueue_ = new BlockingDequeueProtoMessageQueue(); // 发送消息队列
 
-		protected Thread _recvMsgThread = null; // 接收消息线程
-		protected Thread _sendMsgThread = null; // 发送消息线程
+		protected Thread recvMsgThread_ = null; // 接收消息线程
+		protected Thread sendMsgThread_ = null; // 发送消息线程
 
-		protected bool _needHB;           // 是否需要心跳
-		protected bool _enableSendCRC;    // 是否需要发包时校验CRC码
-		protected bool _enableRecvCRC;    // 是否需要收包时校验CRC码
-		protected bool _enableSerial;     // 是否需要消息序号
+		protected bool needHB_;           // 是否需要心跳
+		protected bool enableSendCRC_;    // 是否需要发包时校验CRC码
+		protected bool enableRecvCRC_;    // 是否需要收包时校验CRC码
+		protected bool enableSerial_;     // 是否需要消息序号
 
-		protected int _lastRecvSerial = 0;
-		protected int _lastSendSerial = 0;
+		protected int lastRecvSerial_ = 0;
+		protected int lastSendSerial_ = 0;
 
-		protected long _lastRecvHBTime;   // 最后一次收到心跳的时间
-		protected long _lastSendHBTime;   // 最后一次发送心跳的时间
+		protected long lastRecvHBTime_;   // 最后一次收到心跳的时间
+		protected long lastSendHBTime_;   // 最后一次发送心跳的时间
 
-		protected bool _running = false;
+		protected bool running_ = false;
 
-		protected ICrypter _crypter = null;
+		protected ICrypter crypter_ = null;
 
-		Dictionary<int, MessageRegInfo> _registerTable = new Dictionary<int, MessageRegInfo>();
+		Dictionary<int, MessageRegInfo> registerTable_ = new Dictionary<int, MessageRegInfo>();
 
         public bool Running
         {
             get
             {
                 //Some other code
-                return _running;
+                return running_;
             }
         }
 
         public ICrypter Crypter {
             set
             {
-                _crypter = value;
+                crypter_ = value;
             }
         }
 
 		public MessageClient(bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial)
 		{
-			_needHB = needHB;
-			_enableSendCRC = enableSendCRC;
-			_enableRecvCRC = enableRecvCRC;
-			_enableSerial = enableSerial;
+			needHB_ = needHB;
+			enableSendCRC_ = enableSendCRC;
+			enableRecvCRC_ = enableRecvCRC;
+			enableSerial_ = enableSerial;
 		}
 
 		public bool Register(int type, MessageParser parser, MessageHandler handler)
 		{
-			if (_registerTable.ContainsKey(type))
+			if (registerTable_.ContainsKey(type))
             {
 				Debug.LogErrorFormat("duplicate register message [{0}]!!!", type);
 				return false;
             }
 
-			_registerTable.Add(type, new MessageRegInfo(type, parser, handler));
+			registerTable_.Add(type, new MessageRegInfo(type, parser, handler));
 			return true;
 		}
 
 		public void Unregister(int type)
 		{
-			if (_registerTable.ContainsKey(type)) {
-				_registerTable.Remove(type);
+			if (registerTable_.ContainsKey(type)) {
+				registerTable_.Remove(type);
 			}
 		}
 
 		protected void HandleMessage(int type, IMessage msg)
 		{
-			if (!_registerTable.ContainsKey(type))
+			if (!registerTable_.ContainsKey(type))
 			{
 				Debug.LogWarningFormat("Handle unknown message [{0}]!!!", type);
 				return;
 			}
 
-			_registerTable[type].Handler(type, msg);
+			registerTable_[type].Handler(type, msg);
 		}
 
 		protected byte[] Serialize(ProtoMessage msg)
@@ -117,19 +117,19 @@ namespace Corpc
 
 		protected IMessage Deserialize(int type, byte[] data, int offset, int length)
 		{
-			if (!_registerTable.ContainsKey(type))
+			if (!registerTable_.ContainsKey(type))
             {
 				Debug.LogErrorFormat("Deserialize unknown handle message [{0}]!!!", type);
 				return null;
             }
 
-			return _registerTable[type].Parser.ParseFrom(data, offset, length);
+			return registerTable_[type].Parser.ParseFrom(data, offset, length);
 		}
 
         // 异步发送数据
         public void Send(int type, ushort tag, IMessage msg, bool needCrypter)
         {
-            _sendMsgQueue.Enqueue(new ProtoMessage(type, tag, msg, needCrypter));
+            sendMsgQueue_.Enqueue(new ProtoMessage(type, tag, msg, needCrypter));
         }
 	}
 }

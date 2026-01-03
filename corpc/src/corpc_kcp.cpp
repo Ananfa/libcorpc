@@ -23,6 +23,8 @@ KcpMessageTerminal::Connection::Connection(int fd, IO *io, Worker *worker, KcpMe
 DEBUG_LOG("KcpMessageTerminal::Connection::Connection -- fd:%d\n", fd_);
     pkcp_ = ikcp_create(0x1, (void *)this);
     ikcp_nodelay(pkcp_, 1, 20, 2, 1);
+    ikcp_wndsize(pkcp_, 32, 32);
+    ikcp_setmtu(pkcp_, 470);
     pkcp_->output = rawOut;
 }
 
