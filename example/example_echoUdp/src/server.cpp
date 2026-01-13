@@ -164,7 +164,7 @@ int main(int argc, const char * argv[]) {
     server->start();
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
-    corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
+    //corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
     
     corpc::RoutineEnvironment::runEventLoop();
 }

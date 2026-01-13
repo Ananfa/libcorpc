@@ -51,7 +51,7 @@ int main(int argc, const char * argv[])
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1, 0);
 
-    corpc::KcpMessageTerminal *terminal = new corpc::KcpMessageTerminal(true, true, true, true);
+    corpc::KcpMessageTerminal *terminal = new corpc::KcpMessageTerminal(true, true, true, false);
 
     corpc::KcpClient *client = new corpc::KcpClient(io, nullptr, terminal, host, port, LOCAL_PORT);
     

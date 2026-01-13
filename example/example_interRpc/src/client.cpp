@@ -118,7 +118,7 @@ static void *foo_routine( void *arg )
             testStubs->foo_clt->Foo(controller, request, response, NULL);
             
             if (controller->Failed()) {
-                //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                 iFooFailCnt++;
                 
                 msleep(100);
@@ -155,7 +155,7 @@ static void *bar_routine( void *arg )
             testStubs->bar_clt->Bar(controller, request, response, NULL);
             
             if (controller->Failed()) {
-                //LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
+                LOG("Rpc Call Failed : %s\n", controller->ErrorText().c_str());
                 iBarFailCnt++;
                 
                 msleep(100);
