@@ -227,6 +227,7 @@ namespace Corpc
                     Debug.LogError("heartbeat timeout");
                     _ = Close();
                 } else if (nowms - lastSendHBTime_ > Constants.CORPC_HEARTBEAT_PERIOD) {
+                    Debug.LogError("send heartbeat");
                     Send(Constants.CORPC_MSG_TYPE_HEARTBEAT, 0, null, false);
                     lastSendHBTime_ = nowms;
                 }
@@ -300,62 +301,77 @@ namespace Corpc
                             break;
                         }
 
-                        //var buffer = bufferOwner.Memory.Slice(0, avalidLength);
-                        byte[] buffer = bufferOwner.Memory.Slice(0, avalidLength).ToArray();
-
                         Debug.Assert(avalidLength >= Constants.CORPC_MESSAGE_HEAD_SIZE);
 
-                        uint msgLen = (uint)((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]);
-                        int msgType = (int)((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]);
-                        ushort tag = (ushort)((buffer[8] << 8) | buffer[9]);
-                        ushort flag = (ushort)((buffer[10] << 8) | buffer[11]);
+                        int offset = 0;
 
-                        Debug.Assert(avalidLength == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
+                        while (offset < avalidLength) {
+                            byte[] headbuf = bufferOwner.Memory.Slice(offset, Constants.CORPC_MESSAGE_HEAD_SIZE).ToArray();
 
-                        IMessage protoData = null;
-                        if (msgType > 0) {
-                            // 校验序号
-                            if (enableSerial_) {
-                                uint serial = (uint)((buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19]);
-                                if (serial != 0 && serial != lastRecvSerial_+1) {
-                                    Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
-                                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                    return;
-                                }
+                            //byte[] buffer = bufferOwner.Memory.Slice(0, avalidLength).ToArray();
 
-                                lastRecvSerial_++;
+                            uint msgLen = (uint)((headbuf[0] << 24) | (headbuf[1] << 16) | (headbuf[2] << 8) | headbuf[3]);
+                            int msgType = (int)((headbuf[4] << 24) | (headbuf[5] << 16) | (headbuf[6] << 8) | headbuf[7]);
+                            ushort tag = (ushort)((headbuf[8] << 8) | headbuf[9]);
+                            ushort flag = (ushort)((headbuf[10] << 8) | headbuf[11]);
+
+                            offset += Constants.CORPC_MESSAGE_HEAD_SIZE;
+
+                            Debug.Assert(avalidLength >= offset + (int)msgLen);
+
+                            //Debug.Assert(avalidLength == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
+                            if (avalidLength != Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen) {
+                                Debug.LogErrorFormat("avalidLength {0} msgLen {1} msgType {2} tag {3} flag {4}", avalidLength, msgLen, msgType, tag, flag);
                             }
 
-                            if (msgLen > 0) {
-                                // 校验CRC
-                                if (enableRecvCRC_) {
-                                    ushort crc = (ushort)((buffer[20] << 8) | buffer[21]);
-                                    ushort crc1 = CRC.CheckSum(buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, (uint)msgLen);
-
-                                    if (crc != crc1)
-                                    {
-                                        Debug.LogErrorFormat("crc check failed, msgType:{0}, size:{1}, recv:{2}, cal:{3}\n", msgType, msgLen, crc, crc1);
-                                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                        return;
-                                    }
-                                }
-
-                                // 解密
-                                if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
-                                    if (crypter_ == null) {
-                                        Debug.LogError("cant decrypt message for crypter not exist\n");
+                            IMessage protoData = null;
+                            if (msgType > 0) {
+                                // 校验序号
+                                if (enableSerial_) {
+                                    uint serial = (uint)((headbuf[16] << 24) | (headbuf[17] << 16) | (headbuf[18] << 8) | headbuf[19]);
+                                    if (serial != 0 && serial != lastRecvSerial_+1) {
+                                        Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
                                         recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                         return;
                                     }
 
-                                    crypter_.decrypt(buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, (uint)msgLen);
+                                    lastRecvSerial_++;
                                 }
 
-                                protoData = Deserialize(msgType, buffer, Constants.CORPC_MESSAGE_HEAD_SIZE, (int)msgLen);
+                                if (msgLen > 0) {
+                                    byte[] buffer = bufferOwner.Memory.Slice(offset, (int)msgLen).ToArray();
+                                    offset += (int)msgLen;
+
+                                    // 校验CRC
+                                    if (enableRecvCRC_) {
+                                        ushort crc = (ushort)((headbuf[20] << 8) | headbuf[21]);
+                                        ushort crc1 = CRC.CheckSum(buffer, 0, 0xFFFF, (uint)msgLen);
+
+                                        if (crc != crc1)
+                                        {
+                                            Debug.LogErrorFormat("crc check failed, msgType:{0}, size:{1}, recv:{2}, cal:{3}\n", msgType, msgLen, crc, crc1);
+                                            recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                            return;
+                                        }
+                                    }
+
+                                    // 解密
+                                    if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                                        if (crypter_ == null) {
+                                            Debug.LogError("cant decrypt message for crypter not exist\n");
+                                            recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                            return;
+                                        }
+
+                                        crypter_.decrypt(buffer, 0, buffer, 0, (uint)msgLen);
+                                    }
+
+                                    protoData = Deserialize(msgType, buffer, 0, (int)msgLen);
+                                }
                             }
+
+                            recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
                         }
-
-                        recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
 
                     }
 

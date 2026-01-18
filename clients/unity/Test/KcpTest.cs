@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using Corpc;
 using Google.Protobuf;
@@ -7,27 +7,28 @@ using System.Threading;
 
 //using echo;
 
-public class UdpTest : MonoBehaviour
+public class KcpTest : MonoBehaviour
 {
     public string _host;
     public int _port;
 
-    private UdpMessageClient _client = null;
+    private KcpMessageClient _client = null;
     private System.Random _rnd = new System.Random();
     private CancellationTokenSource _cts;
-    private float _lastSendTime = 0f;
-    private const float SEND_INTERVAL = 1f; // 每秒发送一次
+    //private float _lastSendTime = 0f;
+    //private const float SEND_INTERVAL = 1f; // 每秒发送一次
+    private int _i = 0;
 
     // Use this for initialization
     async void Start()
     {
-        Debug.Log("UdpTest start");
-
+        Debug.Log("KcpTest start");
+        
         _cts = new CancellationTokenSource();
         
         if (_client == null)
         {
-            _client = new UdpMessageClient(_host, _port, 10000 + _rnd.Next(10000), true, true, true);
+            _client = new KcpMessageClient(_host, _port, 10000 + _rnd.Next(10000), true, true, true);
             _client.Crypter = new SimpleXORCrypter(System.Text.Encoding.UTF8.GetBytes("1234567fvxcvc"));
             _client.Register(1, FooResponse.Parser, FooResponseHandler);
             _client.Register(3, ServerReady.Parser, ServerReadyHandler);
@@ -47,6 +48,8 @@ public class UdpTest : MonoBehaviour
 
             // 定时发送消息
             //if (Time.time - _lastSendTime > SEND_INTERVAL)
+            _i = (_i + 1) % 5;
+            if (_i == 0)
             {
                 SendTestMessage();
                 //_lastSendTime = Time.time;
@@ -159,7 +162,7 @@ public class UdpTest : MonoBehaviour
 
     async void OnDestroy()
     {
-        Debug.Log("UdpTest OnDestroy");
+        Debug.Log("KcpTest OnDestroy");
         
         _cts?.Cancel();
         
