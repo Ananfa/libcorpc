@@ -117,8 +117,7 @@ namespace corpc {
     public:
         MessagePipeline(std::shared_ptr<Connection> &connection, Worker *worker, DecodeFunction decodeFun, EncodeFunction encodeFun, uint headSize, uint maxBodySize);
         virtual ~MessagePipeline() = 0;
-        
-        virtual bool downflow(uint8_t *buf, int space, int &size) override final;
+        virtual bool downflow(uint8_t *buf, int space, int &size) override;
         
     protected:
         DecodeFunction decodeFun_;
@@ -134,7 +133,7 @@ namespace corpc {
         uint8_t *bodyBuf_;
         uint bodySize_;
         
-    private:
+    protected:
         std::string downflowBuf_; // 在downflow过程中写不进buf的数据将记录到_downflowBuf中
         uint32_t downflowBufSentNum_; // 已发送的数据量
     };
@@ -145,7 +144,7 @@ namespace corpc {
         virtual ~TcpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size) override;
-        
+
     private:
         uint headNum_;
         uint bodyNum_;
@@ -160,6 +159,7 @@ namespace corpc {
         virtual ~UdpPipeline() {}
         
         virtual bool upflow(uint8_t *buf, int size) override;
+        virtual bool downflow(uint8_t *buf, int space, int &size) override; // 注意：udp不要合并消息发送
     };
     
     class PipelineFactory {
@@ -265,7 +265,7 @@ namespace corpc {
         
         int sendThreadIndex_; // 分配到sender的线程下标
         int recvThreadIndex_; // 分配到receiver的线程下标
-        
+
         bool needHB_; // 是否进行心跳
         std::atomic<uint64_t> lastRecvHBTime_; // 最后一次收到数据的时间
         

@@ -277,6 +277,32 @@ bool UdpPipeline::upflow(uint8_t *buf, int size) {
     return true;
 }
 
+bool UdpPipeline::downflow(uint8_t *buf, int space, int &size) {
+    std::shared_ptr<Connection> connection = connection_.lock();
+    assert(connection);
+    size = 0;
+
+    if (connection->getDataSize() == 0) {
+        return true;
+    }
+
+    int tmp = 0;
+    if (!encodeFun_(connection, connection->getFrontData(), buf, space, tmp, downflowBuf_, downflowBufSentNum_)) {
+        // 编码失败
+        return false;
+    }
+
+    if (downflowBuf_.length() > 0) { // udp数据太大放不进buf中
+        ERROR_LOG("UdpPipeline::downflow -- data too large\n");
+        return false;
+    }
+
+    size = tmp;
+    connection->popFrontData();
+    
+    return true;
+}
+
 PipelineFactory::~PipelineFactory() {}
 
 MessagePipelineFactory::~MessagePipelineFactory() {}
@@ -950,6 +976,7 @@ void *Sender::connectionRoutine( void * arg ) {
     connection->routine_ = co_self();
     connection->routineHang_ = false;
     
+    // FixMe: 这里要根据TCP、KCP还是UDP区别缓冲大小，对于UDP来说缓冲区要根据MTU来设置，不然浪费空间
     std::string buffs(CORPC_MAX_BUFFER_SIZE, 0);
     uint8_t *buf = (uint8_t *)buffs.data();
     
