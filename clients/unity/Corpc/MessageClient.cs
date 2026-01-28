@@ -27,8 +27,10 @@ namespace Corpc
 
     public abstract class MessageClient
     {
-        protected LockProtoMessageQueue recvMsgQueue_ = new LockProtoMessageQueue(); // 接收消息队列
-        protected BlockingDequeueProtoMessageQueue sendMsgQueue_ = new BlockingDequeueProtoMessageQueue(); // 发送消息队列
+        //protected LockProtoMessageQueue recvMsgQueue_ = new LockProtoMessageQueue(); // 接收消息队列
+        //protected BlockingDequeueProtoMessageQueue sendMsgQueue_ = new BlockingDequeueProtoMessageQueue(); // 发送消息队列
+        protected AsyncMessageQueue<ProtoMessage> recvMsgQueue_ = new AsyncMessageQueue<ProtoMessage>();
+        protected AsyncMessageQueue<ProtoMessage> sendMsgQueue_ = new AsyncMessageQueue<ProtoMessage>();
 
         protected Thread recvMsgThread_ = null; // 接收消息线程
         protected Thread sendMsgThread_ = null; // 发送消息线程
@@ -159,6 +161,7 @@ namespace Corpc
         {
             sendMsgQueue_.Enqueue(new ProtoMessage(type, tag, msg, needCrypter));
         }
+
     }
 }
 

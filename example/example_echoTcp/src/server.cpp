@@ -117,17 +117,21 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1, 0);
 
-    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, true);
+    bool needBuff = true;
+    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, needBuff);
     
-    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, needBuff](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
-        std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(true));
-        conn->setMsgBuffer(msgBuffer);
 
-        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
-        readyMsg->set_status(1);
-        conn->send(3, false, true, true, 0, readyMsg);
+        if (needBuff) {
+            std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(1000));
+            conn->setMsgBuffer(msgBuffer);
+        }
+
+        //std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        //readyMsg->set_status(1);
+        //conn->send(3, false, true, true, 0, readyMsg);
     });
 
     terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
@@ -157,11 +161,19 @@ int main(int argc, const char * argv[]) {
         conn->send(1, false, true, true, tag, response);
     });
 
+    terminal->registerMessage(3, new ServerReady, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        printf("ServerReady tag:%d\n", tag);
+        
+        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        readyMsg->set_status(1);
+        conn->send(3, false, true, true, tag, readyMsg);
+    });
+
     corpc::TcpMessageServer *server = new corpc::TcpMessageServer(io, nullptr, terminal, ip, port);
     server->start();
     
     corpc::RoutineEnvironment::startCoroutine(log_routine, NULL);
-    corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
+    //corpc::RoutineEnvironment::startCoroutine(ban_routine, terminal);
     
     corpc::RoutineEnvironment::runEventLoop();
 }

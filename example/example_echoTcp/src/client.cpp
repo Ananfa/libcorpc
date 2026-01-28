@@ -41,15 +41,23 @@ int main(int argc, const char * argv[])
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1, 0);
 
-    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, true);
+    bool needBuff = true;
+    corpc::MessageTerminal *terminal = new corpc::MessageTerminal(true, true, true, needBuff);
 
     corpc::TcpClient *client = new corpc::TcpClient(io, nullptr, terminal, host, port);
     
-    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, needBuff](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
-        std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(false));
-        conn->setMsgBuffer(msgBuffer);
+
+        if (needBuff) {
+            std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(1000));
+            conn->setMsgBuffer(msgBuffer);
+        }
+        
+        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        readyMsg->set_status(1);
+        conn->send(3, false, true, true, 0, readyMsg);
     });
 
     terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [&](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {

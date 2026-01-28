@@ -126,17 +126,24 @@ int main(int argc, const char * argv[]) {
     // 注册服务
     corpc::IO *io = corpc::IO::create(1, 1, 0);
 
-    corpc::KcpMessageTerminal *terminal = new corpc::KcpMessageTerminal(true, true, true, false);
+    bool needBuff = true;
+    corpc::KcpMessageTerminal *terminal = new corpc::KcpMessageTerminal(true, true, true, needBuff);
     
-    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+    terminal->registerMessage(CORPC_MSG_TYPE_CONNECT, nullptr, false, [&crypter, needBuff](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
+
+        if (needBuff) {
+            std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(1000));
+            conn->setMsgBuffer(msgBuffer);
+        }
+
         //std::shared_ptr<corpc::MessageBuffer> msgBuffer(new corpc::MessageBuffer(true));
         //conn->setMsgBuffer(msgBuffer);
 //DEBUG_LOG("send ServerReady\n");
-        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
-        readyMsg->set_status(1);
-        conn->send(3, false, true, true, 0, readyMsg);
+        //std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        //readyMsg->set_status(1);
+        //conn->send(3, false, true, true, 0, readyMsg);
     });
 
     terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
@@ -165,6 +172,14 @@ int main(int argc, const char * argv[]) {
         response->set_text(str);
 
         conn->send(1, false, true, true, tag, response);
+    });
+
+    terminal->registerMessage(3, new ServerReady, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        printf("ServerReady tag:%d\n", tag);
+        
+        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        readyMsg->set_status(1);
+        conn->send(3, false, true, true, tag, readyMsg);
     });
 
     corpc::KcpMessageServer *server = new corpc::KcpMessageServer(io, nullptr, terminal, ip, port);

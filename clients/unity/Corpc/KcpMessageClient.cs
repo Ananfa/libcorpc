@@ -20,21 +20,20 @@ namespace Corpc
 
         private string host_;
         private int port_;
-        private int localPort_;
+        public int localPort_ { get; set; }
 
         private byte[] handshake1msg_;
         private byte[] handshake3msg_;
 
         private byte[] heartbeatmsg_;
 
-        public SimpleSegManager.Kcp kcp { get; }
+        public SimpleSegManager.Kcp kcp { get; set; }
 
         // private constructor
-        public KcpMessageClient(string host, int port, int localPort, bool needHB, bool enableSendCRC, bool enableRecvCRC): base(needHB, enableSendCRC, enableRecvCRC, false)
+        public KcpMessageClient(string host, int port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial): base(needHB, enableSendCRC, enableRecvCRC, enableSerial)
         {
             host_ = host;
             port_ = port;
-            localPort_ = localPort;
 
             handshake1msg_ = new byte[Constants.CORPC_UDP_HANDSHAKE_SIZE];
             handshake3msg_ = new byte[Constants.CORPC_UDP_HANDSHAKE_SIZE];
@@ -54,12 +53,15 @@ namespace Corpc
             heartbeatmsg_[5] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 16) & 0xFF);
             heartbeatmsg_[6] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 8) & 0xFF);
             heartbeatmsg_[7] = (byte)(Constants.CORPC_MSG_TYPE_HEARTBEAT & 0xFF);
-
-            kcp = new SimpleSegManager.Kcp(1, this);
         }
 
         public async Task<bool> Start()
         {
+            if (localPort_ == 0) {
+                Debug.LogError("The localport value is not set.");
+                return false;
+            }
+
             if (udpSocket_ == null) {
                 try {
                     udpSocket_ = new Socket (AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -92,10 +94,21 @@ namespace Corpc
 
             if (!running_) {
                 cts_ = new CancellationTokenSource();
-                
+                kcp = new SimpleSegManager.Kcp(1, this);
+                kcp.Interval(0);
+
+                // 注意：关闭的时候清理会导致send任务卡死，因此改为在重连时清理
+                recvMsgQueue_.Clear();
+                sendMsgQueue_.Clear();
+
                 if (needHB_) {
                     lastRecvHBTime_ = lastSendHBTime_ = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                 }
+    
+                lastSendSerial_ = 0;
+                lastRecvSerial_ = 0;
+    
+                HandleMessage(Constants.CORPC_MSG_TYPE_CONNECT, null);
     
                 // 启动收发任务
                 _ = Task.Run(() => RecvMsgLoop(cts_.Token));
@@ -182,35 +195,36 @@ namespace Corpc
             return true;
         }
 
-        public async Task Close()
+        public void Close()
         {
             running_ = false;
 
-            // 发送断开连接消息
-            sendMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-
-            if (udpSocket_ != null) {
-                try {
-                    await Task.Run(() => {
-                        udpSocket_.Close();
-                    }).ConfigureAwait(false);
-                } catch (System.Exception ex) {
-                    Debug.LogError("Shutdown socket error!!!");
-                    Debug.LogError(ex.ToString());
-                    Debug.LogError(ex.StackTrace);
+            if (cts_ != null && !cts_.IsCancellationRequested) {
+                // 注意：这里要先close udp socket，不然receiveTask_会被卡死
+                if (udpSocket_ != null) {
+                    try {
+                        udpSocket_.Close();  // 直接在主线程调用
+                    } catch (System.Exception ex) {
+                        Debug.LogError("Close socket error!!!");
+                        Debug.LogError(ex.ToString());
+                        Debug.LogError(ex.StackTrace);
+                    }
                 }
-                udpSocket_ = null;
-            }
 
-            if (cts_ != null) {
+                // 发送断开连接消息
+                sendMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+
                 cts_.Cancel();
                 cts_.Dispose();
                 cts_ = null;
+                udpSocket_ = null;
             }
 
-            // 清理收发队列
-            recvMsgQueue_.Clear();
-            sendMsgQueue_.Clear();
+            kcp.Dispose();
+
+            // 注意：不能在这里清理收发队列
+            //recvMsgQueue_.Clear();
+            //sendMsgQueue_.Clear();
 
             HandleMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, null);
         }
@@ -225,9 +239,9 @@ namespace Corpc
                 if (nowms - lastRecvHBTime_ > Constants.CORPC_MAX_NO_HEARTBEAT_TIME) {
                     // 无心跳，断线
                     Debug.LogError("heartbeat timeout");
-                    _ = Close();
+                    Close();
+                    return;
                 } else if (nowms - lastSendHBTime_ > Constants.CORPC_HEARTBEAT_PERIOD) {
-                    Debug.LogError("send heartbeat");
                     Send(Constants.CORPC_MSG_TYPE_HEARTBEAT, 0, null, false);
                     lastSendHBTime_ = nowms;
                 }
@@ -236,28 +250,28 @@ namespace Corpc
                 kcp.Update(dateTimeOffset);
 
                 // 心跳和断线消息需要特殊处理
-                ProtoMessage pmsg = recvMsgQueue_.Dequeue();
+                ProtoMessage pmsg = recvMsgQueue_.DequeueWithTimeout(0);
                 while (pmsg != null) {
                     switch (pmsg.Type) {
-                        case Constants.CORPC_MSG_TYPE_DISCONNECT:
+                    case Constants.CORPC_MSG_TYPE_DISCONNECT:
                         {
                             Debug.Log("disconnect");
-                            _ = Close();
-                            break;
+                            Close();
+                            return;
                         }
-                        case Constants.CORPC_MSG_TYPE_HEARTBEAT:
+                    case Constants.CORPC_MSG_TYPE_HEARTBEAT:
                         {
                             lastRecvHBTime_ = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                             break;
                         }
-                        default:
+                    default:
                         {
                             HandleMessage(pmsg.Type, pmsg.Data);
                             break;
                         }
                     }
 
-                    pmsg = recvMsgQueue_.Dequeue();
+                    pmsg = recvMsgQueue_.DequeueWithTimeout(0);
                 }
             }
         }
@@ -268,120 +282,123 @@ namespace Corpc
 
             while (!ct.IsCancellationRequested) {
                 try {
-                    var receiveTask = udpSocket_.ReceiveAsync(new ArraySegment<byte>(buf), SocketFlags.None, ct);
-                    int i = await receiveTask;
+                    // 注意： udp socket的ReceiveAsync在socket close后不会退出，因此需要先Poll查看是否有数据
+                    if (udpSocket_.Poll(100, SelectMode.SelectRead)) {
+                        var receiveTask = udpSocket_.ReceiveAsync(new ArraySegment<byte>(buf), SocketFlags.None, ct);
+                        int i = await receiveTask;
 
-                    // 如果连接被关闭，i可能为0
-                    if (i == 0) {
-                        Debug.Log("Connection closed gracefully");
-                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                        return;
-                    }
-
-                    if (i == Constants.CORPC_UDP_HANDSHAKE_SIZE) {
-                        int mType = (int)((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
-                        if (mType == Constants.CORPC_MSG_TYPE_UDP_UNSHAKE) {
-                            Debug.LogErrorFormat("recv unshake");
+                        // 如果连接被关闭，i可能为0
+                        if (i == 0) {
+                            Debug.Log("Connection closed gracefully");
                             recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                             return;
                         }
-                        continue;
-                    }
 
-                    //Debug.LogErrorFormat("kcpInput {0}", i);
-                    int ret = kcp.Input(buf.AsSpan(0, i));
-                    if (ret < 0) {
-                        Debug.LogErrorFormat("kcpInput failed {0} {1}", i, ret);
-                        //return;
-                    }
-
-                    while (true) {
-                        var (bufferOwner, avalidLength) = kcp.TryRecv();
-                        if (bufferOwner == null) {
-                            break;
+                        if (i == Constants.CORPC_UDP_HANDSHAKE_SIZE) {
+                            int mType = (int)((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
+                            if (mType == Constants.CORPC_MSG_TYPE_UDP_UNSHAKE) {
+                                Debug.LogErrorFormat("recv unshake");
+                                recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                return;
+                            }
+                            continue;
                         }
 
-                        Debug.Assert(avalidLength >= Constants.CORPC_MESSAGE_HEAD_SIZE);
+                        //Debug.LogErrorFormat("kcpInput {0}", i);
+                        int ret = kcp.Input(buf.AsSpan(0, i));
+                        if (ret < 0) {
+                            Debug.LogErrorFormat("kcpInput failed {0} {1}", i, ret);
+                            //return;
+                        }
 
-                        int offset = 0;
-
-                        while (offset < avalidLength) {
-                            byte[] headbuf = bufferOwner.Memory.Slice(offset, Constants.CORPC_MESSAGE_HEAD_SIZE).ToArray();
-
-                            //byte[] buffer = bufferOwner.Memory.Slice(0, avalidLength).ToArray();
-
-                            uint msgLen = (uint)((headbuf[0] << 24) | (headbuf[1] << 16) | (headbuf[2] << 8) | headbuf[3]);
-                            int msgType = (int)((headbuf[4] << 24) | (headbuf[5] << 16) | (headbuf[6] << 8) | headbuf[7]);
-                            ushort tag = (ushort)((headbuf[8] << 8) | headbuf[9]);
-                            ushort flag = (ushort)((headbuf[10] << 8) | headbuf[11]);
-
-                            offset += Constants.CORPC_MESSAGE_HEAD_SIZE;
-
-                            Debug.Assert(avalidLength >= offset + (int)msgLen);
-
-                            //Debug.Assert(avalidLength == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
-                            if (avalidLength != Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen) {
-                                Debug.LogErrorFormat("avalidLength {0} msgLen {1} msgType {2} tag {3} flag {4}", avalidLength, msgLen, msgType, tag, flag);
+                        while (true) {
+                            var (bufferOwner, avalidLength) = kcp.TryRecv();
+                            if (bufferOwner == null) {
+                                break;
                             }
 
-                            IMessage protoData = null;
-                            if (msgType > 0) {
-                                // 校验序号
-                                if (enableSerial_) {
-                                    uint serial = (uint)((headbuf[16] << 24) | (headbuf[17] << 16) | (headbuf[18] << 8) | headbuf[19]);
-                                    if (serial != 0 && serial != lastRecvSerial_+1) {
-                                        Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
-                                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                        return;
-                                    }
+                            Debug.Assert(avalidLength >= Constants.CORPC_MESSAGE_HEAD_SIZE);
 
-                                    lastRecvSerial_++;
+                            int offset = 0;
+
+                            while (offset < avalidLength) {
+                                byte[] headbuf = bufferOwner.Memory.Slice(offset, Constants.CORPC_MESSAGE_HEAD_SIZE).ToArray();
+
+                                //byte[] buffer = bufferOwner.Memory.Slice(0, avalidLength).ToArray();
+
+                                uint msgLen = (uint)((headbuf[0] << 24) | (headbuf[1] << 16) | (headbuf[2] << 8) | headbuf[3]);
+                                int msgType = (int)((headbuf[4] << 24) | (headbuf[5] << 16) | (headbuf[6] << 8) | headbuf[7]);
+                                ushort tag = (ushort)((headbuf[8] << 8) | headbuf[9]);
+                                ushort flag = (ushort)((headbuf[10] << 8) | headbuf[11]);
+
+                                offset += Constants.CORPC_MESSAGE_HEAD_SIZE;
+
+                                Debug.Assert(avalidLength >= offset + (int)msgLen);
+
+                                //Debug.Assert(avalidLength == Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen);
+                                if (avalidLength != Constants.CORPC_MESSAGE_HEAD_SIZE + (int)msgLen) {
+                                    Debug.LogErrorFormat("avalidLength {0} msgLen {1} msgType {2} tag {3} flag {4}", avalidLength, msgLen, msgType, tag, flag);
                                 }
 
-                                if (msgLen > 0) {
-                                    byte[] buffer = bufferOwner.Memory.Slice(offset, (int)msgLen).ToArray();
-                                    offset += (int)msgLen;
-
-                                    // 校验CRC
-                                    if (enableRecvCRC_) {
-                                        ushort crc = (ushort)((headbuf[20] << 8) | headbuf[21]);
-                                        ushort crc1 = CRC.CheckSum(buffer, 0, 0xFFFF, (uint)msgLen);
-
-                                        if (crc != crc1)
-                                        {
-                                            Debug.LogErrorFormat("crc check failed, msgType:{0}, size:{1}, recv:{2}, cal:{3}\n", msgType, msgLen, crc, crc1);
-                                            recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                                            return;
-                                        }
-                                    }
-
-                                    // 解密
-                                    if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
-                                        if (crypter_ == null) {
-                                            Debug.LogError("cant decrypt message for crypter not exist\n");
+                                IMessage protoData = null;
+                                if (msgType > 0) {
+                                    // 校验序号
+                                    if (enableSerial_) {
+                                        uint serial = (uint)((headbuf[16] << 24) | (headbuf[17] << 16) | (headbuf[18] << 8) | headbuf[19]);
+                                        if (serial != 0 && serial != lastRecvSerial_+1) {
+                                            Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
                                             recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                             return;
                                         }
 
-                                        crypter_.decrypt(buffer, 0, buffer, 0, (uint)msgLen);
+                                        lastRecvSerial_++;
                                     }
 
-                                    protoData = Deserialize(msgType, buffer, 0, (int)msgLen);
+                                    if (msgLen > 0) {
+                                        byte[] buffer = bufferOwner.Memory.Slice(offset, (int)msgLen).ToArray();
+                                        offset += (int)msgLen;
+
+                                        // 校验CRC
+                                        if (enableRecvCRC_) {
+                                            ushort crc = (ushort)((headbuf[20] << 8) | headbuf[21]);
+                                            ushort crc1 = CRC.CheckSum(buffer, 0, 0xFFFF, (uint)msgLen);
+
+                                            if (crc != crc1)
+                                            {
+                                                Debug.LogErrorFormat("crc check failed, msgType:{0}, size:{1}, recv:{2}, cal:{3}\n", msgType, msgLen, crc, crc1);
+                                                recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                                return;
+                                            }
+                                        }
+
+                                        // 解密
+                                        if ((flag & Constants.CORPC_MESSAGE_FLAG_CRYPT) != 0) {
+                                            if (crypter_ == null) {
+                                                Debug.LogError("cant decrypt message for crypter not exist\n");
+                                                recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                                return;
+                                            }
+
+                                            crypter_.decrypt(buffer, 0, buffer, 0, (uint)msgLen);
+                                        }
+
+                                        protoData = Deserialize(msgType, buffer, 0, (int)msgLen);
+                                    }
                                 }
+
+                                recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
                             }
-
-                            recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
                         }
-
                     }
-
                 } catch (OperationCanceledException) {
                     // 任务被取消，正常退出
                     Debug.Log("Receive task cancelled");
                     break;
-                } catch (ObjectDisposedException) {
+                } catch (ObjectDisposedException ex) {
                     // Socket已被释放
-                    Debug.Log("Socket disposed, stopping receive loop");
+                    Debug.LogError("Socket disposed, stopping receive loop");
+                    Debug.LogError(ex.ToString());
+                    Debug.LogError(ex.StackTrace);
                     break;
                 } catch (SocketException ex) {
                     // Socket错误
@@ -397,6 +414,7 @@ namespace Corpc
                     break;
                 }
             }
+Debug.LogError("RecvMsgLoop ----- finished");
         }
 
         private async Task SendMsgLoop(CancellationToken ct)
@@ -406,12 +424,13 @@ namespace Corpc
             while (!ct.IsCancellationRequested) {
                 try {
                     // 使用异步方式等待消息
-                    ProtoMessage msg = await Task.Run(() => sendMsgQueue_.Dequeue());
+                    ProtoMessage msg = await sendMsgQueue_.DequeueAsync(ct);//await Task.Run(() => sendMsgQueue_.DequeueWithTimeout(1000), ct.Token);
                     
                     if (msg == null) continue;
 
                     switch (msg.Type) {
                         case Constants.CORPC_MSG_TYPE_DISCONNECT:
+Debug.LogError("SendMsgLoop ----- finished 1");
                             return;
                         case Constants.CORPC_MSG_TYPE_HEARTBEAT:
                             Debug.Log("send heartbeat");
@@ -419,7 +438,7 @@ namespace Corpc
                             //await udpSocket_.SendAsync(new ArraySegment<byte>(heartbeatmsg_, 0, Constants.CORPC_MESSAGE_HEAD_SIZE), SocketFlags.None);
                             break;
                         default:
-                            Debug.Log($"send msg: {msg.Type}");
+                            //Debug.Log($"send msg: {msg.Type}");
                             // 构造要发出的消息数据
                             byte[] data = Serialize(msg);
 
@@ -486,11 +505,13 @@ namespace Corpc
                     }
                 } catch (OperationCanceledException) {
                     // 任务被取消，正常退出
+Debug.LogError("SendMsgLoop ----- finished 2");
                     break;
                 } catch (System.Exception ex) {
                     Debug.LogError("SendMsgLoop error!!! --- ");
                     Debug.LogError(ex.ToString());
                     Debug.LogError(ex.StackTrace);
+Debug.LogError("SendMsgLoop ----- finished 3");
                     return;
                 }
             }

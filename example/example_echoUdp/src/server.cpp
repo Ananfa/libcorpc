@@ -128,9 +128,9 @@ int main(int argc, const char * argv[]) {
         LOG("connect %d\n", conn->getfd());
         conn->setCrypter(crypter);
         
-        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
-        readyMsg->set_status(1);
-        conn->send(3, false, true, false, 0, readyMsg);
+        //std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        //readyMsg->set_status(1);
+        //conn->send(3, false, true, false, 0, readyMsg);
     });
 
     terminal->registerMessage(CORPC_MSG_TYPE_CLOSE, nullptr, false, [](uint16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
@@ -160,6 +160,14 @@ int main(int argc, const char * argv[]) {
         conn->send(1, false, true, false, tag, response);
     });
     
+    terminal->registerMessage(3, new ServerReady, false, [](int16_t type, uint16_t tag, std::shared_ptr<google::protobuf::Message> msg, std::shared_ptr<corpc::MessageTerminal::Connection> conn) {
+        printf("ServerReady tag:%d\n", tag);
+        
+        std::shared_ptr<ServerReady> readyMsg(new ServerReady);
+        readyMsg->set_status(1);
+        conn->send(3, false, true, false, tag, readyMsg);
+    });
+
     corpc::UdpMessageServer *server = new corpc::UdpMessageServer(io, nullptr, terminal, ip, port);
     server->start();
     

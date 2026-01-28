@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using System.IO;
 using Google.Protobuf;
 using UnityEngine;
@@ -11,23 +12,19 @@ namespace Corpc
 {   
     public class TcpMessageClient : MessageClient
     {
-        private TcpClient tcpClient_ = null; // 与服务器的连接通道
-        private Stream stream_ = null; // 与服务器间的数据流
+        private TcpClient tcpClient_ = null;
+        private NetworkStream stream_ = null;
+        private CancellationTokenSource cts_ = null;
 
         private string host_;
         private int port_;
 
         private byte[] heartbeatmsg_;
 
-        // private constructor
         public TcpMessageClient(string host, int port, bool needHB, bool enableSendCRC, bool enableRecvCRC, bool enableSerial): base(needHB, enableSendCRC, enableRecvCRC, enableSerial)
         {
             host_ = host;
             port_ = port;
-            needHB_ = needHB;
-            enableSendCRC_ = enableSendCRC;
-            enableRecvCRC_ = enableRecvCRC;
-            enableSerial_ = enableSerial;
 
             heartbeatmsg_ = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE];
             heartbeatmsg_[4] = (byte)((Constants.CORPC_MSG_TYPE_HEARTBEAT >> 24) & 0xFF);
@@ -36,11 +33,12 @@ namespace Corpc
             heartbeatmsg_[7] = (byte)(Constants.CORPC_MSG_TYPE_HEARTBEAT & 0xFF);
         }
 
-        public bool Start()
+        public async Task<bool> Start()
         {
             if (tcpClient_ == null) {
                 try {
-                    tcpClient_ = new TcpClient(host_, port_);
+                    tcpClient_ = new TcpClient();
+                    await tcpClient_.ConnectAsync(host_, port_);
                     tcpClient_.NoDelay = true;
                     stream_ = tcpClient_.GetStream();
                 } catch (System.Exception ex) {
@@ -48,25 +46,31 @@ namespace Corpc
                     Debug.LogError(ex.ToString());
                     Debug.LogError(ex.StackTrace);
 
-                    Debug.Assert(tcpClient_ == null);
-
+                    tcpClient_?.Close();
+                    tcpClient_ = null;
                     return false;
                 }
             }
 
             if (!running_) {
+                cts_ = new CancellationTokenSource();
+                
+                // 注意：关闭的时候清理会导致send任务卡死，因此改为在重连时清理
+                recvMsgQueue_.Clear();
+                sendMsgQueue_.Clear();
+
                 if (needHB_) {
                     lastRecvHBTime_ = lastSendHBTime_ = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
                 }
 
                 lastSendSerial_ = 0;
+                lastRecvSerial_ = 0;
     
-                // 启动收发线程
-                recvMsgThread_ = new Thread(new ThreadStart(RecvMsgLoop));
-                sendMsgThread_ = new Thread(new ThreadStart(SendMsgLoop));
-                
-                recvMsgThread_.Start();
-                sendMsgThread_.Start();
+                HandleMessage(Constants.CORPC_MSG_TYPE_CONNECT, null);
+    
+                // 启动收发任务
+                _ = Task.Run(() => RecvMsgLoop(cts_.Token));
+                _ = Task.Run(() => SendMsgLoop(cts_.Token));
 
                 running_ = true;
                 return true;
@@ -77,11 +81,14 @@ namespace Corpc
 
         public void Close()
         {
-            if (sendMsgThread_ != null) {
-                // send close msg to sendMsgThread
+            if (cts_ != null && !cts_.IsCancellationRequested) {
+                // 发送断开消息
                 sendMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                sendMsgThread_.Join();
-                sendMsgThread_ = null;
+                
+                // 取消任务
+                cts_.Cancel();
+                cts_.Dispose();
+                cts_ = null;
             }
 
             if (tcpClient_ != null) {
@@ -89,32 +96,25 @@ namespace Corpc
                 tcpClient_ = null;
             }
 
-            if (recvMsgThread_ != null) {
-                recvMsgThread_.Join();
-                recvMsgThread_ = null;
-            }
-
             stream_ = null;
             running_ = false;
 
-            // 清理收发队列（主要是发送队列）
-            // 注意：此时收发线程已经退出，对收发队列的处理没有线程同步的问题
-            recvMsgQueue_.Clear();
-            sendMsgQueue_.Clear();
+            // 注意：不能在这里清理收发队列
+            //recvMsgQueue_.Clear();
+            //sendMsgQueue_.Clear();
 
             HandleMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, null);
         }
 
-        // Update method is called by outside MonoBehaviour object's Update method
+        // Update方法由外部MonoBehaviour对象调用
         public void Update()
         {
-            // 定期检查心跳，分发消息处理，由外部的MonoBehaviour对象驱动
             if (running_) {
                 if (needHB_) {
                     long nowms = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
 
                     if (nowms - lastRecvHBTime_ > Constants.CORPC_MAX_NO_HEARTBEAT_TIME) {
-                        // 无心跳，断线
+                        // 心跳超时，断开连接
                         Debug.LogError("heartbeat timeout");
                         Close();
 
@@ -124,8 +124,8 @@ namespace Corpc
                     }
                 }
 
-                // 心跳和断线消息需要特殊处理
-                ProtoMessage pmsg = recvMsgQueue_.Dequeue();
+                // 处理接收到的消息
+                ProtoMessage pmsg = recvMsgQueue_.DequeueWithTimeout(0);
                 while (pmsg != null) {
                     switch (pmsg.Type) {
                     case Constants.CORPC_MSG_TYPE_DISCONNECT:
@@ -145,21 +145,27 @@ namespace Corpc
                         }
                     }
 
-                    pmsg = recvMsgQueue_.Dequeue();
+                    pmsg = recvMsgQueue_.DequeueWithTimeout(0);
                 }
             }
         }
 
-        private void RecvMsgLoop()
+        private async Task RecvMsgLoop(CancellationToken ct)
         {
             byte[] head = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE];
-            while (true) {
+            
+            while (!ct.IsCancellationRequested) {
                 try {
-                    // 读出消息头部（4字节类型+4字节长度）
-                    // |body size(4 bytes)|message type(4 bytes)|tag(2 byte)|flag(2 byte)|req serial number(4 bytes)|serial number(4 bytes)|crc(2 bytes)|
+                    // 读取消息头部
                     int remainLen = Constants.CORPC_MESSAGE_HEAD_SIZE;
                     while (remainLen > 0) {
-                        remainLen -= stream_.Read(head, Constants.CORPC_MESSAGE_HEAD_SIZE - remainLen, remainLen);
+                        int bytesRead = await stream_.ReadAsync(head, Constants.CORPC_MESSAGE_HEAD_SIZE - remainLen, remainLen, ct);
+                        if (bytesRead == 0) {
+                            // 连接已关闭
+                            recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                            return;
+                        }
+                        remainLen -= bytesRead;
                     }
 
                     uint msgLen = (uint)((head[0] << 24) | (head[1] << 16) | (head[2] << 8) | head[3]);
@@ -170,18 +176,21 @@ namespace Corpc
                     // 读取消息体
                     byte[] data = null;
                     if (msgLen > 0) {
-                        // TODO: 校验服务器发给客户端消息大小，超过阈值报警
-                        // 注意：目前每个消息分配内存的实现会产生较多的回收垃圾，可以改为分配一个最大空间重复使用
                         data = new byte[msgLen];
                         remainLen = (int)msgLen;
                         while (remainLen > 0) {
-                            remainLen -= stream_.Read(data, (int)msgLen - remainLen, remainLen);
-                            //Console.WriteLine("remainLen = " + remainLen + " : " + (DateTime.UtcNow.Ticks/TimeSpan.TicksPerMillisecond-startTimeStamp));
+                            int bytesRead = await stream_.ReadAsync(data, (int)msgLen - remainLen, remainLen, ct);
+                            if (bytesRead == 0) {
+                                // 连接已关闭
+                                recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                                return;
+                            }
+                            remainLen -= bytesRead;
                         }
                     }
 
                     if (msgType == Constants.CORPC_MSG_TYPE_JUMP_SERIAL) {
-                        uint serial = (uint)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
+                        int serial = (int)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
                         if (serial <= lastRecvSerial_) {
                             Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
                             recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
@@ -189,15 +198,15 @@ namespace Corpc
                         }
 
                         lastRecvSerial_ = serial;
-                        return;
+                        continue;
                     }
 
                     IMessage protoData = null;
                     if (msgType > 0) {
                         // 校验序号
                         if (enableSerial_) {
-                            uint serial = (uint)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
-                            if (serial != 0 && serial != lastRecvSerial_+1) {
+                            int serial = (int)((head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19]);
+                            if (serial != 0 && serial != lastRecvSerial_ + 1) {
                                 Debug.LogErrorFormat("serial check failed! need {0}, recv {1}", lastRecvSerial_, serial);
                                 recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                 return;
@@ -237,26 +246,32 @@ namespace Corpc
                     }
 
                     recvMsgQueue_.Enqueue(new ProtoMessage(msgType, tag, protoData, false));
+                } catch (OperationCanceledException) {
+                    // 任务被取消，正常退出
+                    return;
                 } catch (System.Exception ex) {
-                    Debug.LogError("RecvThread error!!!");
-                    Debug.LogError(ex.ToString());
-                    Debug.LogError(ex.StackTrace);
-                    
-                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
-                    
+                    if (!ct.IsCancellationRequested) {
+                        Debug.LogError("ReceiveMsgLoop error!!!");
+                        Debug.LogError(ex.ToString());
+                        Debug.LogError(ex.StackTrace);
+                        
+                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                    }
                     return;
                 }
             }
         }
 
-        private void SendMsgLoop()
+        private async Task SendMsgLoop(CancellationToken ct)
         {
-            while (true) {
-                ProtoMessage msg = null;
+            while (!ct.IsCancellationRequested) {
                 try {
-                    msg = sendMsgQueue_.Dequeue();
+                    // 异步等待消息
+                    ProtoMessage msg = await sendMsgQueue_.DequeueAsync(ct);//await Task.Run(() => sendMsgQueue_.DequeueWithTimeout(Timeout.Infinite));
 
-                    Debug.Assert(msg != null);
+                    if (msg == null) {
+                        continue;
+                    }
 
                     switch (msg.Type) {
                     case Constants.CORPC_MSG_TYPE_DISCONNECT:
@@ -265,7 +280,7 @@ namespace Corpc
                         }
                     case Constants.CORPC_MSG_TYPE_HEARTBEAT:
                         {
-                            stream_.Write(heartbeatmsg_, 0, Constants.CORPC_MESSAGE_HEAD_SIZE);
+                            await stream_.WriteAsync(heartbeatmsg_, 0, Constants.CORPC_MESSAGE_HEAD_SIZE, ct);
                             break;
                         }
                     default:
@@ -273,14 +288,12 @@ namespace Corpc
                             uint dataLength = 0;
                             byte[] buf = null;
                             ushort flag = 0;
-                            if (msg.Data != null)
-                            {
+                            if (msg.Data != null) {
                                 // 构造要发出的消息数据
                                 byte[] data = Serialize(msg);
 
                                 dataLength = (uint)data.Length;
-                                if (Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength > Constants.CORPC_MAX_MESSAGE_SIZE)
-                                {
+                                if (Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength > Constants.CORPC_MAX_MESSAGE_SIZE) {
                                     Debug.LogError("send message size too large!!!");
                                     recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
                                     return;
@@ -289,18 +302,13 @@ namespace Corpc
                                 buf = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE + dataLength];
 
                                 // 加密
-                                if (msg.NeedCrypter)
-                                {
+                                if (msg.NeedCrypter) {
                                     crypter_.encrypt(data, 0, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, dataLength);
                                     flag |= Constants.CORPC_MESSAGE_FLAG_CRYPT;
-                                }
-                                else
-                                {
+                                } else {
                                     Array.Copy(data, 0, buf, Constants.CORPC_MESSAGE_HEAD_SIZE, dataLength);
                                 }
-                            }
-                            else
-                            {
+                            } else {
                                 buf = new byte[Constants.CORPC_MESSAGE_HEAD_SIZE];
                             }
 
@@ -318,9 +326,7 @@ namespace Corpc
                             buf[10] = (byte)((flag >> 8) & 0xFF);
                             buf[11] = (byte)(flag & 0xFF);
 
-                            if (enableSerial_)
-                            {
-                                // _lastRecvSerial是否会导致线程同步问题？
+                            if (enableSerial_) {
                                 buf[12] = (byte)((lastRecvSerial_ >> 24) & 0xFF);
                                 buf[13] = (byte)((lastRecvSerial_ >> 16) & 0xFF);
                                 buf[14] = (byte)((lastRecvSerial_ >> 8) & 0xFF);
@@ -332,29 +338,29 @@ namespace Corpc
                                 buf[19] = (byte)(lastSendSerial_ & 0xFF);
                             }
 
-                            if (enableSendCRC_)
-                            {
-                                //ushort crc = CRC.CheckSum(buf, 0, 0xFFFF, Constants.CORPC_MESSAGE_HEAD_SIZE - 2);
-                                //crc = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, crc, dataLength);
+                            if (enableSendCRC_) {
                                 ushort crc = CRC.CheckSum(buf, Constants.CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, dataLength);
-
                                 buf[20] = (byte)((crc >> 8) & 0xFF);
                                 buf[21] = (byte)(crc & 0xFF);
                             }
 
-                            stream_.Write(buf, 0, Constants.CORPC_MESSAGE_HEAD_SIZE + (int)dataLength);
+                            await stream_.WriteAsync(buf, 0, Constants.CORPC_MESSAGE_HEAD_SIZE + (int)dataLength, ct);
                             break;
                         }
                     }
+                } catch (OperationCanceledException) {
+                    // 任务被取消，正常退出
+                    return;
                 } catch (System.Exception ex) {
-                    Debug.LogError("SendMsgLoop error!!! --- ");
-                    Debug.LogError(ex.ToString());
-                    Debug.LogError(ex.StackTrace);
-                    recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                    if (!ct.IsCancellationRequested) {
+                        Debug.LogError("SendMsgLoop error!!! --- ");
+                        Debug.LogError(ex.ToString());
+                        Debug.LogError(ex.StackTrace);
+                        recvMsgQueue_.Enqueue(new ProtoMessage(Constants.CORPC_MSG_TYPE_DISCONNECT, 0, null, false));
+                    }
                     return;
                 }
             }
         }
-
     }
 }

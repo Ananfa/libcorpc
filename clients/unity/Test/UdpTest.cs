@@ -11,12 +11,15 @@ public class UdpTest : MonoBehaviour
 {
     public string _host;
     public int _port;
+    private int _localPort; 
 
     private UdpMessageClient _client = null;
     private System.Random _rnd = new System.Random();
     private CancellationTokenSource _cts;
-    private float _lastSendTime = 0f;
-    private const float SEND_INTERVAL = 1f; // 每秒发送一次
+    //private float _lastSendTime = 0f;
+    //private const float SEND_INTERVAL = 1f; // 每秒发送一次
+
+    private int _isConnectingFlag = 0;
 
     // Use this for initialization
     async void Start()
@@ -27,12 +30,14 @@ public class UdpTest : MonoBehaviour
         
         if (_client == null)
         {
-            _client = new UdpMessageClient(_host, _port, 10000 + _rnd.Next(10000), true, true, true);
+            _client = new UdpMessageClient(_host, _port, true, true, true);
             _client.Crypter = new SimpleXORCrypter(System.Text.Encoding.UTF8.GetBytes("1234567fvxcvc"));
             _client.Register(1, FooResponse.Parser, FooResponseHandler);
             _client.Register(3, ServerReady.Parser, ServerReadyHandler);
-            _client.Register(-1, null, CloseHandler);
+            _client.Register(Constants.CORPC_MSG_TYPE_CONNECT, null, ConnectHandler);
+            _client.Register(Constants.CORPC_MSG_TYPE_DISCONNECT, null, CloseHandler);
 
+            _localPort = 10000 + _rnd.Next(10000);
             await TryConnectAsync();
         }
     }
@@ -47,52 +52,73 @@ public class UdpTest : MonoBehaviour
 
             // 定时发送消息
             //if (Time.time - _lastSendTime > SEND_INTERVAL)
-            {
-                SendTestMessage();
-                //_lastSendTime = Time.time;
-            }
+            //{
+            //    SendTestMessage();
+            //    //_lastSendTime = Time.time;
+            //}
         }
     }
 
     async Task TryConnectAsync()
     {
-        while (!_cts.IsCancellationRequested)
+        Debug.Log("TryConnectAsync 1");
+        if (Interlocked.CompareExchange(ref _isConnectingFlag, 1, 0) != 0)
         {
-            if (!_client.Running)
+            Debug.Log("Already connecting, skip");
+            return;
+        }
+
+        Debug.Log("TryConnectAsync 2");
+        try
+        {
+            while (!_cts.IsCancellationRequested)
             {
+                Debug.Log("TryConnectAsync 3");
+                if (!_client.Running)
+                {
+                    Debug.Log("TryConnectAsync 4");
+                    try
+                    {
+                        _localPort = 10000 + (_localPort - 10000  + 1) % 10000;
+                        _client.localPort_ = _localPort;
+                        bool connected = await _client.Start();
+                        if (connected)
+                        {
+                            Debug.Log("Connected");
+                            break;
+                        }
+                        else
+                        {
+                            Debug.Log("Connection failed, will retry in 2 seconds");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Connection error: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    break;
+                }
+
+                // 等待2秒后重试
                 try
                 {
-                    bool connected = await _client.Start();
-                    if (connected)
-                    {
-                        Debug.Log("Connected");
-                        break;
-                    }
-                    else
-                    {
-                        Debug.Log("Connection failed, will retry in 2 seconds");
-                    }
+                    await Task.Delay(2000, _cts.Token);
                 }
-                catch (Exception ex)
+                catch (TaskCanceledException)
                 {
-                    Debug.LogError($"Connection error: {ex.Message}");
+                    break;
                 }
-            }
-            else
-            {
-                break;
-            }
-
-            // 等待2秒后重试
-            try
-            {
-                await Task.Delay(2000, _cts.Token);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
             }
         }
+        finally
+        {
+            // 确保总是重置标志
+            Interlocked.Exchange(ref _isConnectingFlag, 0);
+        }
+
     }
 
     public void FooResponseHandler(int type, IMessage msg)
@@ -100,10 +126,12 @@ public class UdpTest : MonoBehaviour
         // 已经在主线程，可以直接调用Unity API
         //Debug.Log("enter FooResponseHandler");
         
-        if (msg is FooResponse response)
-        {
-            Debug.Log($"Received response: {response.Text}, Result: {response.Result}");
-        }
+        //if (msg is FooResponse response)
+        //{
+        //    Debug.Log($"Received response: {response.Text}, Result: {response.Result}");
+        //}
+
+        SendTestMessage();
     }
 
     public void ServerReadyHandler(int type, IMessage msg)
@@ -115,6 +143,15 @@ public class UdpTest : MonoBehaviour
         //{
         //    Debug.Log($"Received response: {response.Text}, Result: {response.Result}");
         //}
+        SendTestMessage();
+    }
+
+    public void ConnectHandler(int type, IMessage msg)
+    {
+        // 已经在主线程
+        Debug.Log("connected");
+        
+        SendReadyMessage();
     }
 
     public void CloseHandler(int type, IMessage msg)
@@ -139,6 +176,20 @@ public class UdpTest : MonoBehaviour
         catch (TaskCanceledException)
         {
             // 取消是正常的
+        }
+    }
+
+    private void SendReadyMessage()
+    {
+        try
+        {
+            ServerReady request = new ServerReady();
+            request.Status = 1;
+            _client.Send(3, 0, request, true);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error sending message: {ex.Message}");
         }
     }
 
@@ -171,7 +222,7 @@ public class UdpTest : MonoBehaviour
                 await Task.Delay(100);
                 
                 // 关闭客户端
-                await _client.Close();
+                _client.Close();
             }
             catch (Exception ex)
             {
@@ -189,27 +240,29 @@ public class UdpTest : MonoBehaviour
     // 可选：添加暂停/恢复处理
     void OnApplicationPause(bool pauseStatus)
     {
+        if (!enabled) return;
+
         if (pauseStatus)
         {
             // 应用进入后台
             Debug.Log("Application paused, disconnecting");
-            _ = DisconnectAsync();
+            Disconnect();
         }
         else
         {
             // 应用回到前台
             Debug.Log("Application resumed, reconnecting");
-            _ = ReconnectAsync();
+            Reconnect();
         }
     }
 
-    private async Task DisconnectAsync()
+    private void Disconnect()
     {
         if (_client != null && _client.Running)
         {
             try
             {
-                await _client.Close();
+                _client.Close();
             }
             catch (Exception ex)
             {
@@ -218,9 +271,9 @@ public class UdpTest : MonoBehaviour
         }
     }
 
-    private async Task ReconnectAsync()
+    private void Reconnect()
     {
-        await TryConnectAsync();
+        _ = TryConnectAsync();
     }
 
     // 可选：添加UI按钮控制
@@ -236,7 +289,7 @@ public class UdpTest : MonoBehaviour
     {
         if (_client != null && _client.Running)
         {
-            _ = _client.Close();
+            _client.Close();
         }
     }
 
