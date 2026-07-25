@@ -443,10 +443,11 @@ bool MessageTerminal::encode(std::shared_ptr<corpc::Connection> &connection, std
                 if (needCrypt) {
                     crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                 }
+            }
 
-                if (needCRC) {
-                    crc = CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
-                }
+            // 空 body 也要写 CRC：CheckSum(len=0) 返回初值 0xFFFF，与 decode 侧一致
+            if (needCRC) {
+                crc = CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
             }
             
             size = CORPC_MESSAGE_HEAD_SIZE + msgSize;
@@ -487,10 +488,11 @@ bool MessageTerminal::encode(std::shared_ptr<corpc::Connection> &connection, std
                 if (needCrypt) {
                     crypter->encrypt(buf + CORPC_MESSAGE_HEAD_SIZE, buf + CORPC_MESSAGE_HEAD_SIZE, msgSize);
                 }
+            }
 
-                if (needCRC) {
-                    crc = CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
-                }
+            // 空 body（如尚无关注服时的 ACCESS_RSP）也必须写入 CRC
+            if (needCRC) {
+                crc = CRC::CheckSum(buf + CORPC_MESSAGE_HEAD_SIZE, 0xFFFF, msgSize);
             }
             
             size = CORPC_MESSAGE_HEAD_SIZE + msgSize;

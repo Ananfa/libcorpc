@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <vector>
+#include <cstring>
 
 #include <google/protobuf/message.h>
 

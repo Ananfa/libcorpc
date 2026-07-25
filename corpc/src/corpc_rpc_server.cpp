@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstring>
 
 #include <sys/time.h>
 
